@@ -3,12 +3,15 @@ Folder ini disiapkan untuk artefak Alembic (`flask db init/migrate/upgrade`).
 Langkah awal:
 
 1. `python -m venv .venv`
-2. `pip install -r requirements.txt`
-3. salin `.env.example` menjadi `.env`
-4. `flask --app run.py db init` (sekali saja, jika folder migration belum diinisialisasi)
-5. `flask --app run.py db migrate -m "init schema"`
-6. `flask --app run.py db upgrade`
-7. `flask --app run.py seed`
+2. **Aktifkan virtual environment:**
+   - Windows: `.venv\Scripts\activate`
+   - Mac/Linux: `source .venv/bin/activate`
+3. `pip install -r requirements.txt`
+4. salin `.env.example` menjadi `.env`
+5. `flask --app run.py db init` (sekali saja, jika folder migration belum diinisialisasi)
+6. `flask --app run.py db migrate -m "init schema"`
+7. `flask --app run.py db upgrade`
+8. `flask --app run.py seed`
 
 ### Menjalankan Server (Development Lokal)
 
