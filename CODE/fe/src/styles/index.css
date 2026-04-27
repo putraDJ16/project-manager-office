@@ -1,0 +1,25 @@
+@import "./tailwind.css";
+
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #4338ca #312e81;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: #312e81;
+  border-radius: 9999px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6366f1 0%, #4338ca 100%);
+  border-radius: 9999px;
+  border: 1px solid #312e81;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #818cf8 0%, #4f46e5 100%);
+}

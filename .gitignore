@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.venv/
+env/
+venv/
+ENV/
+bin/
+lib/
+share/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.vite/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.conan/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project specific
+stitch_task_md_pack/SAMPLE GENERATE.rar
