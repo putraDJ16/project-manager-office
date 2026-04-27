@@ -9,3 +9,17 @@ Langkah awal:
 5. `flask --app run.py db migrate -m "init schema"`
 6. `flask --app run.py db upgrade`
 7. `flask --app run.py seed`
+
+### Menjalankan Server (Development Lokal)
+
+Untuk menjalankan server di lingkungan lokal tanpa Docker:
+```bash
+python run.py
+```
+*(Server akan berjalan pada http://localhost:5000)*
+
+### Menjalankan Server (Melalui Docker)
+Alternatif yang lebih mudah, jika Anda menggunakan Docker, kembali ke folder paling luar (root `Project ZOHO`) dan jalankan:
+```bash
+docker-compose up --build
+```
