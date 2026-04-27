@@ -14,10 +14,17 @@ This project is a PMO SaaS prototype inspired by ZOHO, featuring a modern fronte
 To deploy the frontend to Vercel:
 
 1. Connect this GitHub repository to Vercel.
-2. In the project settings, set the **Root Directory** to `CODE/fe`.
+2. **IMPORTANT**: In the project settings, set the **Root Directory** to `CODE/fe`. 
+   - *If you don't do this, you will get a 404 NOT_FOUND error because Vercel won't find the `index.html` file.*
 3. Vercel will automatically detect the **Vite** framework preset.
 4. Ensure the build command is `npm run build` and output directory is `dist`.
 5. Add any necessary environment variables.
+
+## Troubleshooting 404 Errors
+
+If you see a `404: NOT_FOUND` error after deploying:
+1. **Check Root Directory**: Ensure it is set to `CODE/fe` in Vercel Project Settings > General.
+2. **Client-side Routing**: I have added a `vercel.json` in `CODE/fe` to handle React Router rewrites. This ensures that refreshing the page doesn't cause a 404.
 
 ## Local Development
 
