@@ -26,7 +26,22 @@ If you see a `404: NOT_FOUND` error after deploying:
 1. **Check Root Directory**: Ensure it is set to `CODE/fe` in Vercel Project Settings > General.
 2. **Client-side Routing**: I have added a `vercel.json` in `CODE/fe` to handle React Router rewrites. This ensures that refreshing the page doesn't cause a 404.
 
-## Local Development
+## Setup with Docker Compose (Recommended for Local Dev)
+
+The easiest way to run the entire stack (PostgreSQL, Flask Backend, Vite Frontend) locally is using Docker Compose:
+
+1. Ensure you have Docker and Docker Compose installed.
+2. Run the following command in the root directory:
+```bash
+docker-compose up --build
+```
+3. The Vite frontend will be available at http://localhost:5173
+4. The Flask backend will be available at http://localhost:5000
+5. The PostgreSQL database is mapped to port 5432.
+
+*Note: Changes made to `CODE/fe` and `CODE/be` will automatically hot-reload.*
+
+## Local Development (Without Docker)
 
 ### Frontend
 ```bash
