@@ -1,31 +1,17 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: zoho_pmo_db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: zoho_pm
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-
   api:
     build:
       context: ./CODE/be
       dockerfile: Dockerfile
     container_name: zoho_pmo_api
-    depends_on:
-      - db
+
     environment:
       - FLASK_ENV=development
       - FLASK_APP=run.py
-      # The host in DATABASE_URL must match the db service name above
-      - DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/zoho_pm
+      # Remote Supabase Connection
+      - DATABASE_URL=postgresql+psycopg://postgres:Q0j6cfh8mbOcqECA@db.jnpkccinhrfdtesohedq.supabase.co:5432/postgres
       - JWT_SECRET_KEY=dev-secret-key
       - CORS_ORIGINS=http://localhost:5173
     ports:
