@@ -1,4 +1,6 @@
 import pytest
+import shutil
+import tempfile
 
 from app import create_app
 from app.extensions import db
@@ -7,12 +9,14 @@ from app.services.seed_service import seed_database
 
 @pytest.fixture()
 def app():
+    attachment_dir = tempfile.mkdtemp(prefix="zoho-attachments-test-")
     application = create_app(
         {
             "TESTING": True,
             "SQLALCHEMY_DATABASE_URI": "sqlite+pysqlite:///:memory:",
             "JWT_SECRET_KEY": "test-secret",
             "CORS_ORIGINS": ["http://localhost:5173"],
+            "ATTACHMENT_STORAGE_DIR": attachment_dir,
         }
     )
     with application.app_context():
@@ -21,6 +25,7 @@ def app():
         yield application
         db.session.remove()
         db.drop_all()
+    shutil.rmtree(attachment_dir, ignore_errors=True)
 
 
 @pytest.fixture()

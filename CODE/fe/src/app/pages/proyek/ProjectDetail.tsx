@@ -1,17 +1,53 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useNavigate, useParams } from "react-router";
 import {
-  ArrowLeft, Users, CheckSquare, Layers, Loader2,
-  AlertCircle, Plus, Trash2, Edit2, X, Calendar, User, Activity,
-  Save
+  Activity,
+  AlertCircle,
+  ArrowLeft,
+  Calendar,
+  CheckSquare,
+  Download,
+  Eye,
+  Edit2,
+  FilePlus2,
+  FolderClosed,
+  FolderPlus,
+  KanbanSquare,
+  Layers,
+  List,
+  Loader2,
+  Plus,
+  Save,
+  Trash2,
+  User,
+  Users,
+  X
 } from "lucide-react";
+import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import {
-  getProject, updateProject,
-  addProjectMember, removeProjectMember,
-  type ApiProjectDetail, type ApiProjectMember,
+  addProjectMember,
+  getProject,
+  removeProjectMember,
+  updateProject,
+  type ApiProjectDetail,
+  type ApiProjectMember
 } from "../../services/projectApi";
 import { fetchEmployees } from "../../services/masterApi";
-import { fetchPhases, fetchTasks, createTask, type ApiPhase, type ApiTask } from "../../services/taskApi";
+import { createTask, fetchPhases, fetchTasks, updateTask, type ApiPhase, type ApiTask } from "../../services/taskApi";
+import {
+  createAttachmentFolder,
+  deleteAttachmentFile,
+  deleteAttachmentFolder,
+  downloadAttachmentFile,
+  fetchAttachmentFiles,
+  fetchAttachmentFolders,
+  fetchAttachmentFileBlob,
+  updateAttachmentFile,
+  updateAttachmentFolder,
+  uploadAttachmentFile,
+  type ApiAttachmentFile,
+  type ApiAttachmentFolder
+} from "../../services/projectAttachmentApi";
 import type { Employee } from "../../data/masterData";
 
 const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
@@ -22,17 +58,23 @@ const STATUS_COLORS: Record<string, string> = {
   Active: "bg-emerald-100 text-emerald-700",
   Planning: "bg-blue-100 text-blue-700",
   "On Hold": "bg-amber-100 text-amber-700",
-  Completed: "bg-slate-100 text-slate-600",
+  Completed: "bg-slate-100 text-slate-600"
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
   Critical: "bg-red-100 text-red-700",
   High: "bg-orange-100 text-orange-700",
   Medium: "bg-yellow-100 text-yellow-700",
-  Low: "bg-green-100 text-green-700",
+  Low: "bg-green-100 text-green-700"
 };
 
-type Tab = "ringkasan" | "anggota" | "tugas";
+type Tab = "ringkasan" | "anggota" | "tugas" | "lampiran";
+type TaskView = "list" | "kanban";
+
+function formatDate(value: string | null) {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -45,24 +87,29 @@ export function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("ringkasan");
+  const [taskView, setTaskView] = useState<TaskView>("list");
 
-  // Edit project state
   const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<{
-    name: string; description: string; status: string;
-    priority: string; manager_id: string; start_date: string; end_date: string;
-  }>>({});
+  const [editForm, setEditForm] = useState<
+    Partial<{
+      name: string;
+      description: string;
+      status: string;
+      priority: string;
+      manager_id: string;
+      start_date: string;
+      end_date: string;
+    }>
+  >({});
   const [saving, setSaving] = useState(false);
   const [saveNotice, setSaveNotice] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
-  // Member state
   const [showAddMember, setShowAddMember] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberSaving, setMemberSaving] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  // Task state
   const [showAddTask, setShowAddTask] = useState(false);
   const [taskForm, setTaskForm] = useState({
     title: "",
@@ -70,10 +117,36 @@ export function ProjectDetail() {
     assignee: "",
     priority: "Medium" as string,
     start_date: "",
-    end_date: "",
+    end_date: ""
   });
   const [taskError, setTaskError] = useState<string | null>(null);
   const [taskSaving, setTaskSaving] = useState(false);
+
+  const [attachmentFolders, setAttachmentFolders] = useState<ApiAttachmentFolder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [attachmentFiles, setAttachmentFiles] = useState<ApiAttachmentFile[]>([]);
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [folderEditName, setFolderEditName] = useState("");
+  const [folderEditParentId, setFolderEditParentId] = useState<string | null>(null);
+  const [uploadForm, setUploadForm] = useState<{ file: File | null; description: string }>({
+    file: null,
+    description: ""
+  });
+  const [attachmentLoading, setAttachmentLoading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [folderSearch, setFolderSearch] = useState("");
+  const [fileSearch, setFileSearch] = useState("");
+  const [isDropzoneActive, setIsDropzoneActive] = useState(false);
+  const [descriptionModal, setDescriptionModal] = useState<{
+    fileId: string;
+    filename: string;
+    description: string;
+  } | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ file: ApiAttachmentFile; url: string; text?: string } | null>(
+    null
+  );
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -83,16 +156,346 @@ export function ProjectDetail() {
       fetchPhases(id),
       fetchTasks(id, ""),
       fetchEmployees(),
+      fetchAttachmentFolders(id),
+      fetchAttachmentFiles(id)
     ])
-      .then(([proj, ph, tk, emps]) => {
-        setProject(proj);
-        setPhases(ph);
-        setTasks(tk);
-        setEmployees(emps);
+      .then(([projectResult, phaseResult, taskResult, employeeResult, folderResult, fileResult]) => {
+        setProject(projectResult);
+        setPhases(phaseResult);
+        setTasks(taskResult);
+        setEmployees(employeeResult);
+        setAttachmentFolders(folderResult);
+        setAttachmentFiles(fileResult);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    setAttachmentLoading(true);
+    fetchAttachmentFiles(id, selectedFolderId)
+      .then((files) => setAttachmentFiles(files))
+      .catch((err: Error) => setAttachmentError(err.message))
+      .finally(() => setAttachmentLoading(false));
+  }, [id, selectedFolderId]);
+
+  const memberEmployeeIds = useMemo(
+    () => new Set(project?.members.map((member) => member.employee_id) ?? []),
+    [project]
+  );
+
+  const availableEmployees = useMemo(
+    () => employees.filter((employee) => employee.status === "Active" && !memberEmployeeIds.has(employee.id)),
+    [employees, memberEmployeeIds]
+  );
+
+  const phasesSorted = useMemo(
+    () => [...phases].sort((left, right) => left.order_index - right.order_index),
+    [phases]
+  );
+
+  const resolveAssigneeLabel = (assigneeValue: string) => {
+    if (!assigneeValue) return "";
+    const projectMember = (project?.members ?? []).find((member) => member.employee_id === assigneeValue);
+    if (projectMember?.employee_name) return projectMember.employee_name;
+    const employee = employees.find((item) => item.id === assigneeValue);
+    if (employee?.name) return employee.name;
+    return assigneeValue;
+  };
+
+  const refreshAttachmentFolders = async (projectId: string) => {
+    const folders = await fetchAttachmentFolders(projectId);
+    setAttachmentFolders(folders);
+  };
+
+  const refreshAttachmentFiles = async (projectId: string, folderId: string | null) => {
+    const files = await fetchAttachmentFiles(projectId, folderId);
+    setAttachmentFiles(files);
+  };
+
+  const handleCreateFolder = async () => {
+    if (!id) return;
+    const name = newFolderName.trim();
+    if (!name) return;
+    try {
+      setAttachmentError(null);
+      await createAttachmentFolder(id, { name, parent_id: selectedFolderId });
+      await refreshAttachmentFolders(id);
+      setNewFolderName("");
+      setShowCreateFolder(false);
+      setSaveNotice({ type: "success", msg: "Folder lampiran berhasil dibuat." });
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Gagal membuat folder.");
+    }
+  };
+
+  const handleUploadAttachment = async () => {
+    if (!id || !uploadForm.file) return;
+    try {
+      setAttachmentError(null);
+      await uploadAttachmentFile(id, {
+        file: uploadForm.file,
+        folder_id: selectedFolderId,
+        description: uploadForm.description.trim() || null
+      });
+      await refreshAttachmentFiles(id, selectedFolderId);
+      setUploadForm({ file: null, description: "" });
+      if (uploadInputRef.current) {
+        uploadInputRef.current.value = "";
+      }
+      setSaveNotice({ type: "success", msg: "File lampiran berhasil diunggah." });
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Gagal mengunggah file.");
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    if (!id) return;
+    try {
+      await deleteAttachmentFolder(id, folderId);
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId(null);
+      }
+      await refreshAttachmentFolders(id);
+      await refreshAttachmentFiles(id, selectedFolderId === folderId ? null : selectedFolderId);
+      setSaveNotice({ type: "success", msg: "Folder lampiran berhasil dihapus." });
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Gagal menghapus folder.");
+    }
+  };
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!id) return;
+    try {
+      await deleteAttachmentFile(id, fileId);
+      await refreshAttachmentFiles(id, selectedFolderId);
+      setSaveNotice({ type: "success", msg: "File lampiran berhasil dihapus." });
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Gagal menghapus file.");
+    }
+  };
+
+  const handleSaveSelectedFolder = async () => {
+    if (!id || !selectedFolder) return;
+    if (!folderEditName.trim()) {
+      setAttachmentError("Nama folder wajib diisi.");
+      return;
+    }
+    try {
+      await updateAttachmentFolder(id, selectedFolder.id, {
+        name: folderEditName.trim(),
+        parent_id: folderEditParentId
+      });
+      await refreshAttachmentFolders(id);
+      setSaveNotice({ type: "success", msg: "Folder lampiran berhasil diperbarui." });
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Gagal memperbarui folder.");
+    }
+  };
+
+  const handleMoveFileToFolder = async (fileId: string, targetFolderId: string | null) => {
+    if (!id) return;
+    try {
+      await updateAttachmentFile(id, fileId, { folder_id: targetFolderId });
+      await refreshAttachmentFiles(id, selectedFolderId);
+      setSaveNotice({ type: "success", msg: "File berhasil dipindahkan ke folder." });
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Gagal memindahkan file.");
+    }
+  };
+
+  const handleUpdateFileDescription = async (fileId: string, description: string) => {
+    if (!id) return false;
+    try {
+      await updateAttachmentFile(id, fileId, { description });
+      await refreshAttachmentFiles(id, selectedFolderId);
+      setSaveNotice({ type: "success", msg: "Deskripsi file berhasil diperbarui." });
+      return true;
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Gagal memperbarui deskripsi file.");
+      return false;
+    }
+  };
+
+  const handleDownloadFile = async (fileId: string, filename: string) => {
+    if (!id) return;
+    try {
+      await downloadAttachmentFile(id, fileId, filename);
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Gagal mengunduh file.");
+    }
+  };
+
+  const handlePreviewFile = async (file: ApiAttachmentFile) => {
+    if (!id) return;
+    try {
+      setAttachmentError(null);
+      if (previewFile) {
+        window.URL.revokeObjectURL(previewFile.url);
+      }
+      const blob = await fetchAttachmentFileBlob(id, file.id);
+      const url = window.URL.createObjectURL(blob);
+      if ((file.mime_type ?? "").startsWith("text/") || file.original_name.endsWith(".md") || file.original_name.endsWith(".json")) {
+        const text = await blob.text();
+        setPreviewFile({ file, url, text });
+      } else {
+        setPreviewFile({ file, url });
+      }
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Gagal menampilkan preview file.");
+    }
+  };
+
+  const closePreview = () => {
+    if (previewFile) {
+      window.URL.revokeObjectURL(previewFile.url);
+    }
+    setPreviewFile(null);
+  };
+
+  const openDescriptionModal = (file: ApiAttachmentFile) => {
+    setDescriptionModal({
+      fileId: file.id,
+      filename: file.original_name,
+      description: file.description ?? ""
+    });
+  };
+
+  const closeDescriptionModal = () => {
+    setDescriptionModal(null);
+  };
+
+  const handleSaveDescriptionFromModal = async () => {
+    if (!descriptionModal) return;
+    const saved = await handleUpdateFileDescription(descriptionModal.fileId, descriptionModal.description.trim());
+    if (saved) {
+      closeDescriptionModal();
+    }
+  };
+
+  const handleDropzoneDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isDropzoneActive) {
+      setIsDropzoneActive(true);
+    }
+  };
+
+  const handleDropzoneDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDropzoneActive(false);
+  };
+
+  const handleDropzoneDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDropzoneActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    setUploadForm((current) => ({ ...current, file }));
+  };
+
+  const folderOptions = useMemo(() => {
+    const byParent = attachmentFolders.reduce<Record<string, ApiAttachmentFolder[]>>((acc, folder) => {
+      const key = folder.parent_id ?? "root";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(folder);
+      return acc;
+    }, {});
+    Object.keys(byParent).forEach((key) => {
+      byParent[key] = byParent[key].sort((a, b) => a.name.localeCompare(b.name, "id"));
+    });
+
+    const output: Array<{ id: string; label: string }> = [];
+    const walk = (parentId: string | null, depth: number) => {
+      const key = parentId ?? "root";
+      const list = byParent[key] ?? [];
+      list.forEach((folder) => {
+        output.push({ id: folder.id, label: `${"  ".repeat(depth)}${folder.name}` });
+        walk(folder.id, depth + 1);
+      });
+    };
+    walk(null, 0);
+    return output;
+  }, [attachmentFolders]);
+
+  const selectedFolder = useMemo(
+    () => attachmentFolders.find((folder) => folder.id === selectedFolderId) ?? null,
+    [attachmentFolders, selectedFolderId]
+  );
+
+  const folderLabelMap = useMemo(() => {
+    const output = new Map<string, string>();
+    folderOptions.forEach((folder) => {
+      output.set(folder.id, folder.label.trim());
+    });
+    return output;
+  }, [folderOptions]);
+
+  const filteredFolderOptions = useMemo(() => {
+    const query = folderSearch.trim().toLowerCase();
+    if (!query) return folderOptions;
+    return folderOptions.filter((folder) => folder.label.toLowerCase().includes(query));
+  }, [folderOptions, folderSearch]);
+
+  const filteredAttachmentFiles = useMemo(() => {
+    const query = fileSearch.trim().toLowerCase();
+    if (!query) return attachmentFiles;
+    return attachmentFiles.filter((file) => {
+      const folderLabel = file.folder_id ? folderLabelMap.get(file.folder_id) ?? "" : "root";
+      return (
+        file.original_name.toLowerCase().includes(query) ||
+        (file.description ?? "").toLowerCase().includes(query) ||
+        folderLabel.toLowerCase().includes(query)
+      );
+    });
+  }, [attachmentFiles, fileSearch, folderLabelMap]);
+
+  useEffect(() => {
+    if (!selectedFolder) {
+      setFolderEditName("");
+      setFolderEditParentId(null);
+      return;
+    }
+    setFolderEditName(selectedFolder.name);
+    setFolderEditParentId(selectedFolder.parent_id);
+  }, [selectedFolder]);
+
+  useEffect(() => {
+    return () => {
+      if (previewFile) {
+        window.URL.revokeObjectURL(previewFile.url);
+      }
+    };
+  }, [previewFile]);
+
+  const invalidParentIds = useMemo(() => {
+    if (!selectedFolder) return new Set<string>();
+
+    const childrenByParent = attachmentFolders.reduce<Record<string, string[]>>((acc, folder) => {
+      const key = folder.parent_id ?? "root";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(folder.id);
+      return acc;
+    }, {});
+
+    const blocked = new Set<string>([selectedFolder.id]);
+    const stack = [selectedFolder.id];
+    while (stack.length > 0) {
+      const current = stack.pop() as string;
+      const children = childrenByParent[current] ?? [];
+      children.forEach((childId) => {
+        if (!blocked.has(childId)) {
+          blocked.add(childId);
+          stack.push(childId);
+        }
+      });
+    }
+
+    return blocked;
+  }, [attachmentFolders, selectedFolder]);
 
   const openEdit = () => {
     if (!project) return;
@@ -103,7 +506,7 @@ export function ProjectDetail() {
       priority: project.priority ?? "",
       manager_id: project.manager_id ?? "",
       start_date: project.start_date ?? "",
-      end_date: project.end_date ?? "",
+      end_date: project.end_date ?? ""
     });
     setEditMode(true);
     setSaveNotice(null);
@@ -121,14 +524,14 @@ export function ProjectDetail() {
         priority: editForm.priority || undefined,
         manager_id: editForm.manager_id || undefined,
         start_date: editForm.start_date || undefined,
-        end_date: editForm.end_date || undefined,
+        end_date: editForm.end_date || undefined
       });
-      setProject((prev) => prev ? { ...prev, ...updated.data } : prev);
+      setProject((current) => (current ? { ...current, ...updated.data } : current));
       setEditMode(false);
       setSaveNotice({ type: "success", msg: "Proyek berhasil diperbarui." });
       setTimeout(() => setSaveNotice(null), 3000);
     } catch (err: unknown) {
-      setSaveNotice({ type: "error", msg: err instanceof Error ? err.message : "Gagal menyimpan." });
+      setSaveNotice({ type: "error", msg: err instanceof Error ? err.message : "Gagal menyimpan data proyek." });
     } finally {
       setSaving(false);
     }
@@ -140,8 +543,10 @@ export function ProjectDetail() {
     setMemberError(null);
     try {
       const result = await addProjectMember(id, selectedEmployeeId);
-      setProject((prev) =>
-        prev ? { ...prev, members: [...prev.members, result.data], member_count: prev.member_count + 1 } : prev
+      setProject((current) =>
+        current
+          ? { ...current, members: [...current.members, result.data], member_count: current.member_count + 1 }
+          : current
       );
       setSelectedEmployeeId("");
       setShowAddMember(false);
@@ -157,13 +562,15 @@ export function ProjectDetail() {
     setRemovingId(employeeId);
     try {
       await removeProjectMember(id, employeeId);
-      setProject((prev) =>
-        prev
-          ? { ...prev, members: prev.members.filter((m) => m.employee_id !== employeeId), member_count: prev.member_count - 1 }
-          : prev
+      setProject((current) =>
+        current
+          ? {
+              ...current,
+              members: current.members.filter((member) => member.employee_id !== employeeId),
+              member_count: current.member_count - 1
+            }
+          : current
       );
-    } catch {
-      // silently ignore
     } finally {
       setRemovingId(null);
     }
@@ -171,11 +578,15 @@ export function ProjectDetail() {
 
   const handleAddTask = async () => {
     if (!id || !taskForm.title.trim()) return;
-    if (!taskForm.phase_id) { setTaskError("Pilih fase untuk tugas ini."); return; }
+    if (!taskForm.phase_id) {
+      setTaskError("Pilih fase untuk tugas ini.");
+      return;
+    }
     if (taskForm.start_date && taskForm.end_date && taskForm.end_date < taskForm.start_date) {
       setTaskError("Tanggal selesai tidak boleh lebih awal dari tanggal mulai.");
       return;
     }
+
     setTaskSaving(true);
     setTaskError(null);
     try {
@@ -186,16 +597,16 @@ export function ProjectDetail() {
         project_id: id,
         phase_id: taskForm.phase_id,
         start_date: taskForm.start_date || null,
-        end_date: taskForm.end_date || null,
+        end_date: taskForm.end_date || null
       });
-      setTasks((prev) => [result.data, ...prev]);
+      setTasks((current) => [result.data, ...current]);
       setTaskForm({
         title: "",
         phase_id: "",
         assignee: "",
         priority: "Medium",
         start_date: "",
-        end_date: "",
+        end_date: ""
       });
       setShowAddTask(false);
     } catch (err: unknown) {
@@ -205,8 +616,30 @@ export function ProjectDetail() {
     }
   };
 
-  const memberEmployeeIds = new Set(project?.members.map((m) => m.employee_id) ?? []);
-  const availableEmployees = employees.filter((e) => e.status === "Active" && !memberEmployeeIds.has(e.id));
+  const handleTaskKanbanDragEnd = async (result: DropResult) => {
+    if (!id || !result.destination) return;
+    const destinationPhaseId = result.destination.droppableId;
+    const sourcePhaseId = result.source.droppableId;
+    const taskId = result.draggableId;
+
+    if (destinationPhaseId === sourcePhaseId) return;
+
+    setTasks((current) =>
+      current.map((task) => (task.id === taskId ? { ...task, phase_id: destinationPhaseId } : task))
+    );
+
+    try {
+      const updated = await updateTask(taskId, { phase_id: destinationPhaseId });
+      setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
+    } catch (err: unknown) {
+      const freshTasks = await fetchTasks(id, "");
+      setTasks(freshTasks);
+      setSaveNotice({
+        type: "error",
+        msg: err instanceof Error ? err.message : "Gagal memindahkan tugas antar fase."
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -222,7 +655,7 @@ export function ProjectDetail() {
         <AlertCircle className="w-8 h-8 text-red-400" />
         <p>{error ?? "Proyek tidak ditemukan."}</p>
         <button onClick={() => navigate("/proyek/list")} className="text-indigo-600 hover:underline text-sm">
-          ← Kembali ke daftar proyek
+          Kembali ke daftar proyek
         </button>
       </div>
     );
@@ -230,7 +663,6 @@ export function ProjectDetail() {
 
   return (
     <div className="min-h-full bg-white">
-      {/* Top bar */}
       <div className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <button
@@ -241,7 +673,9 @@ export function ProjectDetail() {
           </button>
           <div>
             <div className="flex items-center text-xs text-slate-400 mb-1 gap-1">
-              <span className="hover:underline cursor-pointer" onClick={() => navigate("/proyek/list")}>Proyek</span>
+              <span className="hover:underline cursor-pointer" onClick={() => navigate("/proyek/list")}>
+                Proyek
+              </span>
               <span>/</span>
               <span className="text-slate-600 font-medium">{project.name}</span>
             </div>
@@ -249,47 +683,61 @@ export function ProjectDetail() {
               <input
                 type="text"
                 value={editForm.name ?? ""}
-                onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
                 className="text-2xl font-bold text-slate-900 border-b-2 border-indigo-400 focus:outline-none bg-transparent w-full max-w-lg"
               />
             ) : (
               <h1 className="text-2xl font-bold text-slate-900">{project.name}</h1>
             )}
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[project.status] ?? "bg-slate-100 text-slate-600"}`}>
-                <Activity className="w-3 h-3 mr-1" />{project.status}
+              <span
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[project.status] ?? "bg-slate-100 text-slate-600"}`}
+              >
+                <Activity className="w-3 h-3 mr-1" />
+                {project.status}
               </span>
               {project.priority && (
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${PRIORITY_COLORS[project.priority] ?? ""}`}>
+                <span
+                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${PRIORITY_COLORS[project.priority] ?? ""}`}
+                >
                   {project.priority}
                 </span>
               )}
               {project.manager_name && (
                 <span className="flex items-center gap-1 text-xs text-slate-500">
-                  <User className="w-3.5 h-3.5" />{project.manager_name}
+                  <User className="w-3.5 h-3.5" />
+                  {project.manager_name}
                 </span>
               )}
               {project.start_date && (
                 <span className="flex items-center gap-1 text-xs text-slate-500">
                   <Calendar className="w-3.5 h-3.5" />
-                  {new Date(project.start_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
-                  {project.end_date && (
-                    <> — {new Date(project.end_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</>
-                  )}
+                  {formatDate(project.start_date)}
+                  {project.end_date && <span>- {formatDate(project.end_date)}</span>}
                 </span>
               )}
             </div>
           </div>
         </div>
+
         <div className="flex items-center gap-2 shrink-0 mt-1">
           {saveNotice && (
-            <span className={`text-xs px-3 py-1.5 rounded-md border ${saveNotice.type === "success" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+            <span
+              className={`text-xs px-3 py-1.5 rounded-md border ${
+                saveNotice.type === "success"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-red-50 text-red-700 border-red-200"
+              }`}
+            >
               {saveNotice.msg}
             </span>
           )}
           {editMode ? (
             <>
-              <button onClick={() => setEditMode(false)} className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 text-slate-600">
+              <button
+                onClick={() => setEditMode(false)}
+                className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 text-slate-600"
+              >
                 Batal
               </button>
               <button
@@ -302,75 +750,107 @@ export function ProjectDetail() {
               </button>
             </>
           ) : (
-            <button onClick={openEdit} className="flex items-center px-4 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 text-slate-600">
+            <button
+              onClick={openEdit}
+              className="flex items-center px-4 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 text-slate-600"
+            >
               <Edit2 className="w-4 h-4 mr-1.5" /> Edit Proyek
             </button>
           )}
         </div>
       </div>
 
-      {/* Edit form (inline, shown when editMode) */}
       {editMode && (
         <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl">
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
-              <select value={editForm.status ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, status: e.target.value }))}
-                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                {PROJECT_STATUSES.map((s) => <option key={s}>{s}</option>)}
+              <select
+                value={editForm.status ?? ""}
+                onChange={(event) => setEditForm((current) => ({ ...current, status: event.target.value }))}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {PROJECT_STATUSES.map((status) => (
+                  <option key={status}>{status}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Prioritas</label>
-              <select value={editForm.priority ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, priority: e.target.value }))}
-                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">— Tidak Ada —</option>
-                {PROJECT_PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+              <select
+                value={editForm.priority ?? ""}
+                onChange={(event) => setEditForm((current) => ({ ...current, priority: event.target.value }))}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">- Tidak Ada -</option>
+                {PROJECT_PRIORITIES.map((priority) => (
+                  <option key={priority}>{priority}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Tanggal Mulai</label>
-              <input type="date" value={editForm.start_date ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, start_date: e.target.value }))}
-                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input
+                type="date"
+                value={editForm.start_date ?? ""}
+                onChange={(event) => setEditForm((current) => ({ ...current, start_date: event.target.value }))}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Tanggal Selesai</label>
-              <input type="date" value={editForm.end_date ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, end_date: e.target.value }))}
-                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input
+                type="date"
+                value={editForm.end_date ?? ""}
+                onChange={(event) => setEditForm((current) => ({ ...current, end_date: event.target.value }))}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-medium text-slate-500 mb-1">Manajer Proyek</label>
-              <select value={editForm.manager_id ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, manager_id: e.target.value }))}
-                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">— Tidak Ada —</option>
-                {employees.filter((e) => e.status === "Active").map((e) => (
-                  <option key={e.id} value={e.id}>{e.name} — {e.position}</option>
-                ))}
+              <select
+                value={editForm.manager_id ?? ""}
+                onChange={(event) => setEditForm((current) => ({ ...current, manager_id: event.target.value }))}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">- Tidak Ada -</option>
+                {employees
+                  .filter((employee) => employee.status === "Active")
+                  .map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.name} - {employee.position}
+                    </option>
+                  ))}
               </select>
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-medium text-slate-500 mb-1">Deskripsi</label>
-              <textarea value={editForm.description ?? ""} onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
-                rows={2} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
+              <textarea
+                value={editForm.description ?? ""}
+                onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))}
+                rows={2}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              />
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab Nav */}
       <div className="px-6 border-b border-slate-200 flex items-center gap-0">
         {([
           { key: "ringkasan", label: "Ringkasan", icon: Layers },
           { key: "anggota", label: `Anggota (${project.member_count})`, icon: Users },
           { key: "tugas", label: `Tugas (${tasks.length})`, icon: CheckSquare },
+          { key: "lampiran", label: `Lampiran (${attachmentFiles.length})`, icon: FolderClosed }
         ] as { key: Tab; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === key
-              ? "border-indigo-600 text-indigo-700"
-              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-              }`}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === key
+                ? "border-indigo-600 text-indigo-700"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+            }`}
           >
             <Icon className="w-4 h-4" />
             {label}
@@ -378,20 +858,15 @@ export function ProjectDetail() {
         ))}
       </div>
 
-      {/* Tab Content */}
       <div className="p-6">
-
-        {/* ── RINGKASAN ── */}
         {activeTab === "ringkasan" && (
-          <div className="max-w-3xl space-y-6">
-            {/* Stats row */}
+          <div className="space-y-6">
             <div className="grid grid-cols-3 gap-4">
               <StatCard label="Total Fase" value={phases.length} icon={Layers} color="indigo" />
               <StatCard label="Total Tugas" value={tasks.length} icon={CheckSquare} color="violet" />
               <StatCard label="Anggota Tim" value={project.member_count} icon={Users} color="sky" />
             </div>
 
-            {/* Description */}
             {project.description && (
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 mb-2">Deskripsi</h3>
@@ -399,17 +874,19 @@ export function ProjectDetail() {
               </div>
             )}
 
-            {/* Phases list */}
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-3">Fase Proyek</h3>
-              {phases.length === 0 ? (
+              {phasesSorted.length === 0 ? (
                 <p className="text-sm text-slate-400">Belum ada fase.</p>
               ) : (
                 <div className="space-y-2">
-                  {phases.map((phase, index) => {
-                    const phaseTasks = tasks.filter((t) => t.phase_id === phase.id);
+                  {phasesSorted.map((phase, index) => {
+                    const phaseTasks = tasks.filter((task) => task.phase_id === phase.id);
                     return (
-                      <div key={phase.id} className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <div
+                        key={phase.id}
+                        className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-lg border border-slate-200"
+                      >
                         <div className="flex items-center gap-3">
                           <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
                             {index + 1}
@@ -426,32 +903,36 @@ export function ProjectDetail() {
           </div>
         )}
 
-        {/* ── ANGGOTA ── */}
         {activeTab === "anggota" && (
-          <div className="max-w-2xl">
+          <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-slate-700">Anggota Tim</h3>
               <button
-                onClick={() => { setShowAddMember(true); setMemberError(null); setSelectedEmployeeId(""); }}
+                onClick={() => {
+                  setShowAddMember(true);
+                  setMemberError(null);
+                  setSelectedEmployeeId("");
+                }}
                 className="flex items-center px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
               >
                 <Plus className="w-4 h-4 mr-1" /> Tambah Anggota
               </button>
             </div>
 
-            {/* Add member inline form */}
             {showAddMember && (
               <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                 <p className="text-sm font-medium text-indigo-800 mb-2">Tambah Anggota Baru</p>
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedEmployeeId}
-                    onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                    onChange={(event) => setSelectedEmployeeId(event.target.value)}
                     className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="">— Pilih Pegawai —</option>
-                    {availableEmployees.map((e) => (
-                      <option key={e.id} value={e.id}>{e.name} — {e.position} ({e.organization})</option>
+                    <option value="">- Pilih Pegawai -</option>
+                    {availableEmployees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.name} - {employee.position} ({employee.organization})
+                      </option>
                     ))}
                   </select>
                   <button
@@ -467,7 +948,7 @@ export function ProjectDetail() {
                 </div>
                 {memberError && (
                   <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />{memberError}
+                    <AlertCircle className="w-3.5 h-3.5" /> {memberError}
                   </p>
                 )}
               </div>
@@ -506,11 +987,32 @@ export function ProjectDetail() {
           </div>
         )}
 
-        {/* ── TUGAS ── */}
         {activeTab === "tugas" && (
-          <div className="max-w-4xl">
+          <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-700">Daftar Tugas</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm font-semibold text-slate-700">Daftar Tugas</h3>
+                <div className="grid grid-cols-2 bg-white p-1 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setTaskView("list")}
+                    className={`px-3 py-1.5 text-sm rounded-md flex items-center justify-center ${
+                      taskView === "list" ? "bg-slate-100 text-indigo-700" : "text-slate-600"
+                    }`}
+                  >
+                    <List className="w-4 h-4 mr-1.5" /> List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaskView("kanban")}
+                    className={`px-3 py-1.5 text-sm rounded-md flex items-center justify-center ${
+                      taskView === "kanban" ? "bg-slate-100 text-indigo-700" : "text-slate-600"
+                    }`}
+                  >
+                    <KanbanSquare className="w-4 h-4 mr-1.5" /> Board
+                  </button>
+                </div>
+              </div>
               <button
                 onClick={() => {
                   setShowAddTask(true);
@@ -521,7 +1023,7 @@ export function ProjectDetail() {
                     assignee: "",
                     priority: "Medium",
                     start_date: "",
-                    end_date: "",
+                    end_date: ""
                   });
                 }}
                 className="flex items-center px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
@@ -530,7 +1032,6 @@ export function ProjectDetail() {
               </button>
             </div>
 
-            {/* Add task inline form */}
             {showAddTask && (
               <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                 <p className="text-sm font-medium text-indigo-800 mb-3">Tambah Tugas Baru</p>
@@ -540,7 +1041,7 @@ export function ProjectDetail() {
                       type="text"
                       placeholder="Judul tugas..."
                       value={taskForm.title}
-                      onChange={(e) => setTaskForm((p) => ({ ...p, title: e.target.value }))}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
@@ -548,35 +1049,50 @@ export function ProjectDetail() {
                     <label className="block text-xs text-slate-500 mb-1">Fase</label>
                     <select
                       value={taskForm.phase_id}
-                      onChange={(e) => setTaskForm((p) => ({ ...p, phase_id: e.target.value }))}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, phase_id: event.target.value }))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      <option value="">— Pilih Fase —</option>
-                      {phases.map((ph) => <option key={ph.id} value={ph.id}>{ph.name}</option>)}
+                      <option value="">- Pilih Fase -</option>
+                      {phasesSorted.map((phase) => (
+                        <option key={phase.id} value={phase.id}>
+                          {phase.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">Prioritas</label>
                     <select
                       value={taskForm.priority}
-                      onChange={(e) => setTaskForm((p) => ({ ...p, priority: e.target.value }))}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value }))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      {TASK_PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+                      {TASK_PRIORITIES.map((priority) => (
+                        <option key={priority}>{priority}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">Assignee</label>
                     <select
                       value={taskForm.assignee}
-                      onChange={(e) => setTaskForm((p) => ({ ...p, assignee: e.target.value }))}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, assignee: event.target.value }))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      <option value="">— Tidak Diassign —</option>
+                      <option value="">- Tidak Diassign -</option>
                       {project.members.length > 0
-                        ? project.members.map((m) => <option key={m.employee_id} value={m.employee_id}>{m.employee_name}</option>)
-                        : employees.filter((e) => e.status === "Active").map((e) => <option key={e.id} value={e.id}>{e.name}</option>)
-                      }
+                        ? project.members.map((member) => (
+                            <option key={member.employee_id} value={member.employee_id}>
+                              {member.employee_name}
+                            </option>
+                          ))
+                        : employees
+                            .filter((employee) => employee.status === "Active")
+                            .map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
                     </select>
                   </div>
                   <div>
@@ -584,7 +1100,7 @@ export function ProjectDetail() {
                     <input
                       type="date"
                       value={taskForm.start_date}
-                      onChange={(e) => setTaskForm((p) => ({ ...p, start_date: e.target.value }))}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, start_date: event.target.value }))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
@@ -593,18 +1109,23 @@ export function ProjectDetail() {
                     <input
                       type="date"
                       value={taskForm.end_date}
-                      onChange={(e) => setTaskForm((p) => ({ ...p, end_date: e.target.value }))}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, end_date: event.target.value }))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </div>
                 {taskError && (
                   <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />{taskError}
+                    <AlertCircle className="w-3.5 h-3.5" /> {taskError}
                   </p>
                 )}
                 <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => setShowAddTask(false)} className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 text-slate-600">Batal</button>
+                  <button
+                    onClick={() => setShowAddTask(false)}
+                    className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 text-slate-600"
+                  >
+                    Batal
+                  </button>
                   <button
                     onClick={handleAddTask}
                     disabled={taskSaving || !taskForm.title.trim()}
@@ -623,67 +1144,501 @@ export function ProjectDetail() {
                 <p className="text-sm">Belum ada tugas. Klik <strong>Tambah Tugas</strong> untuk mulai.</p>
               </div>
             ) : (
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase">
-                    <tr>
-                      <th className="px-4 py-3 font-medium text-left">ID</th>
-                      <th className="px-4 py-3 font-medium text-left">Judul</th>
-                      <th className="px-4 py-3 font-medium text-left">Fase</th>
-                      <th className="px-4 py-3 font-medium text-left">Prioritas</th>
-                      <th className="px-4 py-3 font-medium text-left">Assignee</th>
-                      <th className="px-4 py-3 font-medium text-left">Mulai</th>
-                      <th className="px-4 py-3 font-medium text-left">Selesai</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {tasks.map((task) => {
-                      const phase = phases.find((p) => p.id === task.phase_id);
-                      return (
-                        <tr key={task.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 text-xs text-slate-400 font-mono">{task.id}</td>
-                          <td className="px-4 py-3 font-medium text-slate-900">{task.title}</td>
-                          <td className="px-4 py-3 text-slate-600">{phase?.name ?? "—"}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${PRIORITY_COLORS[task.priority] ?? "bg-slate-100 text-slate-600"}`}>
-                              {task.priority}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">{task.assignee || <span className="text-slate-300">—</span>}</td>
-                          <td className="px-4 py-3 text-slate-600">
-                            {task.start_date
-                              ? new Date(task.start_date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
-                              : <span className="text-slate-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">
-                            {task.end_date
-                              ? new Date(task.end_date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
-                              : <span className="text-slate-300">—</span>}
-                          </td>
+              <>
+                {taskView === "list" && (
+                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase">
+                        <tr>
+                          <th className="px-4 py-3 font-medium text-left">ID</th>
+                          <th className="px-4 py-3 font-medium text-left">Judul</th>
+                          <th className="px-4 py-3 font-medium text-left">Fase</th>
+                          <th className="px-4 py-3 font-medium text-left">Prioritas</th>
+                          <th className="px-4 py-3 font-medium text-left">Assignee</th>
+                          <th className="px-4 py-3 font-medium text-left">Mulai</th>
+                          <th className="px-4 py-3 font-medium text-left">Selesai</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {tasks.map((task) => {
+                          const phase = phasesSorted.find((item) => item.id === task.phase_id);
+                          return (
+                            <tr key={task.id} className="hover:bg-slate-50">
+                              <td className="px-4 py-3 text-xs text-slate-400 font-mono">{task.id}</td>
+                              <td className="px-4 py-3 font-medium text-slate-900">{task.title}</td>
+                              <td className="px-4 py-3 text-slate-600">{phase?.name ?? "-"}</td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                    PRIORITY_COLORS[task.priority] ?? "bg-slate-100 text-slate-600"
+                                  }`}
+                                >
+                                  {task.priority}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                {resolveAssigneeLabel(task.assignee) || <span className="text-slate-300">-</span>}
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">{formatDate(task.start_date)}</td>
+                              <td className="px-4 py-3 text-slate-600">{formatDate(task.end_date)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {taskView === "kanban" && (
+                  <DragDropContext onDragEnd={(result) => void handleTaskKanbanDragEnd(result)}>
+                    <div className="flex gap-6 overflow-x-auto pb-2">
+                      {phasesSorted.map((phase) => {
+                        const phaseTasks = tasks.filter((task) => task.phase_id === phase.id);
+                        return (
+                          <div key={phase.id} className="w-80 shrink-0 flex flex-col bg-slate-100/70 rounded-xl border border-slate-200">
+                            <div className="p-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/50 rounded-t-xl">
+                              <h3 className="font-semibold text-slate-800 text-sm">{phase.name}</h3>
+                              <span className="bg-slate-200 text-slate-600 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                {phaseTasks.length}
+                              </span>
+                            </div>
+                            <Droppable droppableId={phase.id}>
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.droppableProps}
+                                  className="p-3 space-y-3 min-h-[140px]"
+                                >
+                                  {phaseTasks.length === 0 && (
+                                    <div className="text-xs text-slate-400 border border-dashed border-slate-300 rounded-md px-3 py-2 bg-white">
+                                      Belum ada tugas
+                                    </div>
+                                  )}
+                                  {phaseTasks.map((task, index) => (
+                                    <Draggable key={task.id} draggableId={task.id} index={index}>
+                                      {(draggableProvided) => (
+                                        <div
+                                          ref={draggableProvided.innerRef}
+                                          {...draggableProvided.draggableProps}
+                                          {...draggableProvided.dragHandleProps}
+                                          className="bg-white p-4 rounded-xl border shadow-sm border-slate-200 cursor-grab active:cursor-grabbing"
+                                        >
+                                          <div className="flex justify-between items-start mb-2">
+                                            <span className="text-xs font-semibold text-slate-400">{task.id}</span>
+                                            <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-md bg-slate-100 text-slate-700">
+                                              {task.priority}
+                                            </span>
+                                          </div>
+                                          <h4 className="font-medium text-slate-900 mb-2 text-sm">{task.title}</h4>
+                                          <p className="text-xs text-slate-500">
+                                            Assignee: {resolveAssigneeLabel(task.assignee) || "-"}
+                                          </p>
+                                          <p className="text-xs text-slate-500 mt-1">
+                                            {formatDate(task.start_date)} - {formatDate(task.end_date)}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  ))}
+                                  {provided.placeholder}
+                                </div>
+                              )}
+                            </Droppable>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </DragDropContext>
+                )}
+              </>
             )}
           </div>
         )}
+
+        {activeTab === "lampiran" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-4 rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-700">Folder Lampiran</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateFolder((current) => !current)}
+                    className="inline-flex items-center px-2.5 py-1.5 text-xs border border-slate-300 rounded-md hover:bg-slate-50"
+                  >
+                    <FolderPlus className="w-3.5 h-3.5 mr-1" /> Folder
+                  </button>
+                </div>
+
+                {showCreateFolder && (
+                  <div className="mb-3 space-y-2">
+                    <input
+                      type="text"
+                      value={newFolderName}
+                      onChange={(event) => setNewFolderName(event.target.value)}
+                      placeholder="Nama folder..."
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateFolder()}
+                        className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                      >
+                        Simpan Folder
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateFolder(false);
+                          setNewFolderName("");
+                        }}
+                        className="px-3 py-1.5 text-xs border border-slate-300 rounded-md hover:bg-slate-50"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <input
+                  type="text"
+                  value={folderSearch}
+                  onChange={(event) => setFolderSearch(event.target.value)}
+                  placeholder="Cari folder..."
+                  className="w-full mb-3 px-3 py-2 border border-slate-300 rounded-md text-sm"
+                />
+
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFolderId(null)}
+                    className={`w-full text-left px-3 py-2 text-sm rounded-md ${
+                      selectedFolderId === null ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    Semua File
+                  </button>
+                  {filteredFolderOptions.map((folder) => (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      onClick={() => setSelectedFolderId(folder.id)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md whitespace-pre ${
+                        selectedFolderId === folder.id
+                          ? "bg-indigo-50 text-indigo-700"
+                          : "hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <FolderClosed className="inline-block w-3.5 h-3.5 mr-1" />
+                      {folder.label}
+                    </button>
+                  ))}
+                  {filteredFolderOptions.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-slate-400">Folder tidak ditemukan.</p>
+                  )}
+                </div>
+
+                {selectedFolder && (
+                  <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                    <p className="text-xs font-semibold text-slate-600">Kelola Folder Terpilih</p>
+                    <input
+                      type="text"
+                      value={folderEditName}
+                      onChange={(event) => setFolderEditName(event.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                    />
+                    <select
+                      value={folderEditParentId ?? ""}
+                      onChange={(event) => setFolderEditParentId(event.target.value || null)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                    >
+                      <option value="">(Pindah ke root)</option>
+                      {folderOptions
+                        .filter((option) => !invalidParentIds.has(option.id))
+                        .map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveSelectedFolder()}
+                        className="inline-flex items-center px-3 py-1.5 text-xs border border-slate-300 rounded-md hover:bg-slate-50"
+                      >
+                        Simpan Folder
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteFolder(selectedFolder.id)}
+                        className="inline-flex items-center px-3 py-1.5 text-xs border border-red-200 text-red-700 rounded-md hover:bg-red-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1" /> Hapus
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="col-span-12 md:col-span-8 rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">Upload Lampiran</h3>
+                <div
+                  onDragOver={handleDropzoneDragOver}
+                  onDragLeave={handleDropzoneDragLeave}
+                  onDrop={handleDropzoneDrop}
+                  onClick={() => uploadInputRef.current?.click()}
+                  className={`mb-3 rounded-lg border-2 border-dashed px-4 py-6 text-center cursor-pointer transition ${
+                    isDropzoneActive
+                      ? "border-indigo-400 bg-indigo-50 text-indigo-700"
+                      : "border-slate-300 text-slate-500 hover:border-indigo-300 hover:bg-slate-50"
+                  }`}
+                >
+                  <p className="text-sm font-medium">Drop file di sini atau klik untuk pilih file</p>
+                  <p className="text-xs mt-1">File akan diunggah ke folder yang sedang dipilih.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+                  <input
+                    type="file"
+                    ref={uploadInputRef}
+                    onChange={(event) =>
+                      setUploadForm((current) => ({ ...current, file: event.target.files?.[0] ?? null }))
+                    }
+                    className="md:col-span-2 border border-slate-300 rounded-md text-sm px-2 py-1.5"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleUploadAttachment()}
+                    disabled={!uploadForm.file}
+                    className="inline-flex items-center justify-center px-3 py-2 bg-indigo-600 text-white rounded-md text-sm disabled:opacity-50"
+                  >
+                    <FilePlus2 className="w-4 h-4 mr-1.5" /> Upload
+                  </button>
+                  <input
+                    type="text"
+                    value={uploadForm.description}
+                    onChange={(event) =>
+                      setUploadForm((current) => ({ ...current, description: event.target.value }))
+                    }
+                    placeholder="Deskripsi file (opsional)"
+                    className="md:col-span-3 border border-slate-300 rounded-md text-sm px-3 py-2"
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  value={fileSearch}
+                  onChange={(event) => setFileSearch(event.target.value)}
+                  placeholder="Cari file, deskripsi, atau folder..."
+                  className="w-full mb-3 px-3 py-2 border border-slate-300 rounded-md text-sm"
+                />
+
+                {attachmentError && (
+                  <p className="text-xs text-red-600 mb-3 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> {attachmentError}
+                  </p>
+                )}
+
+                {attachmentLoading ? (
+                  <div className="text-sm text-slate-500 py-8 text-center">Memuat lampiran...</div>
+                ) : attachmentFiles.length === 0 ? (
+                  <div className="text-sm text-slate-400 py-8 text-center">Belum ada file pada folder ini.</div>
+                ) : filteredAttachmentFiles.length === 0 ? (
+                  <div className="text-sm text-slate-400 py-8 text-center">
+                    Tidak ada file yang cocok dengan pencarian.
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-slate-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">Nama File</th>
+                          <th className="px-3 py-2 text-left font-medium">Deskripsi</th>
+                          <th className="px-3 py-2 text-left font-medium">Folder</th>
+                          <th className="px-3 py-2 text-left font-medium">Ukuran</th>
+                          <th className="px-3 py-2 text-right font-medium">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredAttachmentFiles.map((file) => (
+                          <tr key={file.id} className="hover:bg-slate-50">
+                            <td className="px-3 py-2 text-slate-800 font-medium">{file.original_name}</td>
+                            <td className="px-3 py-2 text-slate-600">{file.description || "-"}</td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={file.folder_id ?? ""}
+                                onChange={(event) =>
+                                  void handleMoveFileToFolder(file.id, event.target.value || null)
+                                }
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs bg-white"
+                              >
+                                <option value="">(Root)</option>
+                                {folderOptions.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-3 py-2 text-slate-600">
+                              {Math.max(1, Math.round(file.size_bytes / 1024))} KB
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => void handlePreviewFile(file)}
+                                  className="inline-flex items-center px-2 py-1 text-xs border border-slate-300 rounded-md hover:bg-slate-50"
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-1" /> Preview
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDownloadFile(file.id, file.original_name)}
+                                  className="inline-flex items-center px-2 py-1 text-xs border border-slate-300 rounded-md hover:bg-slate-50"
+                                >
+                                  <Download className="w-3.5 h-3.5 mr-1" /> Unduh
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openDescriptionModal(file)}
+                                  className="inline-flex items-center px-2 py-1 text-xs border border-slate-300 rounded-md hover:bg-slate-50"
+                                >
+                                  Edit Deskripsi
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteFile(file.id)}
+                                  className="inline-flex items-center px-2 py-1 text-xs border border-red-200 text-red-700 rounded-md hover:bg-red-50"
+                                >
+                                  Hapus
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {previewFile && (
+        <div
+          className="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-4"
+          onClick={closePreview}
+        >
+          <div
+            className="w-full max-w-5xl max-h-[88vh] bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-800 truncate">{previewFile.file.original_name}</p>
+                <p className="text-xs text-slate-500">
+                  {previewFile.file.mime_type || "unknown"} - {Math.max(1, Math.round(previewFile.file.size_bytes / 1024))} KB
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closePreview}
+                className="inline-flex items-center px-2.5 py-1.5 text-xs border border-slate-300 rounded-md hover:bg-slate-50"
+              >
+                Tutup
+              </button>
+            </div>
+            <div className="p-4 overflow-auto max-h-[calc(88vh-64px)] bg-slate-50">
+              {(previewFile.file.mime_type ?? "").startsWith("image/") && (
+                <img src={previewFile.url} alt={previewFile.file.original_name} className="max-w-full h-auto rounded-md mx-auto" />
+              )}
+              {(previewFile.file.mime_type ?? "").includes("pdf") && (
+                <iframe title={previewFile.file.original_name} src={previewFile.url} className="w-full h-[70vh] rounded-md bg-white" />
+              )}
+              {((previewFile.file.mime_type ?? "").startsWith("text/") || previewFile.text !== undefined) && (
+                <pre className="whitespace-pre-wrap text-xs text-slate-700 bg-white border border-slate-200 rounded-md p-3">
+                  {previewFile.text ?? "Tidak dapat membaca isi teks."}
+                </pre>
+              )}
+              {!((previewFile.file.mime_type ?? "").startsWith("image/")) &&
+                !((previewFile.file.mime_type ?? "").includes("pdf")) &&
+                !((previewFile.file.mime_type ?? "").startsWith("text/") || previewFile.text !== undefined) && (
+                  <div className="text-sm text-slate-500 bg-white border border-dashed border-slate-300 rounded-md p-6 text-center">
+                    Preview tidak tersedia untuk tipe file ini. Silakan unduh file.
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {descriptionModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={closeDescriptionModal}>
+          <div
+            className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-slate-200">
+              <p className="text-sm font-semibold text-slate-800">Edit Deskripsi File</p>
+              <p className="text-xs text-slate-500 truncate mt-0.5">{descriptionModal.filename}</p>
+            </div>
+            <div className="p-4">
+              <textarea
+                value={descriptionModal.description}
+                onChange={(event) =>
+                  setDescriptionModal((current) =>
+                    current ? { ...current, description: event.target.value } : current
+                  )
+                }
+                rows={4}
+                placeholder="Tulis deskripsi file..."
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm resize-y"
+              />
+            </div>
+            <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeDescriptionModal}
+                className="inline-flex items-center px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveDescriptionFromModal()}
+                className="inline-flex items-center px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function StatCard({
-  label, value, icon: Icon, color,
+  label,
+  value,
+  icon: Icon,
+  color
 }: {
-  label: string; value: number; icon: React.ElementType; color: string;
+  label: string;
+  value: number;
+  icon: React.ElementType;
+  color: string;
 }) {
   const colorMap: Record<string, string> = {
     indigo: "bg-indigo-50 text-indigo-600",
     violet: "bg-violet-50 text-violet-600",
-    sky: "bg-sky-50 text-sky-600",
+    sky: "bg-sky-50 text-sky-600"
   };
+
   return (
     <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex items-center gap-4">
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorMap[color] ?? "bg-slate-100 text-slate-600"}`}>
@@ -698,22 +1653,26 @@ function StatCard({
 }
 
 function MemberRow({
-  member, removing, onRemove,
+  member,
+  removing,
+  onRemove
 }: {
-  member: ApiProjectMember; removing: boolean; onRemove: () => void;
+  member: ApiProjectMember;
+  removing: boolean;
+  onRemove: () => void;
 }) {
   return (
     <tr className="hover:bg-slate-50 group">
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
-            {(member.employee_name ?? "?")[0].toUpperCase()}
+            {(member.employee_name ?? "?")[0]?.toUpperCase() ?? "?"}
           </div>
           <span className="font-medium text-slate-900">{member.employee_name ?? member.employee_id}</span>
         </div>
       </td>
-      <td className="px-4 py-3 text-slate-600">{member.employee_position ?? "—"}</td>
-      <td className="px-4 py-3 text-slate-500 text-xs">{member.employee_organization ?? "—"}</td>
+      <td className="px-4 py-3 text-slate-600">{member.employee_position ?? "-"}</td>
+      <td className="px-4 py-3 text-slate-500 text-xs">{member.employee_organization ?? "-"}</td>
       <td className="px-4 py-3 text-slate-400 text-xs">
         {new Date(member.joined_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
       </td>

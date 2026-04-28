@@ -1,6 +1,11 @@
 from app.extensions import db
 from app.models import Employee, Role
-from app.repositories import EmployeeRepository
+from app.repositories import (
+    EmployeeRepository,
+    OrganizationRepository,
+    OrganizationUnitRepository,
+    PositionRepository,
+)
 from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
 
@@ -27,6 +32,38 @@ def _validate_role(role_id: str, current_role_id: str | None = None):
         raise ApiError("Role inactive tidak bisa dipilih untuk data baru.", errors={"role_id": "inactive"})
 
 
+def _validate_organization(name: str, current_name: str | None = None):
+    organization = OrganizationRepository.get_by_name(name)
+    if not organization:
+        raise ApiError("Organisasi yang dipilih tidak tersedia.", errors={"organization": "not_found"})
+    is_current_value = bool(current_name and name.lower() == current_name.lower())
+    if organization.status != "Active" and not is_current_value:
+        raise ApiError(
+            "Organisasi inactive tidak bisa dipilih untuk data baru.", errors={"organization": "inactive"}
+        )
+
+
+def _validate_unit_organization(name: str, current_name: str | None = None):
+    unit = OrganizationUnitRepository.get_by_name(name)
+    if not unit:
+        raise ApiError("Unit organisasi yang dipilih tidak tersedia.", errors={"unit_organization": "not_found"})
+    is_current_value = bool(current_name and name.lower() == current_name.lower())
+    if unit.status != "Active" and not is_current_value:
+        raise ApiError(
+            "Unit organisasi inactive tidak bisa dipilih untuk data baru.",
+            errors={"unit_organization": "inactive"},
+        )
+
+
+def _validate_position(name: str, current_name: str | None = None):
+    position = PositionRepository.get_by_name(name)
+    if not position:
+        raise ApiError("Jabatan yang dipilih tidak tersedia.", errors={"position": "not_found"})
+    is_current_value = bool(current_name and name.lower() == current_name.lower())
+    if position.status != "Active" and not is_current_value:
+        raise ApiError("Jabatan inactive tidak bisa dipilih untuk data baru.", errors={"position": "inactive"})
+
+
 def create_employee(payload: dict):
     required_fields = [
         "nip",
@@ -44,6 +81,9 @@ def create_employee(payload: dict):
 
     _validate_unique(clean["nip"], clean["email"])
     _validate_role(clean["role_id"])
+    _validate_organization(clean["organization"])
+    _validate_unit_organization(clean["unit_organization"])
+    _validate_position(clean["position"])
 
     ids = [employee.id for employee in Employee.query.with_entities(Employee.id).all()]
     employee = Employee(
@@ -78,6 +118,9 @@ def update_employee(employee_id: str, payload: dict):
 
     _validate_unique(nip, email, employee.id)
     _validate_role(role_id, current_role_id=employee.role_id)
+    _validate_organization(organization, current_name=employee.organization)
+    _validate_unit_organization(unit_organization, current_name=employee.unit_organization)
+    _validate_position(position, current_name=employee.position)
 
     employee.nip = nip
     employee.name = name

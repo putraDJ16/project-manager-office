@@ -13,6 +13,7 @@ import {
   X
 } from "lucide-react";
 import { DEFAULT_ORGANIZATION_NAME, type Employee, type EmployeeStatus, type Role } from "../../data/masterData";
+import type { MasterReferenceItem, MasterReferenceType } from "../../data/masterReferenceData";
 import {
   createEmployee,
   fetchEmployees,
@@ -20,6 +21,7 @@ import {
   updateEmployee,
   updateEmployeeStatus
 } from "../../services/masterApi";
+import { fetchMasterReferences } from "../../services/masterReferenceApi";
 
 type EmployeeTab = "data" | "structure";
 type ModalMode = "create" | "edit";
@@ -40,10 +42,28 @@ function normalizeValue(value: string) {
   return value.trim().toLowerCase();
 }
 
+function buildReferenceOptions(
+  references: MasterReferenceItem[],
+  type: MasterReferenceType,
+  currentValue: string
+) {
+  const activeNames = references
+    .filter((item) => item.type === type && item.status === "Active")
+    .map((item) => item.name)
+    .sort((a, b) => a.localeCompare(b, "id"));
+
+  if (!currentValue) return activeNames;
+  const normalizedCurrent = normalizeValue(currentValue);
+  const existsInActive = activeNames.some((name) => normalizeValue(name) === normalizedCurrent);
+  if (existsInActive) return activeNames;
+  return [...activeNames, currentValue];
+}
+
 export function EmployeeMaster() {
   const [activeTab, setActiveTab] = useState<EmployeeTab>("data");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [masterReferences, setMasterReferences] = useState<MasterReferenceItem[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | EmployeeStatus>("All");
@@ -58,9 +78,14 @@ export function EmployeeMaster() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [employeeData, roleData] = await Promise.all([fetchEmployees(), fetchRoles()]);
+      const [employeeData, roleData, referenceData] = await Promise.all([
+        fetchEmployees(),
+        fetchRoles(),
+        fetchMasterReferences()
+      ]);
       setEmployees(employeeData);
       setRoles(roleData);
+      setMasterReferences(referenceData);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Gagal memuat data pegawai.";
       setNotice(message);
@@ -92,6 +117,19 @@ export function EmployeeMaster() {
       return modalMode === "edit" && form.roleId === role.id;
     });
   }, [form.roleId, modalMode, roles]);
+
+  const organizationOptions = useMemo(
+    () => buildReferenceOptions(masterReferences, "organization", form.organization),
+    [form.organization, masterReferences]
+  );
+  const unitOrganizationOptions = useMemo(
+    () => buildReferenceOptions(masterReferences, "unitOrganization", form.unitOrganization),
+    [form.unitOrganization, masterReferences]
+  );
+  const positionOptions = useMemo(
+    () => buildReferenceOptions(masterReferences, "position", form.position),
+    [form.position, masterReferences]
+  );
 
   const filteredEmployees = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -129,10 +167,19 @@ export function EmployeeMaster() {
 
   const openCreateModal = () => {
     const defaultRole = roles.find((role) => role.status === "Active");
+    const defaultOrganization = buildReferenceOptions(masterReferences, "organization", "")[0] ?? DEFAULT_ORGANIZATION_NAME;
+    const defaultUnitOrganization = buildReferenceOptions(masterReferences, "unitOrganization", "")[0] ?? "";
+    const defaultPosition = buildReferenceOptions(masterReferences, "position", "")[0] ?? "";
     setModalMode("create");
     setEditingEmployeeId(null);
     setFormError("");
-    setForm({ ...emptyFormState, roleId: defaultRole?.id ?? "" });
+    setForm({
+      ...emptyFormState,
+      organization: defaultOrganization,
+      unitOrganization: defaultUnitOrganization,
+      position: defaultPosition,
+      roleId: defaultRole?.id ?? ""
+    });
     setIsModalOpen(true);
   };
 
@@ -482,22 +529,34 @@ export function EmployeeMaster() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input
+                <Select
                   label="Organisasi"
                   value={form.organization}
                   onChange={(value) => setForm((cur) => ({ ...cur, organization: value }))}
+                  options={[
+                    { value: "", label: "Pilih organisasi" },
+                    ...organizationOptions.map((value) => ({ value, label: value }))
+                  ]}
                 />
-                <Input
+                <Select
                   label="Unit Organisasi"
                   value={form.unitOrganization}
                   onChange={(value) => setForm((cur) => ({ ...cur, unitOrganization: value }))}
+                  options={[
+                    { value: "", label: "Pilih unit organisasi" },
+                    ...unitOrganizationOptions.map((value) => ({ value, label: value }))
+                  ]}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input
+                <Select
                   label="Jabatan"
                   value={form.position}
                   onChange={(value) => setForm((cur) => ({ ...cur, position: value }))}
+                  options={[
+                    { value: "", label: "Pilih jabatan" },
+                    ...positionOptions.map((value) => ({ value, label: value }))
+                  ]}
                 />
                 <Select
                   label="Role"

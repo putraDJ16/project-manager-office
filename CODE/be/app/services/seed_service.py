@@ -1,7 +1,19 @@
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import Employee, Issue, Phase, Project, Role, SlaRule, Task, User
+from app.models import (
+    Employee,
+    Issue,
+    Organization,
+    OrganizationUnit,
+    Phase,
+    Position,
+    Project,
+    Role,
+    SlaRule,
+    Task,
+    User,
+)
 from app.services.issue_service import DEFAULT_SLA_RULES, SEVERITY_ORDER
 
 DEFAULT_ROLE_PERMISSIONS = {
@@ -12,6 +24,9 @@ DEFAULT_ROLE_PERMISSIONS = {
     "masterEmployees": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
     "masterProjects": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
     "masterRoles": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
+    "masterOrganizations": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
+    "masterOrganizationUnits": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
+    "masterPositions": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
 }
 
 
@@ -54,6 +69,26 @@ def seed_database(force_reset: bool = False):
         ),
     ]
     db.session.add_all(roles)
+
+    organizations = [
+        Organization(id="org-001", name="ZOHO PM SaaS", status="Active"),
+    ]
+    db.session.add_all(organizations)
+
+    organization_units = [
+        OrganizationUnit(id="unit-001", name="Engineering", status="Active"),
+        OrganizationUnit(id="unit-002", name="Quality Assurance", status="Active"),
+        OrganizationUnit(id="unit-003", name="Product Design", status="Active"),
+    ]
+    db.session.add_all(organization_units)
+
+    positions = [
+        Position(id="pos-001", name="Lead Developer", status="Active"),
+        Position(id="pos-002", name="QA Engineer", status="Active"),
+        Position(id="pos-003", name="UI/UX Designer", status="Active"),
+        Position(id="pos-004", name="Backend Developer", status="Active"),
+    ]
+    db.session.add_all(positions)
 
     employees = [
         Employee(

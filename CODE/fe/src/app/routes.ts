@@ -6,6 +6,9 @@ import { ProjectList } from "./pages/proyek/ProjectList";
 import { ProjectDetail } from "./pages/proyek/ProjectDetail";
 import { EmployeeMaster } from "./pages/master/EmployeeMaster";
 import { RoleMaster } from "./pages/master/RoleMaster";
+import { OrganizationMaster } from "./pages/master/OrganizationMaster";
+import { OrganizationUnitMaster } from "./pages/master/OrganizationUnitMaster";
+import { PositionMaster } from "./pages/master/PositionMaster";
 import { ProfilePage } from "./pages/kustomisasi/ProfilePage";
 import { SettingsPlaceholder } from "./pages/kustomisasi/SettingsPlaceholder";
 
@@ -18,6 +21,9 @@ export const routes = [
   { path: "/proyek/:id", component: ProjectDetail },
   { path: "/master/pegawai", component: EmployeeMaster },
   { path: "/master/role", component: RoleMaster },
+  { path: "/master/organisasi", component: OrganizationMaster },
+  { path: "/master/unit-organisasi", component: OrganizationUnitMaster },
+  { path: "/master/jabatan", component: PositionMaster },
   { path: "/profile", component: ProfilePage },
   { path: "/settings", component: SettingsPlaceholder }
 ];

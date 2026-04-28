@@ -26,4 +26,10 @@ class Project(BaseModel, TimestampMixin):
     phases = relationship("Phase", back_populates="project", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
+    attachment_folders = relationship(
+        "ProjectAttachmentFolder", back_populates="project", cascade="all, delete-orphan"
+    )
+    attachment_files = relationship(
+        "ProjectAttachmentFile", back_populates="project", cascade="all, delete-orphan"
+    )
     manager = relationship("Employee", foreign_keys=[manager_id])

@@ -8,7 +8,10 @@ export type ModuleKey =
   | "workload"
   | "masterEmployees"
   | "masterProjects"
-  | "masterRoles";
+  | "masterRoles"
+  | "masterOrganizations"
+  | "masterOrganizationUnits"
+  | "masterPositions";
 
 export type PermissionSet = {
   view: boolean;
@@ -50,7 +53,10 @@ export const modulePermissionLabels: Record<ModuleKey, string> = {
   workload: "SDM & Kapabilitas",
   masterEmployees: "Master - Pegawai",
   masterProjects: "Master - Proyek",
-  masterRoles: "Master - Role"
+  masterRoles: "Master - Role",
+  masterOrganizations: "Master - Organisasi",
+  masterOrganizationUnits: "Master - Unit Organisasi",
+  masterPositions: "Master - Jabatan"
 };
 
 function createPermissionSet(overrides?: Partial<PermissionSet>): PermissionSet {
@@ -74,7 +80,10 @@ function createRolePermissions(
     workload: createPermissionSet(overrides?.workload),
     masterEmployees: createPermissionSet(overrides?.masterEmployees),
     masterProjects: createPermissionSet(overrides?.masterProjects),
-    masterRoles: createPermissionSet(overrides?.masterRoles)
+    masterRoles: createPermissionSet(overrides?.masterRoles),
+    masterOrganizations: createPermissionSet(overrides?.masterOrganizations),
+    masterOrganizationUnits: createPermissionSet(overrides?.masterOrganizationUnits),
+    masterPositions: createPermissionSet(overrides?.masterPositions)
   };
 }
 
@@ -91,7 +100,10 @@ export const initialRoles: Role[] = [
       workload: { view: true, create: true, edit: true, delete: true, restore: true },
       masterEmployees: { view: true, create: true, edit: true, delete: true, restore: true },
       masterProjects: { view: true, create: true, edit: true, delete: true, restore: true },
-      masterRoles: { view: true, create: true, edit: true, delete: true, restore: true }
+      masterRoles: { view: true, create: true, edit: true, delete: true, restore: true },
+      masterOrganizations: { view: true, create: true, edit: true, delete: true, restore: true },
+      masterOrganizationUnits: { view: true, create: true, edit: true, delete: true, restore: true },
+      masterPositions: { view: true, create: true, edit: true, delete: true, restore: true }
     })
   },
   {
@@ -104,7 +116,10 @@ export const initialRoles: Role[] = [
       tasks: { view: true, create: true, edit: true },
       issues: { view: true, create: true, edit: true },
       workload: { view: true },
-      masterProjects: { view: true, edit: true }
+      masterProjects: { view: true, edit: true },
+      masterOrganizations: { view: true },
+      masterOrganizationUnits: { view: true },
+      masterPositions: { view: true }
     })
   },
   {
@@ -116,7 +131,10 @@ export const initialRoles: Role[] = [
       dashboard: { view: true },
       workload: { view: true },
       masterEmployees: { view: true, create: true, edit: true, delete: true, restore: true },
-      masterRoles: { view: true }
+      masterRoles: { view: true },
+      masterOrganizations: { view: true, create: true, edit: true, delete: true, restore: true },
+      masterOrganizationUnits: { view: true, create: true, edit: true, delete: true, restore: true },
+      masterPositions: { view: true, create: true, edit: true, delete: true, restore: true }
     })
   },
   {
@@ -131,7 +149,10 @@ export const initialRoles: Role[] = [
       workload: { view: true },
       masterEmployees: { view: true },
       masterProjects: { view: true },
-      masterRoles: { view: true }
+      masterRoles: { view: true },
+      masterOrganizations: { view: true },
+      masterOrganizationUnits: { view: true },
+      masterPositions: { view: true }
     })
   }
 ];

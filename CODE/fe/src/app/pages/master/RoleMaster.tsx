@@ -24,8 +24,30 @@ function createEmptyPermissions(): Record<ModuleKey, PermissionSet> {
     workload: createEmptyPermissionSet(),
     masterEmployees: createEmptyPermissionSet(),
     masterProjects: createEmptyPermissionSet(),
-    masterRoles: createEmptyPermissionSet()
+    masterRoles: createEmptyPermissionSet(),
+    masterOrganizations: createEmptyPermissionSet(),
+    masterOrganizationUnits: createEmptyPermissionSet(),
+    masterPositions: createEmptyPermissionSet()
   };
+}
+
+function normalizePermissions(
+  permissions: Partial<Record<ModuleKey, PermissionSet>> | undefined
+): Record<ModuleKey, PermissionSet> {
+  const defaults = createEmptyPermissions();
+  if (!permissions) return defaults;
+
+  return (Object.keys(defaults) as ModuleKey[]).reduce<Record<ModuleKey, PermissionSet>>((acc, key) => {
+    const current = permissions[key];
+    acc[key] = {
+      view: current?.view ?? false,
+      create: current?.create ?? false,
+      edit: current?.edit ?? false,
+      delete: current?.delete ?? false,
+      restore: current?.restore ?? false
+    };
+    return acc;
+  }, defaults);
 }
 
 const emptyRoleFormState: RoleFormState = {
@@ -52,7 +74,7 @@ export function RoleMaster() {
     setIsLoading(true);
     try {
       const result = await fetchRoles();
-      setRoles(result);
+      setRoles(result.map((role) => ({ ...role, permissions: normalizePermissions(role.permissions) })));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Gagal memuat role.";
       setNotice(message);
@@ -107,7 +129,7 @@ export function RoleMaster() {
       name: role.name,
       description: role.description,
       status: role.status,
-      permissions: role.permissions
+      permissions: normalizePermissions(role.permissions)
     });
     setIsModalOpen(true);
   };

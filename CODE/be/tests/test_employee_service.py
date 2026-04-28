@@ -14,7 +14,7 @@ def test_employee_duplicate_email_blocked(app):
                     "email": "andi.jatmiko@company.co.id",
                     "organization": "ZOHO PM SaaS",
                     "unit_organization": "Engineering",
-                    "position": "Developer",
+                    "position": "Lead Developer",
                     "role_id": "role-001",
                 }
             )

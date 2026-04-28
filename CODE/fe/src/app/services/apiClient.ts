@@ -35,15 +35,18 @@ async function refreshAccessToken() {
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
   const { body, headers, skipAuth, ...rest } = options;
 
+  const isFormDataBody = typeof FormData !== "undefined" && body instanceof FormData;
+
   const makeRequest = async (token: string | null) => {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...rest,
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormDataBody ? {} : { "Content-Type": "application/json" }),
         ...(headers ?? {}),
         ...(!skipAuth && token ? { Authorization: `Bearer ${token}` } : {})
       },
-      body: body === undefined ? undefined : JSON.stringify(body)
+      body:
+        body === undefined ? undefined : isFormDataBody ? (body as FormData) : JSON.stringify(body)
     });
     return response;
   };

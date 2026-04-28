@@ -1,5 +1,5 @@
 import { apiRequest } from "./apiClient";
-import type { Employee, Role } from "../data/masterData";
+import type { Employee, ModuleKey, PermissionSet, Role } from "../data/masterData";
 
 type ApiEmployee = {
   id: string;
@@ -12,6 +12,35 @@ type ApiEmployee = {
   role_id: string;
   status: Employee["status"];
 };
+
+const roleModuleKeys: ModuleKey[] = [
+  "dashboard",
+  "tasks",
+  "issues",
+  "workload",
+  "masterEmployees",
+  "masterProjects",
+  "masterRoles",
+  "masterOrganizations",
+  "masterOrganizationUnits",
+  "masterPositions"
+];
+
+function normalizeRole(role: Role): Role {
+  const permissions = roleModuleKeys.reduce<Record<ModuleKey, PermissionSet>>((acc, key) => {
+    const current = role.permissions?.[key];
+    acc[key] = {
+      view: current?.view ?? false,
+      create: current?.create ?? false,
+      edit: current?.edit ?? false,
+      delete: current?.delete ?? false,
+      restore: current?.restore ?? false
+    };
+    return acc;
+  }, {} as Record<ModuleKey, PermissionSet>);
+
+  return { ...role, permissions };
+}
 
 function mapEmployeeFromApi(data: ApiEmployee): Employee {
   return {
@@ -47,7 +76,7 @@ export async function fetchRoles() {
   if (rolesInFlight) return rolesInFlight;
 
   rolesInFlight = apiRequest<Role[]>("/roles", { method: "GET" })
-    .then((result) => result.data)
+    .then((result) => result.data.map(normalizeRole))
     .finally(() => {
       rolesInFlight = null;
     });
@@ -57,12 +86,12 @@ export async function fetchRoles() {
 
 export async function createRole(payload: Omit<Role, "id">) {
   const result = await apiRequest<Role>("/roles", { method: "POST", body: payload });
-  return result.data;
+  return normalizeRole(result.data);
 }
 
 export async function updateRole(id: string, payload: Partial<Omit<Role, "id">>) {
   const result = await apiRequest<Role>(`/roles/${id}`, { method: "PATCH", body: payload });
-  return result.data;
+  return normalizeRole(result.data);
 }
 
 export async function updateRoleStatus(id: string, status: Role["status"]) {
@@ -70,7 +99,7 @@ export async function updateRoleStatus(id: string, status: Role["status"]) {
     method: "PATCH",
     body: { status }
   });
-  return result.data;
+  return normalizeRole(result.data);
 }
 
 export async function fetchEmployees() {

@@ -7,9 +7,12 @@ import {
   CheckSquare,
   Bug,
   FolderKanban,
+  Building2,
+  Network,
   User,
   Users,
   Shield,
+  BriefcaseBusiness,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -97,6 +100,15 @@ export function AppShell({ session, onLogout }: AppShellProps) {
                 <Link to="/master/role" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Role">
                   <Shield className="w-5 h-5 opacity-75" />
                 </Link>
+                <Link to="/master/organisasi" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Organisasi">
+                  <Building2 className="w-5 h-5 opacity-75" />
+                </Link>
+                <Link to="/master/unit-organisasi" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Unit Organisasi">
+                  <Network className="w-5 h-5 opacity-75" />
+                </Link>
+                <Link to="/master/jabatan" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Jabatan">
+                  <BriefcaseBusiness className="w-5 h-5 opacity-75" />
+                </Link>
               </>
             ) : (
               <div className="mt-1">
@@ -112,7 +124,7 @@ export function AppShell({ session, onLogout }: AppShellProps) {
                 >
                   <span className="flex items-center">
                     <Users className="w-5 h-5 mr-3 opacity-75" />
-                    Pegawai & Role
+                    Data Master
                   </span>
                   <ChevronDown className={`w-4 h-4 transition-transform ${isMasterMenuOpen ? "rotate-180" : ""}`} />
                 </button>
@@ -132,6 +144,27 @@ export function AppShell({ session, onLogout }: AppShellProps) {
                     >
                       <Shield className="w-4 h-4 mr-2 opacity-80" />
                       Role
+                    </Link>
+                    <Link
+                      to="/master/organisasi"
+                      className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                    >
+                      <Building2 className="w-4 h-4 mr-2 opacity-80" />
+                      Organisasi
+                    </Link>
+                    <Link
+                      to="/master/unit-organisasi"
+                      className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                    >
+                      <Network className="w-4 h-4 mr-2 opacity-80" />
+                      Unit Organisasi
+                    </Link>
+                    <Link
+                      to="/master/jabatan"
+                      className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                    >
+                      <BriefcaseBusiness className="w-4 h-4 mr-2 opacity-80" />
+                      Jabatan
                     </Link>
                   </div>
                 )}
