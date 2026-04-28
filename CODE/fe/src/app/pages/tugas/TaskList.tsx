@@ -275,7 +275,9 @@ export function TaskList() {
         title: form.title.trim(),
         phase_id: form.phaseId,
         assignee: form.assignee,
-        priority: form.priority
+        priority: form.priority,
+        start_date: form.startDate || null,
+        end_date: form.endDate || null
       });
       const mapped = toTask(updated);
       setTasks((current) => current.map((task) => (task.id === mapped.id ? mapped : task)));
@@ -382,8 +384,9 @@ export function TaskList() {
                   <th className="px-4 py-3 font-medium">Fase</th>
                   <th className="px-4 py-3 font-medium">Assignee</th>
                   <th className="px-4 py-3 font-medium">Dibuat Oleh</th>
-                  <th className="px-4 py-3 font-medium">Tanggal Buat</th>
-                  <th className="px-4 py-3 font-medium">Edit Fase Terakhir</th>
+                  <th className="px-4 py-3 font-medium">Tanggal Mulai</th>
+                  <th className="px-4 py-3 font-medium">Tanggal Selesai</th>
+                  <th className="px-4 py-3 font-medium">Status Waktu</th>
                   <th className="px-4 py-3 font-medium">Prioritas</th>
                 </tr>
               </thead>
@@ -395,8 +398,9 @@ export function TaskList() {
                     <td className="px-4 py-3 text-slate-600">{taskStatus(task, phaseById)}</td>
                     <td className="px-4 py-3 text-slate-600">{teamMembers.find((member) => member.id === task.assignee)?.name ?? task.assignee}</td>
                     <td className="px-4 py-3 text-slate-600">{task.createdBy}</td>
-                    <td className="px-4 py-3 text-slate-600">{formatDateTimeLabel(task.createdAt)}</td>
-                    <td className="px-4 py-3 text-slate-600">{formatDateTimeLabel(task.phaseUpdatedAt)}</td>
+                    <td className="px-4 py-3 text-slate-600">{task.startDate ? new Date(task.startDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "-"}</td>
+                    <td className="px-4 py-3 text-slate-600">{task.endDate ? new Date(task.endDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "-"}</td>
+                    <td className="px-4 py-3">{(() => { const s = taskDateStatus(task.startDate, task.endDate); return s ? <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-md ${DATE_STATUS_CONFIG[s].className}`}>{DATE_STATUS_CONFIG[s].label}</span> : <span className="text-slate-400 text-xs">-</span>; })()}</td>
                     <td className="px-4 py-3"><span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-md bg-slate-100 text-slate-700">{task.priority}</span></td>
                   </tr>
                 ))}
@@ -423,6 +427,12 @@ export function TaskList() {
                               <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps} onClick={() => setSelectedTask(task.id)} className={`bg-white p-4 rounded-xl border shadow-sm cursor-pointer hover:shadow-md ${selectedTask === task.id ? "border-indigo-500 ring-1 ring-indigo-500" : "border-slate-200"}`}>
                                 <div className="flex justify-between items-start mb-2"><span className="text-xs font-semibold text-slate-400">{task.id}</span><span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-md bg-slate-100 text-slate-700">{task.priority}</span></div>
                                 <h4 className="font-medium text-slate-900 mb-3 text-sm">{task.title}</h4>
+                                {(task.startDate || task.endDate) && (
+                                  <p className="text-xs text-slate-500 mb-1">
+                                    {task.startDate ? new Date(task.startDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "?"} — {task.endDate ? new Date(task.endDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "?"}
+                                  </p>
+                                )}
+                                {(() => { const s = taskDateStatus(task.startDate, task.endDate); return s ? <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-md ${DATE_STATUS_CONFIG[s].className} mb-2`}>{DATE_STATUS_CONFIG[s].label}</span> : null; })()}
                                 <p className="text-xs text-slate-500">Dibuat oleh: {task.createdBy}</p>
                               </div>
                             )}

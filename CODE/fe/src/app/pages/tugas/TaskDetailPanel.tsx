@@ -11,6 +11,8 @@ type TaskSummary = {
   createdBy: string;
   createdAt: string;
   phaseUpdatedAt: string | null;
+  startDate: string | null;
+  endDate: string | null;
 };
 
 type TaskDetailPanelProps = {
@@ -34,7 +36,9 @@ export function TaskDetailPanel({
     title: task.title,
     phaseId: task.phaseId,
     assignee: task.assignee,
-    priority: task.priority
+    priority: task.priority,
+    startDate: task.startDate ?? "",
+    endDate: task.endDate ?? ""
   });
 
   useEffect(() => {
@@ -42,7 +46,9 @@ export function TaskDetailPanel({
       title: task.title,
       phaseId: task.phaseId,
       assignee: task.assignee,
-      priority: task.priority
+      priority: task.priority,
+      startDate: task.startDate ?? "",
+      endDate: task.endDate ?? ""
     });
   }, [task]);
 
@@ -81,7 +87,7 @@ export function TaskDetailPanel({
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">Dibuat Oleh</p>
               <p className="text-sm font-medium text-slate-800 mt-1">{task.createdBy}</p>

@@ -64,7 +64,14 @@ export function ProjectDetail() {
 
   // Task state
   const [showAddTask, setShowAddTask] = useState(false);
-  const [taskForm, setTaskForm] = useState({ title: "", phase_id: "", assignee: "", priority: "Medium" as string });
+  const [taskForm, setTaskForm] = useState({
+    title: "",
+    phase_id: "",
+    assignee: "",
+    priority: "Medium" as string,
+    start_date: "",
+    end_date: "",
+  });
   const [taskError, setTaskError] = useState<string | null>(null);
   const [taskSaving, setTaskSaving] = useState(false);
 
@@ -165,6 +172,10 @@ export function ProjectDetail() {
   const handleAddTask = async () => {
     if (!id || !taskForm.title.trim()) return;
     if (!taskForm.phase_id) { setTaskError("Pilih fase untuk tugas ini."); return; }
+    if (taskForm.start_date && taskForm.end_date && taskForm.end_date < taskForm.start_date) {
+      setTaskError("Tanggal selesai tidak boleh lebih awal dari tanggal mulai.");
+      return;
+    }
     setTaskSaving(true);
     setTaskError(null);
     try {
@@ -174,9 +185,18 @@ export function ProjectDetail() {
         assignee: taskForm.assignee,
         project_id: id,
         phase_id: taskForm.phase_id,
+        start_date: taskForm.start_date || null,
+        end_date: taskForm.end_date || null,
       });
       setTasks((prev) => [result.data, ...prev]);
-      setTaskForm({ title: "", phase_id: "", assignee: "", priority: "Medium" });
+      setTaskForm({
+        title: "",
+        phase_id: "",
+        assignee: "",
+        priority: "Medium",
+        start_date: "",
+        end_date: "",
+      });
       setShowAddTask(false);
     } catch (err: unknown) {
       setTaskError(err instanceof Error ? err.message : "Gagal menambahkan tugas.");
@@ -492,7 +512,18 @@ export function ProjectDetail() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-slate-700">Daftar Tugas</h3>
               <button
-                onClick={() => { setShowAddTask(true); setTaskError(null); setTaskForm({ title: "", phase_id: "", assignee: "", priority: "Medium" }); }}
+                onClick={() => {
+                  setShowAddTask(true);
+                  setTaskError(null);
+                  setTaskForm({
+                    title: "",
+                    phase_id: "",
+                    assignee: "",
+                    priority: "Medium",
+                    start_date: "",
+                    end_date: "",
+                  });
+                }}
                 className="flex items-center px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
               >
                 <Plus className="w-4 h-4 mr-1" /> Tambah Tugas
@@ -548,6 +579,24 @@ export function ProjectDetail() {
                       }
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Tanggal Mulai</label>
+                    <input
+                      type="date"
+                      value={taskForm.start_date}
+                      onChange={(e) => setTaskForm((p) => ({ ...p, start_date: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Tanggal Selesai</label>
+                    <input
+                      type="date"
+                      value={taskForm.end_date}
+                      onChange={(e) => setTaskForm((p) => ({ ...p, end_date: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
                 </div>
                 {taskError && (
                   <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
@@ -583,6 +632,8 @@ export function ProjectDetail() {
                       <th className="px-4 py-3 font-medium text-left">Fase</th>
                       <th className="px-4 py-3 font-medium text-left">Prioritas</th>
                       <th className="px-4 py-3 font-medium text-left">Assignee</th>
+                      <th className="px-4 py-3 font-medium text-left">Mulai</th>
+                      <th className="px-4 py-3 font-medium text-left">Selesai</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -599,6 +650,16 @@ export function ProjectDetail() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-slate-600">{task.assignee || <span className="text-slate-300">—</span>}</td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {task.start_date
+                              ? new Date(task.start_date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+                              : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {task.end_date
+                              ? new Date(task.end_date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+                              : <span className="text-slate-300">—</span>}
+                          </td>
                         </tr>
                       );
                     })}
