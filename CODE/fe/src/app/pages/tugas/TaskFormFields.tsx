@@ -7,6 +7,8 @@ export type TaskFormState = {
   phaseId: string;
   assignee: string;
   priority: TaskPriority;
+  startDate: string;
+  endDate: string;
 };
 
 export const taskPriorityOptions: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
@@ -68,6 +70,27 @@ export function TaskFormFields({ value, onChange, phaseOptions, assigneeOptions 
               <option key={priority} value={priority}>{priority}</option>
             ))}
           </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Tanggal Mulai</label>
+          <input
+            type="date"
+            value={value.startDate}
+            onChange={(event) => onChange((current) => ({ ...current, startDate: event.target.value }))}
+            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Tanggal Selesai</label>
+          <input
+            type="date"
+            value={value.endDate}
+            min={value.startDate || undefined}
+            onChange={(event) => onChange((current) => ({ ...current, endDate: event.target.value }))}
+            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
         </div>
       </div>
     </>

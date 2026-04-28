@@ -1,9 +1,20 @@
+from datetime import date
+
 from app.models.base import utcnow
 from app.extensions import db
 from app.models import Task
 from app.repositories import ProjectRepository, TaskRepository
 from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
+
+
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def list_tasks(project_id: str | None = None, search: str | None = None):
@@ -32,6 +43,8 @@ def create_task(payload: dict, created_by: str = "System"):
         project_id=data["project_id"],
         phase_id=data["phase_id"],
         created_by=created_by or "System",
+        start_date=_parse_date(payload.get("start_date")),
+        end_date=_parse_date(payload.get("end_date")),
     )
     db.session.add(task)
     db.session.commit()
@@ -57,6 +70,12 @@ def update_task(task_id: str, payload: dict):
 
     if "priority" in payload and payload["priority"]:
         task.priority = payload["priority"]
+
+    if "start_date" in payload:
+        task.start_date = _parse_date(payload.get("start_date"))
+
+    if "end_date" in payload:
+        task.end_date = _parse_date(payload.get("end_date"))
 
     if "phase_id" in payload and payload["phase_id"]:
         phase = ProjectRepository.get_phase(payload["phase_id"])

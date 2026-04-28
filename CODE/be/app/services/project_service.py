@@ -1,5 +1,6 @@
 from app.extensions import db
-from app.models import Phase, Project
+from app.models import Employee, Phase, Project, ProjectMember
+from app.models.constants import PROJECT_PRIORITY, PROJECT_STATUS
 from app.repositories import ProjectRepository
 from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
@@ -9,28 +10,68 @@ def list_projects():
     return ProjectRepository.list_projects()
 
 
+def get_project(project_id: str):
+    project = ProjectRepository.get_project(project_id)
+    if not project:
+        raise ApiError("Project tidak ditemukan.", status_code=404)
+    return project
+
+
 def create_project(payload: dict):
     name = (payload.get("name") or "").strip()
     if not name:
         raise ApiError("Nama project wajib diisi.")
 
+    status = payload.get("status") or "Planning"
+    if status not in PROJECT_STATUS:
+        raise ApiError(f"Status tidak valid. Pilihan: {', '.join(PROJECT_STATUS)}")
+
+    priority = payload.get("priority") or None
+    if priority and priority not in PROJECT_PRIORITY:
+        raise ApiError(f"Prioritas tidak valid. Pilihan: {', '.join(PROJECT_PRIORITY)}")
+
+    manager_id = payload.get("manager_id") or None
+    if manager_id and not Employee.query.get(manager_id):
+        raise ApiError("Manajer tidak ditemukan.")
+
     ids = [project.id for project in Project.query.with_entities(Project.id).all()]
     project = Project(
         id=next_string_id(ids, "p", default_start=1),
         name=name,
-        status=(payload.get("status") or "Planning"),
+        status=status,
+        description=(payload.get("description") or "").strip() or None,
+        priority=priority,
+        manager_id=manager_id,
+        start_date=payload.get("start_date") or None,
+        end_date=payload.get("end_date") or None,
     )
     db.session.add(project)
     db.session.flush()
 
     phase_ids = [phase.id for phase in Phase.query.with_entities(Phase.id).all()]
-    initial_phase = Phase(
-        id=next_string_id(phase_ids, "ph-", default_start=1),
-        project_id=project.id,
-        name="Fase 1: Inisiasi",
-        order_index=1,
-    )
-    db.session.add(initial_phase)
+    phases_payload = payload.get("phases") or []
+    if phases_payload:
+        for index, phase_item in enumerate(phases_payload):
+            phase_name = (phase_item.get("name") or "").strip()
+            if not phase_name:
+                continue
+            phase = Phase(
+                id=next_string_id(phase_ids, "ph-", default_start=1),
+                project_id=project.id,
+                name=phase_name,
+                order_index=index + 1,
+            )
+            db.session.add(phase)
+            phase_ids.append(phase.id)
+    else:
+        initial_phase = Phase(
+            id=next_string_id(phase_ids, "ph-", default_start=1),
+            project_id=project.id,
+            name="Fase 1: Inisiasi",
+            order_index=1,
+        )
+        db.session.add(initial_phase)
+
     db.session.commit()
     return project
 
@@ -45,8 +86,33 @@ def update_project(project_id: str, payload: dict):
         if not name:
             raise ApiError("Nama project wajib diisi.")
         project.name = name
+
     if "status" in payload and payload["status"]:
+        if payload["status"] not in PROJECT_STATUS:
+            raise ApiError(f"Status tidak valid. Pilihan: {', '.join(PROJECT_STATUS)}")
         project.status = payload["status"]
+
+    if "description" in payload:
+        project.description = (payload.get("description") or "").strip() or None
+
+    if "priority" in payload:
+        priority = payload.get("priority") or None
+        if priority and priority not in PROJECT_PRIORITY:
+            raise ApiError(f"Prioritas tidak valid. Pilihan: {', '.join(PROJECT_PRIORITY)}")
+        project.priority = priority
+
+    if "manager_id" in payload:
+        manager_id = payload.get("manager_id") or None
+        if manager_id and not Employee.query.get(manager_id):
+            raise ApiError("Manajer tidak ditemukan.")
+        project.manager_id = manager_id
+
+    if "start_date" in payload:
+        project.start_date = payload.get("start_date") or None
+
+    if "end_date" in payload:
+        project.end_date = payload.get("end_date") or None
+
     db.session.commit()
     return project
 
@@ -78,3 +144,46 @@ def create_phase(project_id: str, payload: dict):
     db.session.add(phase)
     db.session.commit()
     return phase
+
+
+def list_members(project_id: str):
+    project = ProjectRepository.get_project(project_id)
+    if not project:
+        raise ApiError("Project tidak ditemukan.", status_code=404)
+    return ProjectRepository.list_members(project_id)
+
+
+def add_member(project_id: str, payload: dict):
+    project = ProjectRepository.get_project(project_id)
+    if not project:
+        raise ApiError("Project tidak ditemukan.", status_code=404)
+
+    employee_id = (payload.get("employee_id") or "").strip()
+    if not employee_id:
+        raise ApiError("employee_id wajib diisi.")
+
+    employee = Employee.query.get(employee_id)
+    if not employee:
+        raise ApiError("Pegawai tidak ditemukan.", status_code=404)
+
+    existing = ProjectRepository.get_member(project_id, employee_id)
+    if existing:
+        raise ApiError("Pegawai sudah menjadi anggota project ini.")
+
+    member = ProjectMember(project_id=project_id, employee_id=employee_id)
+    db.session.add(member)
+    db.session.commit()
+    return member
+
+
+def remove_member(project_id: str, employee_id: str):
+    project = ProjectRepository.get_project(project_id)
+    if not project:
+        raise ApiError("Project tidak ditemukan.", status_code=404)
+
+    member = ProjectRepository.get_member(project_id, employee_id)
+    if not member:
+        raise ApiError("Anggota tidak ditemukan dalam project ini.", status_code=404)
+
+    db.session.delete(member)
+    db.session.commit()

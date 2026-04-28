@@ -1,4 +1,4 @@
-from app.models import Phase, Project
+from app.models import Phase, Project, ProjectMember
 
 
 class ProjectRepository:
@@ -17,3 +17,18 @@ class ProjectRepository:
     @staticmethod
     def get_phase(phase_id: str):
         return Phase.query.get(phase_id)
+
+    @staticmethod
+    def list_members(project_id: str):
+        return (
+            ProjectMember.query
+            .filter_by(project_id=project_id)
+            .order_by(ProjectMember.joined_at.asc())
+            .all()
+        )
+
+    @staticmethod
+    def get_member(project_id: str, employee_id: str):
+        return ProjectMember.query.filter_by(
+            project_id=project_id, employee_id=employee_id
+        ).first()

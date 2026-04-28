@@ -1,6 +1,6 @@
 from app.schemas.employee_schema import EmployeeSchema
 from app.schemas.issue_schema import IssueSchema, SlaRuleSchema
-from app.schemas.project_schema import PhaseSchema, ProjectSchema
+from app.schemas.project_schema import PhaseSchema, ProjectDetailSchema, ProjectMemberSchema, ProjectSchema
 from app.schemas.role_schema import RoleSchema
 from app.schemas.task_schema import TaskSchema
 
@@ -10,6 +10,9 @@ employee_schema = EmployeeSchema()
 employees_schema = EmployeeSchema(many=True)
 project_schema = ProjectSchema()
 projects_schema = ProjectSchema(many=True)
+project_detail_schema = ProjectDetailSchema()
+project_member_schema = ProjectMemberSchema()
+project_members_schema = ProjectMemberSchema(many=True)
 phase_schema = PhaseSchema()
 phases_schema = PhaseSchema(many=True)
 task_schema = TaskSchema()

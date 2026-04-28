@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel, TimestampMixin
@@ -22,6 +22,8 @@ class Task(BaseModel, TimestampMixin):
         String(150), nullable=False, default="System", server_default="System"
     )
     phase_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    start_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
 
     project = relationship("Project", back_populates="tasks")
     phase = relationship("Phase", back_populates="tasks")

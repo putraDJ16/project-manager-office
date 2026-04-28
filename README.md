@@ -37,7 +37,7 @@ docker-compose up --build
 ```
 3. The Vite frontend will be available at http://localhost:5173
 4. The Flask backend will be available at http://localhost:5000
-5. The PostgreSQL database is mapped to port 5432.
+5. The backend connects to local PostgreSQL on port 5434.
 
 *Note: Changes made to `CODE/fe` and `CODE/be` will automatically hot-reload.*
 

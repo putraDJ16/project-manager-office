@@ -1,6 +1,7 @@
 ROLE_STATUS = ("Active", "Inactive")
 EMPLOYEE_STATUS = ("Active", "Inactive")
 PROJECT_STATUS = ("Planning", "Active", "On Hold", "Completed")
+PROJECT_PRIORITY = ("Low", "Medium", "High", "Critical")
 TASK_PRIORITY = ("Low", "Medium", "High", "Critical")
 ISSUE_STATUS = ("Open", "Investigating", "In Progress", "Escalated", "Resolved")
 ISSUE_SEVERITY = ("Blocker", "Critical", "Major", "Minor", "Trivial")

@@ -24,6 +24,8 @@ export type ApiTask = {
   created_at: string;
   updated_at: string;
   phase_updated_at: string | null;
+  start_date: string | null;
+  end_date: string | null;
 };
 
 type ApiMutationResult<T> = {
@@ -77,6 +79,8 @@ export async function createTask(payload: {
   assignee: string;
   project_id: string;
   phase_id: string;
+  start_date?: string | null;
+  end_date?: string | null;
 }): Promise<ApiMutationResult<ApiTask>> {
   const result = await apiRequest<ApiTask>("/tasks", { method: "POST", body: payload });
   return { data: result.data, message: result.message };
@@ -89,6 +93,8 @@ export async function updateTask(
     priority: "Low" | "Medium" | "High" | "Critical";
     assignee: string;
     phase_id: string;
+    start_date: string | null;
+    end_date: string | null;
   }>
 ) {
   const result = await apiRequest<ApiTask>(`/tasks/${taskId}`, { method: "PATCH", body: payload });

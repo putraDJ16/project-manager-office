@@ -4,7 +4,7 @@ import psycopg
 
 
 def ensure_database_exists():
-    raw_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/zoho_pm")
+    raw_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5434/zoho_pm")
     url = raw_url.replace("+psycopg", "")
 
     if "/" not in url.rsplit("@", 1)[-1]:

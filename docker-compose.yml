@@ -10,8 +10,8 @@ services:
     environment:
       - FLASK_ENV=development
       - FLASK_APP=run.py
-      # Remote Supabase Connection
-      - DATABASE_URL=postgresql+psycopg://postgres:Q0j6cfh8mbOcqECA@db.jnpkccinhrfdtesohedq.supabase.co:5432/postgres
+      # Local PostgreSQL on host machine
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@host.docker.internal:5434/zoho_pm
       - JWT_SECRET_KEY=dev-secret-key
       - CORS_ORIGINS=http://localhost:5173
     ports:

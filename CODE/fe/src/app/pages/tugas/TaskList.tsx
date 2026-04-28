@@ -19,6 +19,8 @@ type Task = {
   createdAt: string;
   updatedAt: string;
   phaseUpdatedAt: string | null;
+  startDate: string | null;
+  endDate: string | null;
 };
 type NoticeState = { type: "success" | "error"; message: string } | null;
 
@@ -37,6 +39,8 @@ function toTask(raw: {
   created_at: string;
   updated_at: string;
   phase_updated_at: string | null;
+  start_date: string | null;
+  end_date: string | null;
 }): Task {
   return {
     id: raw.id,
@@ -48,9 +52,34 @@ function toTask(raw: {
     phaseId: raw.phase_id,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
-    phaseUpdatedAt: raw.phase_updated_at
+    phaseUpdatedAt: raw.phase_updated_at,
+    startDate: raw.start_date,
+    endDate: raw.end_date
   };
 }
+
+type DateStatus = "upcoming" | "on_progress" | "overdue";
+
+function taskDateStatus(startDate: string | null, endDate: string | null): DateStatus | null {
+  if (!startDate && !endDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (endDate) {
+    const end = new Date(endDate);
+    if (today > end) return "overdue";
+  }
+  if (startDate) {
+    const start = new Date(startDate);
+    if (today < start) return "upcoming";
+  }
+  return "on_progress";
+}
+
+const DATE_STATUS_CONFIG: Record<DateStatus, { label: string; className: string }> = {
+  overdue: { label: "Lewat Deadline", className: "bg-red-100 text-red-700" },
+  on_progress: { label: "On Progress", className: "bg-emerald-100 text-emerald-700" },
+  upcoming: { label: "Belum Mulai", className: "bg-blue-100 text-blue-700" },
+};
 
 function taskStatus(task: Task, phaseById: Record<string, Phase>) {
   return phaseById[task.phaseId]?.name ?? "Tanpa Fase";
@@ -91,7 +120,9 @@ export function TaskList() {
     title: "",
     phaseId: "",
     assignee: teamMembers[0]?.id ?? "",
-    priority: "Medium"
+    priority: "Medium",
+    startDate: "",
+    endDate: ""
   });
 
   const activeProject = useMemo(() => projects.find((project) => project.id === selectedProjectId), [projects, selectedProjectId]);
@@ -170,7 +201,7 @@ export function TaskList() {
   const openTaskModal = () => {
     setIsAddMenuOpen(false);
     if (phasesForProject.length === 0) return;
-    setTaskForm({ title: "", phaseId: phasesForProject[0].id, assignee: teamMembers[0]?.id ?? "", priority: "Medium" });
+    setTaskForm({ title: "", phaseId: phasesForProject[0].id, assignee: teamMembers[0]?.id ?? "", priority: "Medium", startDate: "", endDate: "" });
     setModalType("task");
   };
 
@@ -222,7 +253,9 @@ export function TaskList() {
         phase_id: taskForm.phaseId,
         assignee: taskForm.assignee,
         priority: taskForm.priority,
-        project_id: activeProject.id
+        project_id: activeProject.id,
+        start_date: taskForm.startDate || null,
+        end_date: taskForm.endDate || null
       });
       const created = result.data;
       setTasks((current) => [...current, toTask(created)]);

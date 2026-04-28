@@ -21,3 +21,4 @@ class Employee(BaseModel, TimestampMixin):
     )
 
     role = relationship("Role", back_populates="employees")
+    project_memberships = relationship("ProjectMember", back_populates="employee")

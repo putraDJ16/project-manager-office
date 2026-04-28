@@ -3,7 +3,7 @@ import os
 
 class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost:5432/zoho_pm"
+        "DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost:5434/zoho_pm"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-change-me")
