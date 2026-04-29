@@ -652,6 +652,49 @@ Konfigurasi production di panduan ini sudah dibuat lebih ringan untuk server 1 C
 
 ## 19. Troubleshooting
 
+### Permission denied saat menjalankan Docker
+
+Contoh error:
+
+```text
+permission denied while trying to connect to the docker API at unix:///var/run/docker.sock
+```
+
+Penyebabnya user Linux belum punya izin mengakses Docker daemon.
+
+Solusi cepat:
+
+```bash
+sudo docker ps
+sudo docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+Solusi permanen agar tidak perlu selalu memakai `sudo`:
+
+```bash
+sudo usermod -aG docker $USER
+exit
+```
+
+Login ulang ke SSH, lalu cek:
+
+```bash
+groups
+docker ps
+```
+
+Pastikan output `groups` memuat `docker`. Jika belum, restart sesi SSH atau jalankan:
+
+```bash
+newgrp docker
+```
+
+Setelah itu ulangi:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
 ### Container backend restart terus
 
 Cek log:
@@ -681,6 +724,54 @@ Pastikan:
 - Nginx route `/api/` mengarah ke `127.0.0.1:5000`.
 - `CORS_ORIGINS` sesuai domain HTTPS.
 - `VITE_API_BASE_URL=/api/v1`.
+
+### Tidak bisa akses `http://IP_SERVER:5173`
+
+Di konfigurasi production, frontend sengaja dibuka hanya ke localhost server:
+
+```yaml
+ports:
+  - "127.0.0.1:5173:80"
+```
+
+Artinya `http://IP_SERVER:5173` tidak bisa diakses langsung dari luar server. Akses aplikasi lewat Nginx:
+
+```text
+http://IP_SERVER
+```
+
+atau jika domain dan SSL sudah aktif:
+
+```text
+https://pmo.domainanda.com
+```
+
+Cek dari dalam server:
+
+```bash
+curl -I http://127.0.0.1:5173
+curl -I http://127.0.0.1
+```
+
+Jika benar-benar ingin membuka port `5173` langsung untuk testing sementara, ubah di `docker-compose.prod.yml`:
+
+```yaml
+ports:
+  - "5173:80"
+```
+
+Lalu jalankan:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+sudo ufw allow 5173/tcp
+```
+
+Setelah testing, sebaiknya tutup lagi port `5173` dan akses melalui Nginx port `80/443`:
+
+```bash
+sudo ufw delete allow 5173/tcp
+```
 
 ### Error CORS
 

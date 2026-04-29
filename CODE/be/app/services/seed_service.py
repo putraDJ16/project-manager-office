@@ -18,12 +18,49 @@ from app.services.issue_service import DEFAULT_SLA_RULES, SEVERITY_ORDER
 from app.utils.permissions import DEFAULT_ROLE_PERMISSIONS_BY_NAME
 
 
+DEFAULT_ROLES = [
+    {
+        "id": "role-001",
+        "name": "Administrator",
+        "description": "Akses penuh untuk seluruh menu aktif dan aksi pengelolaan data.",
+    },
+    {
+        "id": "role-002",
+        "name": "Project Manager",
+        "description": "Fokus pada manajemen tugas, proyek, dan pemantauan isu.",
+    },
+    {
+        "id": "role-003",
+        "name": "HR Admin",
+        "description": "Mengelola data pegawai dan struktur organisasi.",
+    },
+    {
+        "id": "role-004",
+        "name": "Viewer",
+        "description": "Akses baca untuk pemantauan dashboard dan master data.",
+    },
+]
+
+
 def sync_default_role_permissions():
-    for role_name, permissions in DEFAULT_ROLE_PERMISSIONS_BY_NAME.items():
+    for default_role in DEFAULT_ROLES:
+        role_name = default_role["name"]
+        permissions = DEFAULT_ROLE_PERMISSIONS_BY_NAME[role_name]
         role = Role.query.filter_by(name=role_name).first()
         if not role:
+            role = Role(
+                id=default_role["id"],
+                name=role_name,
+                description=default_role["description"],
+                status="Active",
+                permissions=permissions,
+            )
+            db.session.add(role)
             continue
+
         role.permissions = permissions
+        if not role.description:
+            role.description = default_role["description"]
         if role_name == "Viewer":
             role.status = "Active"
     db.session.commit()
@@ -40,33 +77,13 @@ def seed_database(force_reset: bool = False):
 
     roles = [
         Role(
-            id="role-001",
-            name="Administrator",
-            description="Akses penuh untuk seluruh menu aktif dan aksi pengelolaan data.",
+            id=default_role["id"],
+            name=default_role["name"],
+            description=default_role["description"],
             status="Active",
-            permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME["Administrator"],
-        ),
-        Role(
-            id="role-002",
-            name="Project Manager",
-            description="Fokus pada manajemen tugas, proyek, dan pemantauan isu.",
-            status="Active",
-            permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME["Project Manager"],
-        ),
-        Role(
-            id="role-003",
-            name="HR Admin",
-            description="Mengelola data pegawai dan struktur organisasi.",
-            status="Active",
-            permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME["HR Admin"],
-        ),
-        Role(
-            id="role-004",
-            name="Viewer",
-            description="Akses baca untuk pemantauan dashboard dan master data.",
-            status="Active",
-            permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME["Viewer"],
-        ),
+            permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME[default_role["name"]],
+        )
+        for default_role in DEFAULT_ROLES
     ]
     db.session.add_all(roles)
 
