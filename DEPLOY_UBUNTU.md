@@ -710,6 +710,44 @@ Penyebab umum:
 - Migration error.
 - Secret atau env belum terbaca.
 
+### Error `Role default belum tersedia`
+
+Contoh respons:
+
+```json
+{"message":"Role default belum tersedia. Hubungi administrator."}
+```
+
+Artinya database belum punya role aktif untuk user baru. Jalankan seed:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec api flask --app run.py seed
+```
+
+Lalu coba login dengan akun seed:
+
+```text
+Email: admin@zoho.local
+Password: Admin123!
+```
+
+Jika database sudah pernah terisi sebagian, pastikan kode terbaru sudah ter-deploy lalu rebuild backend:
+
+```bash
+git pull
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build api
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec api flask --app run.py seed
+```
+
+Cek role langsung ke database eksternal:
+
+```bash
+psql "postgresql://zoho_user:ganti_password_database_yang_panjang@HOST_DATABASE:5432/zoho_pm" \
+  -c "select id, name, status from roles order by id;"
+```
+
+Minimal harus ada role `Viewer` dengan status `Active`.
+
 ### Frontend bisa dibuka, API error
 
 Cek:
