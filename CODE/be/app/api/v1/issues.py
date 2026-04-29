@@ -10,7 +10,8 @@ from app.utils.http import success_response
 @api_v1.get("/issues")
 @jwt_required()
 def list_issues_handler():
-    issues = issue_service.list_issues()
+    project_id = (request.args.get("project_id") or "").strip() or None
+    issues = issue_service.list_issues(project_id=project_id)
     return success_response(issues_schema.dump(issues))
 
 

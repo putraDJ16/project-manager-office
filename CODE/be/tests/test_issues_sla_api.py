@@ -26,6 +26,9 @@ def test_issue_and_sla_endpoints(client, auth_headers):
 
     after = client.get("/api/v1/issues", headers=auth_headers)
     assert len(after.get_json()["data"]) == base_count + 1
+    filtered = client.get("/api/v1/issues?project_id=p1", headers=auth_headers)
+    assert filtered.status_code == 200
+    assert any(issue["id"] == issue_id for issue in filtered.get_json()["data"])
 
     status = client.patch(f"/api/v1/issues/{issue_id}/status", headers=auth_headers, json={"status": "In Progress"})
     assert status.status_code == 200

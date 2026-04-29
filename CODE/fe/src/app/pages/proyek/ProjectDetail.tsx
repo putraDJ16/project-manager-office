@@ -4,6 +4,7 @@ import {
   Activity,
   AlertCircle,
   ArrowLeft,
+  Bug,
   Calendar,
   CheckSquare,
   Download,
@@ -60,6 +61,7 @@ import {
 } from "../../services/projectAttachmentApi";
 import type { Employee } from "../../data/masterData";
 import { TaskDetailModal } from "../tugas/TaskDetailModal";
+import { ProjectIssuePanel } from "./ProjectIssuePanel";
 
 const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 const PROJECT_PRIORITIES = ["Low", "Medium", "High", "Critical"];
@@ -80,7 +82,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   Low: "bg-green-100 text-green-700"
 };
 
-type Tab = "ringkasan" | "anggota" | "tugas" | "lampiran";
+type Tab = "ringkasan" | "anggota" | "tugas" | "isu" | "lampiran";
 type TaskView = "list" | "kanban";
 type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
 
@@ -940,6 +942,7 @@ export function ProjectDetail() {
           { key: "ringkasan", label: "Ringkasan", icon: Layers },
           { key: "anggota", label: `Anggota (${project.member_count})`, icon: Users },
           { key: "tugas", label: `Tugas (${tasks.length})`, icon: CheckSquare },
+          { key: "isu", label: "Isu & Bug", icon: Bug },
           { key: "lampiran", label: `Lampiran (${attachmentFiles.length})`, icon: FolderClosed }
         ] as { key: Tab; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
           <button
@@ -1404,6 +1407,22 @@ export function ProjectDetail() {
               </>
             )}
           </div>
+        )}
+
+        {activeTab === "isu" && (
+          <ProjectIssuePanel
+            projectId={project.id}
+            projectName={project.name}
+            assigneeOptions={Array.from(
+              new Set(
+                [
+                  ...project.members.map((member) => member.employee_name ?? "").filter(Boolean),
+                  ...employees.filter((employee) => employee.status === "Active").map((employee) => employee.name)
+                ].filter((name) => name.trim().length > 0)
+              )
+            )}
+            onNotice={setSaveNotice}
+          />
         )}
 
         {activeTab === "lampiran" && (

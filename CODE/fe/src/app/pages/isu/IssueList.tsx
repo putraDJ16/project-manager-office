@@ -13,7 +13,7 @@ import {
   Upload,
   X
 } from "lucide-react";
-import { projects as projectOptions, teamMembers } from "../../data/mockData";
+import type { Employee } from "../../data/masterData";
 import {
   ISSUE_SEVERITY_ORDER,
   ISSUE_STATUS_ORDER,
@@ -31,6 +31,8 @@ import {
   updateIssueStatus,
   updateSlaConfig
 } from "../../services/issueService";
+import { fetchEmployees } from "../../services/masterApi";
+import { fetchProjects, type ApiProject } from "../../services/projectApi";
 import {
   getSlaIndicator,
   shouldAutoEscalate,
@@ -56,9 +58,9 @@ type CreateIssueFormState = {
   expectedResult: string;
 };
 
-function getDefaultCreateForm(): CreateIssueFormState {
+function getDefaultCreateForm(defaultProjectId = ""): CreateIssueFormState {
   return {
-    projectId: projectOptions[0]?.id ?? "",
+    projectId: defaultProjectId,
     title: "",
     severity: "Major",
     reporter: "",
@@ -73,6 +75,8 @@ function getDefaultCreateForm(): CreateIssueFormState {
 }
 
 export function IssueList() {
+  const [projects, setProjects] = useState<ApiProject[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [slaConfig, setSlaConfig] = useState<SlaConfig | null>(null);
   const [view, setView] = useState<ViewMode>("list");
@@ -89,6 +93,7 @@ export function IssueList() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const defaultProjectId = projects[0]?.id ?? "";
 
   useEffect(() => {
     if (!notice) return;
@@ -101,12 +106,22 @@ export function IssueList() {
 
     const loadData = async () => {
       setIsLoading(true);
-      const [fetchedIssues, fetchedSla] = await Promise.all([getIssues(), getSlaConfig()]);
+      const [fetchedIssues, fetchedSla, fetchedProjects, fetchedEmployees] = await Promise.all([
+        getIssues(),
+        getSlaConfig(),
+        fetchProjects(),
+        fetchEmployees()
+      ]);
       if (isCancelled) return;
 
       setIssues(fetchedIssues);
       setSlaConfig(fetchedSla);
       setSlaDraft(buildRuleDraftMap(fetchedSla));
+      setProjects(fetchedProjects);
+      setEmployees(fetchedEmployees.filter((employee) => employee.status === "Active"));
+      setCreateForm((current) =>
+        current.projectId ? current : getDefaultCreateForm(fetchedProjects[0]?.id ?? "")
+      );
       setIsLoading(false);
     };
 
@@ -161,11 +176,11 @@ export function IssueList() {
   }, [issues, selectedIssueId]);
 
   const projectById = useMemo(() => {
-    return projectOptions.reduce<Record<string, string>>((acc, project) => {
+    return projects.reduce<Record<string, string>>((acc, project) => {
       acc[project.id] = project.name;
       return acc;
     }, {});
-  }, []);
+  }, [projects]);
 
   const getProjectName = (projectId: string) => projectById[projectId] ?? projectId;
 
@@ -221,7 +236,7 @@ export function IssueList() {
 
     const refreshed = await getIssues();
     setIssues(refreshed);
-    setCreateForm(getDefaultCreateForm());
+    setCreateForm(getDefaultCreateForm(defaultProjectId));
     setSelectedAttachments([]);
     setIsCreateModalOpen(false);
     setNotice("Isu baru berhasil dibuat.");
@@ -322,7 +337,7 @@ export function IssueList() {
         <button
           type="button"
           onClick={() => {
-            setCreateForm(getDefaultCreateForm());
+            setCreateForm(getDefaultCreateForm(defaultProjectId));
             setSelectedAttachments([]);
             setIsCreateModalOpen(true);
           }}
@@ -512,7 +527,7 @@ export function IssueList() {
                     className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                     required
                   >
-                    {projectOptions.map((project) => (
+                    {projects.map((project) => (
                       <option key={project.id} value={project.id}>
                         {project.name}
                       </option>
@@ -557,9 +572,9 @@ export function IssueList() {
                   className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                 >
                   <option value="">Unassigned</option>
-                  {teamMembers.map((member) => (
-                    <option key={member.id} value={member.name}>
-                      {member.name}
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.name}>
+                      {employee.name}
                     </option>
                   ))}
                 </select>

@@ -15,8 +15,8 @@ DEFAULT_SLA_RULES = {
 }
 
 
-def list_issues():
-    return IssueRepository.list_issues()
+def list_issues(project_id: str | None = None):
+    return IssueRepository.list_issues(project_id=project_id)
 
 
 def create_issue(payload: dict):

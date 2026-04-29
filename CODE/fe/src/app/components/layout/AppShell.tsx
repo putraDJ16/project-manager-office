@@ -4,7 +4,6 @@ import {
   Bell,
   Search,
   Home,
-  CheckSquare,
   Bug,
   FolderKanban,
   Building2,
@@ -73,11 +72,6 @@ export function AppShell({ session, onLogout }: AppShellProps) {
             <Link to="/proyek/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Proyek">
               <FolderKanban className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
               {!isSidebarMinimized && "Proyek"}
-            </Link>
-
-            <Link to="/tugas/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Manajemen Tugas">
-              <CheckSquare className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
-              {!isSidebarMinimized && "Manajemen Tugas"}
             </Link>
 
             <Link to="/isu/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Isu & Bug">
