@@ -1,5 +1,8 @@
+from flask import current_app
+from werkzeug.security import generate_password_hash
+
 from app.extensions import db
-from app.models import Employee, Role
+from app.models import Employee, Role, User
 from app.repositories import (
     EmployeeRepository,
     OrganizationRepository,
@@ -85,6 +88,10 @@ def create_employee(payload: dict):
     _validate_unit_organization(clean["unit_organization"])
     _validate_position(clean["position"])
 
+    existing_user = User.query.filter(db.func.lower(User.email) == clean["email"].lower()).first()
+    if existing_user:
+        raise ApiError("Email sudah digunakan oleh akun user lain.", errors={"email": "duplicate_user"})
+
     ids = [employee.id for employee in Employee.query.with_entities(Employee.id).all()]
     employee = Employee(
         id=next_string_id(ids, "emp-", default_start=1, width=3),
@@ -97,9 +104,21 @@ def create_employee(payload: dict):
         role_id=clean["role_id"],
         status=(payload.get("status") or "Active"),
     )
+
+    default_password = current_app.config.get("DEFAULT_EMPLOYEE_PASSWORD", "Welcome123!")
+    user = User(
+        email=clean["email"],
+        password_hash=generate_password_hash(default_password),
+        display_name=clean["name"],
+        role_id=clean["role_id"],
+        employee_id=employee.id,
+        is_active=employee.status == "Active",
+    )
+
     db.session.add(employee)
+    db.session.add(user)
     db.session.commit()
-    return employee
+    return employee, default_password
 
 
 def update_employee(employee_id: str, payload: dict):

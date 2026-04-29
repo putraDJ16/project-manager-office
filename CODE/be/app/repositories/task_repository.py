@@ -1,6 +1,6 @@
 from sqlalchemy import or_
 
-from app.models import Task
+from app.models import Task, TaskComment
 
 
 class TaskRepository:
@@ -23,3 +23,12 @@ class TaskRepository:
     @staticmethod
     def get_task(task_id: str):
         return Task.query.get(task_id)
+
+    @staticmethod
+    def list_task_comments(task_id: str):
+        return (
+            TaskComment.query
+            .filter(TaskComment.task_id == task_id)
+            .order_by(TaskComment.created_at.asc(), TaskComment.id.asc())
+            .all()
+        )

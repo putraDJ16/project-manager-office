@@ -159,9 +159,9 @@ def seed_database(force_reset: bool = False):
     db.session.add_all(users)
 
     projects = [
-        Project(id="p1", name="Transformasi Digital Kamsiber", status="Active"),
-        Project(id="p2", name="Security Audit Tahunan", status="Active"),
-        Project(id="p3", name="Migrasi Cloud", status="Planning"),
+        Project(id="p1", name="Transformasi Digital Kamsiber", status="Active", manager_id="emp-001"),
+        Project(id="p2", name="Security Audit Tahunan", status="Active", manager_id="emp-002"),
+        Project(id="p3", name="Migrasi Cloud", status="Planning", manager_id="emp-001"),
     ]
     db.session.add_all(projects)
 

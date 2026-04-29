@@ -23,6 +23,18 @@ const endpointMap: Record<MasterReferenceType, string> = {
   position: "/positions"
 };
 
+const MASTER_REFERENCE_CACHE_TTL_MS = 2 * 60 * 1000;
+
+type CacheEntry<T> = {
+  data: T;
+  expiresAt: number;
+};
+
+let allReferencesInFlight: Promise<MasterReferenceItem[]> | null = null;
+const referencesByTypeInFlight: Partial<Record<MasterReferenceType, Promise<MasterReferenceItem[]>>> = {};
+let allReferencesCache: CacheEntry<MasterReferenceItem[]> | null = null;
+const referencesByTypeCache: Partial<Record<MasterReferenceType, CacheEntry<MasterReferenceItem[]>>> = {};
+
 function mapReferenceItem(type: MasterReferenceType, item: ApiReferenceItem): MasterReferenceItem {
   return {
     id: item.id,
@@ -36,23 +48,85 @@ function sortItems(items: MasterReferenceItem[]) {
   return [...items].sort((a, b) => a.name.localeCompare(b.name, "id"));
 }
 
-export async function fetchMasterReferences(type?: MasterReferenceType) {
-  if (type) {
-    const response = await apiRequest<ApiReferenceItem[]>(endpointMap[type], { method: "GET" });
-    return sortItems(response.data.map((item) => mapReferenceItem(type, item)));
+function isCacheFresh<T>(cache: CacheEntry<T> | null | undefined) {
+  return Boolean(cache && cache.expiresAt > Date.now());
+}
+
+function setAllReferencesCache(data: MasterReferenceItem[]) {
+  allReferencesCache = {
+    data: sortItems(data),
+    expiresAt: Date.now() + MASTER_REFERENCE_CACHE_TTL_MS
+  };
+}
+
+function setTypeCache(type: MasterReferenceType, data: MasterReferenceItem[]) {
+  referencesByTypeCache[type] = {
+    data: sortItems(data),
+    expiresAt: Date.now() + MASTER_REFERENCE_CACHE_TTL_MS
+  };
+}
+
+function upsertById(items: MasterReferenceItem[], nextItem: MasterReferenceItem) {
+  const exists = items.some((item) => item.id === nextItem.id && item.type === nextItem.type);
+  if (!exists) return sortItems([nextItem, ...items]);
+  return sortItems(items.map((item) => (item.id === nextItem.id && item.type === nextItem.type ? nextItem : item)));
+}
+
+function syncReferenceCaches(nextItem: MasterReferenceItem) {
+  const currentTypeCache = referencesByTypeCache[nextItem.type];
+  if (currentTypeCache) {
+    setTypeCache(nextItem.type, upsertById(currentTypeCache.data, nextItem));
   }
 
-  const [organizations, units, positions] = await Promise.all([
+  if (allReferencesCache) {
+    setAllReferencesCache(upsertById(allReferencesCache.data, nextItem));
+  }
+}
+
+export async function fetchMasterReferences(type?: MasterReferenceType) {
+  if (type) {
+    const cachedByType = referencesByTypeCache[type];
+    if (isCacheFresh(cachedByType)) return cachedByType!.data;
+    if (referencesByTypeInFlight[type]) return referencesByTypeInFlight[type];
+
+    referencesByTypeInFlight[type] = apiRequest<ApiReferenceItem[]>(endpointMap[type], { method: "GET" })
+      .then((response) => {
+        const mapped = sortItems(response.data.map((item) => mapReferenceItem(type, item)));
+        setTypeCache(type, mapped);
+        return mapped;
+      })
+      .finally(() => {
+        delete referencesByTypeInFlight[type];
+      });
+    return referencesByTypeInFlight[type];
+  }
+
+  if (isCacheFresh(allReferencesCache)) return allReferencesCache!.data;
+  if (allReferencesInFlight) return allReferencesInFlight;
+
+  allReferencesInFlight = Promise.all([
     apiRequest<ApiReferenceItem[]>(endpointMap.organization, { method: "GET" }),
     apiRequest<ApiReferenceItem[]>(endpointMap.unitOrganization, { method: "GET" }),
     apiRequest<ApiReferenceItem[]>(endpointMap.position, { method: "GET" })
-  ]);
+  ])
+    .then(([organizations, units, positions]) => {
+      const organizationItems = organizations.data.map((item) => mapReferenceItem("organization", item));
+      const unitItems = units.data.map((item) => mapReferenceItem("unitOrganization", item));
+      const positionItems = positions.data.map((item) => mapReferenceItem("position", item));
 
-  return sortItems([
-    ...organizations.data.map((item) => mapReferenceItem("organization", item)),
-    ...units.data.map((item) => mapReferenceItem("unitOrganization", item)),
-    ...positions.data.map((item) => mapReferenceItem("position", item))
-  ]);
+      setTypeCache("organization", organizationItems);
+      setTypeCache("unitOrganization", unitItems);
+      setTypeCache("position", positionItems);
+
+      const combined = sortItems([...organizationItems, ...unitItems, ...positionItems]);
+      setAllReferencesCache(combined);
+      return combined;
+    })
+    .finally(() => {
+      allReferencesInFlight = null;
+    });
+
+  return allReferencesInFlight;
 }
 
 export async function createMasterReference(payload: MasterReferencePayload) {
@@ -63,7 +137,9 @@ export async function createMasterReference(payload: MasterReferencePayload) {
       status: payload.status
     }
   });
-  return mapReferenceItem(payload.type, response.data);
+  const created = mapReferenceItem(payload.type, response.data);
+  syncReferenceCaches(created);
+  return created;
 }
 
 export async function updateMasterReference(
@@ -75,7 +151,9 @@ export async function updateMasterReference(
     method: "PATCH",
     body: payload
   });
-  return mapReferenceItem(type, response.data);
+  const updated = mapReferenceItem(type, response.data);
+  syncReferenceCaches(updated);
+  return updated;
 }
 
 export async function updateMasterReferenceStatus(
@@ -87,5 +165,7 @@ export async function updateMasterReferenceStatus(
     method: "PATCH",
     body: { status }
   });
-  return mapReferenceItem(type, response.data);
+  const updated = mapReferenceItem(type, response.data);
+  syncReferenceCaches(updated);
+  return updated;
 }

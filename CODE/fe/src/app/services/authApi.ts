@@ -22,8 +22,20 @@ type MeResponse = {
   position?: string | null;
 };
 
+export type MyProjectResponse = {
+  id: string;
+  name: string;
+  status: string;
+  priority: string | null;
+  manager_name: string | null;
+  member_count: number;
+  task_count: number;
+  start_date: string | null;
+  end_date: string | null;
+};
+
 export async function loginWithApi(email: string, password: string) {
-  // Jika VITE_USE_MOCK=true diset di Vercel, langsung return mock
+  // Mock eksplisit untuk mode demo/testing tertentu.
   if (import.meta.env.VITE_USE_MOCK === "true") {
     return {
       access_token: "mock-token",
@@ -40,18 +52,43 @@ export async function loginWithApi(email: string, password: string) {
     });
     return result.data;
   } catch (error) {
-    // Pada Vercel (tanpa backend konfigurasi), akan selalu throw 404/405
-    // Kita fallback otomatis ke mock agar tidak terjadi bloking.
-    console.warn("Login API failed. Fallback to mock session. Error:", error);
-    return {
-      access_token: "mock-token-fallback",
-      refresh_token: "mock-refresh-fallback",
-      user: { id: "USR-999", name: email.split("@")[0], email, initials: "FB" }
-    };
+    // Di local dev, jangan fallback agar kegagalan auth terlihat jelas.
+    if (import.meta.env.DEV) {
+      throw error;
+    }
+
+    // Fallback hanya aktif jika diizinkan eksplisit via env.
+    if (import.meta.env.VITE_ALLOW_LOGIN_FALLBACK === "true") {
+      console.warn("Login API failed. Fallback to mock session. Error:", error);
+      return {
+        access_token: "mock-token-fallback",
+        refresh_token: "mock-refresh-fallback",
+        user: { id: "USR-999", name: email.split("@")[0], email, initials: "FB" }
+      };
+    }
+
+    throw error;
   }
 }
 
 export async function getMe() {
   const result = await apiRequest<MeResponse>("/auth/me", { method: "GET" });
+  return result.data;
+}
+
+export async function changePassword(payload: {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}) {
+  const result = await apiRequest<null>("/auth/change-password", {
+    method: "POST",
+    body: payload,
+  });
+  return result.message ?? "Password berhasil diubah.";
+}
+
+export async function fetchMyProjects() {
+  const result = await apiRequest<MyProjectResponse[]>("/auth/my-projects", { method: "GET" });
   return result.data;
 }

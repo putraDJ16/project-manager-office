@@ -11,6 +11,7 @@ class Config:
     JSON_SORT_KEYS = False
     ATTACHMENT_STORAGE_DIR = os.getenv("ATTACHMENT_STORAGE_DIR", "")
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(25 * 1024 * 1024)))
+    DEFAULT_EMPLOYEE_PASSWORD = os.getenv("DEFAULT_EMPLOYEE_PASSWORD", "Welcome123!")
 
 
 class TestingConfig(Config):

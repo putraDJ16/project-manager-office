@@ -3,6 +3,7 @@ from flask_jwt_extended import get_jwt, jwt_required
 
 from app.api.v1 import api_v1
 from app.schemas import task_schema, tasks_schema
+from app.schemas import task_comment_schema, task_comments_schema
 from app.services import task_service
 from app.utils.http import success_response
 
@@ -31,3 +32,23 @@ def update_task_handler(task_id: str):
     payload = request.get_json(silent=True) or {}
     task = task_service.update_task(task_id, payload)
     return success_response(task_schema.dump(task), message="Tugas berhasil diperbarui.")
+
+
+@api_v1.get("/tasks/<string:task_id>/comments")
+@jwt_required()
+def list_task_comments_handler(task_id: str):
+    comments = task_service.list_task_comments(task_id)
+    return success_response(task_comments_schema.dump(comments))
+
+
+@api_v1.post("/tasks/<string:task_id>/comments")
+@jwt_required()
+def create_task_comment_handler(task_id: str):
+    payload = request.get_json(silent=True) or {}
+    claims = get_jwt()
+    comment = task_service.create_task_comment(task_id, payload, author_name=claims.get("name", "System"))
+    return success_response(
+        task_comment_schema.dump(comment),
+        message="Komentar berhasil ditambahkan.",
+        status_code=201,
+    )

@@ -2,7 +2,9 @@ from flask import request
 from flask_jwt_extended import create_access_token, get_jwt, jwt_required
 
 from app.api.v1 import api_v1
-from app.services.auth_service import get_profile, login
+from app.schemas import projects_schema
+from app.services.auth_service import change_password, get_profile, list_my_projects, login
+from app.utils.exceptions import ApiError
 from app.utils.http import success_response
 
 
@@ -36,3 +38,34 @@ def me_handler():
     identity = claims["sub"]
     profile = get_profile(identity)
     return success_response(profile)
+
+
+@api_v1.post("/auth/change-password")
+@jwt_required()
+def change_password_handler():
+    claims = get_jwt()
+    identity = claims["sub"]
+    payload = request.get_json(silent=True) or {}
+
+    current_password = (payload.get("current_password") or "").strip()
+    new_password = (payload.get("new_password") or "").strip()
+    confirm_password = (payload.get("confirm_password") or "").strip()
+
+    if not current_password:
+        raise ApiError("Password saat ini wajib diisi.")
+    if not new_password:
+        raise ApiError("Password baru wajib diisi.")
+    if new_password != confirm_password:
+        raise ApiError("Konfirmasi password baru tidak cocok.")
+
+    change_password(identity, current_password, new_password)
+    return success_response(None, message="Password berhasil diubah.")
+
+
+@api_v1.get("/auth/my-projects")
+@jwt_required()
+def my_projects_handler():
+    claims = get_jwt()
+    identity = claims["sub"]
+    projects = list_my_projects(identity)
+    return success_response(projects_schema.dump(projects))

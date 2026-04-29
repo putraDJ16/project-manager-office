@@ -1,3 +1,4 @@
+from app.models.audit_trail import AuditTrail
 from app.models.employee import Employee
 from app.models.issue import Issue
 from app.models.organization import Organization
@@ -11,9 +12,11 @@ from app.models.project_member import ProjectMember
 from app.models.role import Role
 from app.models.sla_rule import SlaRule
 from app.models.task import Task
+from app.models.task_comment import TaskComment
 from app.models.user import User
 
 __all__ = [
+    "AuditTrail",
     "Role",
     "Employee",
     "User",
@@ -23,6 +26,7 @@ __all__ = [
     "ProjectAttachmentFolder",
     "ProjectAttachmentFile",
     "Task",
+    "TaskComment",
     "Issue",
     "SlaRule",
     "Organization",

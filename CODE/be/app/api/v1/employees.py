@@ -18,9 +18,11 @@ def list_employees_handler():
 @jwt_required()
 def create_employee_handler():
     payload = request.get_json(silent=True) or {}
-    employee = employee_service.create_employee(payload)
+    employee, default_password = employee_service.create_employee(payload)
     return success_response(
-        employee_schema.dump(employee), message="Pegawai berhasil ditambahkan.", status_code=201
+        employee_schema.dump(employee),
+        message=f"Pegawai berhasil ditambahkan. Password default: {default_password}",
+        status_code=201,
     )
 
 

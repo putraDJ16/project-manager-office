@@ -40,7 +40,14 @@ def test_employee_crud(client, auth_headers):
         },
     )
     assert created.status_code == 201
+    assert "Password default:" in created.get_json().get("message", "")
     employee_id = created.get_json()["data"]["id"]
+
+    login_new_employee = client.post(
+        "/api/v1/auth/login",
+        json={"email": "tes.pegawai@company.co.id", "password": "Welcome123!"},
+    )
+    assert login_new_employee.status_code == 200
 
     updated = client.patch(
         f"/api/v1/employees/{employee_id}",

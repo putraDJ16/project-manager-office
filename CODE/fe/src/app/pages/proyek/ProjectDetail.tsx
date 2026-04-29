@@ -33,7 +33,17 @@ import {
   type ApiProjectMember
 } from "../../services/projectApi";
 import { fetchEmployees } from "../../services/masterApi";
-import { createTask, fetchPhases, fetchTasks, updateTask, type ApiPhase, type ApiTask } from "../../services/taskApi";
+import {
+  createTask,
+  createTaskComment,
+  fetchPhases,
+  fetchTaskComments,
+  fetchTasks,
+  updateTask,
+  type ApiPhase,
+  type ApiTask,
+  type ApiTaskComment
+} from "../../services/taskApi";
 import {
   createAttachmentFolder,
   deleteAttachmentFile,
@@ -49,10 +59,12 @@ import {
   type ApiAttachmentFolder
 } from "../../services/projectAttachmentApi";
 import type { Employee } from "../../data/masterData";
+import { TaskDetailModal } from "../tugas/TaskDetailModal";
 
 const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 const PROJECT_PRIORITIES = ["Low", "Medium", "High", "Critical"];
 const TASK_PRIORITIES = ["Low", "Medium", "High", "Critical"];
+const TASK_PROGRESS_OPTIONS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 const STATUS_COLORS: Record<string, string> = {
   Active: "bg-emerald-100 text-emerald-700",
@@ -70,10 +82,20 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 type Tab = "ringkasan" | "anggota" | "tugas" | "lampiran";
 type TaskView = "list" | "kanban";
+type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
 
 function formatDate(value: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function toTaskComment(raw: ApiTaskComment): TaskComment {
+  return {
+    id: raw.id,
+    authorName: raw.author_name,
+    content: raw.content,
+    createdAt: raw.created_at
+  };
 }
 
 export function ProjectDetail() {
@@ -116,11 +138,16 @@ export function ProjectDetail() {
     phase_id: "",
     assignee: "",
     priority: "Medium" as string,
+    progress_percentage: 0,
     start_date: "",
     end_date: ""
   });
   const [taskError, setTaskError] = useState<string | null>(null);
   const [taskSaving, setTaskSaving] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
+  const [isLoadingTaskComments, setIsLoadingTaskComments] = useState(false);
+  const [isSavingTaskComment, setIsSavingTaskComment] = useState(false);
 
   const [attachmentFolders, setAttachmentFolders] = useState<ApiAttachmentFolder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -156,16 +183,14 @@ export function ProjectDetail() {
       fetchPhases(id),
       fetchTasks(id, ""),
       fetchEmployees(),
-      fetchAttachmentFolders(id),
-      fetchAttachmentFiles(id)
+      fetchAttachmentFolders(id)
     ])
-      .then(([projectResult, phaseResult, taskResult, employeeResult, folderResult, fileResult]) => {
+      .then(([projectResult, phaseResult, taskResult, employeeResult, folderResult]) => {
         setProject(projectResult);
         setPhases(phaseResult);
         setTasks(taskResult);
         setEmployees(employeeResult);
         setAttachmentFolders(folderResult);
-        setAttachmentFiles(fileResult);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -194,6 +219,10 @@ export function ProjectDetail() {
     () => [...phases].sort((left, right) => left.order_index - right.order_index),
     [phases]
   );
+  const selectedTask = useMemo(
+    () => tasks.find((task) => task.id === selectedTaskId) ?? null,
+    [selectedTaskId, tasks]
+  );
 
   const resolveAssigneeLabel = (assigneeValue: string) => {
     if (!assigneeValue) return "";
@@ -203,6 +232,13 @@ export function ProjectDetail() {
     if (employee?.name) return employee.name;
     return assigneeValue;
   };
+
+  useEffect(() => {
+    if (!selectedTaskId) return;
+    if (!tasks.some((task) => task.id === selectedTaskId)) {
+      setSelectedTaskId(null);
+    }
+  }, [selectedTaskId, tasks]);
 
   const refreshAttachmentFolders = async (projectId: string) => {
     const folders = await fetchAttachmentFolders(projectId);
@@ -596,6 +632,7 @@ export function ProjectDetail() {
         assignee: taskForm.assignee,
         project_id: id,
         phase_id: taskForm.phase_id,
+        progress_percentage: taskForm.progress_percentage,
         start_date: taskForm.start_date || null,
         end_date: taskForm.end_date || null
       });
@@ -605,6 +642,7 @@ export function ProjectDetail() {
         phase_id: "",
         assignee: "",
         priority: "Medium",
+        progress_percentage: 0,
         start_date: "",
         end_date: ""
       });
@@ -638,6 +676,67 @@ export function ProjectDetail() {
         type: "error",
         msg: err instanceof Error ? err.message : "Gagal memindahkan tugas antar fase."
       });
+    }
+  };
+
+  const handleTaskProgressChange = async (taskId: string, nextProgress: number) => {
+    if (!id) return;
+    const sanitized = Math.max(0, Math.min(100, nextProgress));
+    const previousTask = tasks.find((task) => task.id === taskId);
+    if (!previousTask || previousTask.progress_percentage === sanitized) return;
+
+    setTasks((current) =>
+      current.map((task) => (task.id === taskId ? { ...task, progress_percentage: sanitized } : task))
+    );
+
+    try {
+      const updated = await updateTask(taskId, { progress_percentage: sanitized });
+      setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
+    } catch (err: unknown) {
+      const freshTasks = await fetchTasks(id, "");
+      setTasks(freshTasks);
+      setSaveNotice({
+        type: "error",
+        msg: err instanceof Error ? err.message : "Gagal memperbarui persentase tugas."
+      });
+    }
+  };
+
+  const loadTaskComments = async (taskId: string) => {
+    setIsLoadingTaskComments(true);
+    try {
+      const rows = await fetchTaskComments(taskId);
+      setTaskComments((current) => ({ ...current, [taskId]: rows.map(toTaskComment) }));
+    } catch (err: unknown) {
+      setSaveNotice({
+        type: "error",
+        msg: err instanceof Error ? err.message : "Gagal memuat komentar tugas."
+      });
+    } finally {
+      setIsLoadingTaskComments(false);
+    }
+  };
+
+  const handleOpenTaskDetail = async (taskId: string) => {
+    setSelectedTaskId(taskId);
+    await loadTaskComments(taskId);
+  };
+
+  const handleSubmitTaskComment = async (content: string) => {
+    if (!selectedTaskId) return;
+    setIsSavingTaskComment(true);
+    try {
+      await createTaskComment(selectedTaskId, { content });
+      await loadTaskComments(selectedTaskId);
+      setSaveNotice({ type: "success", msg: "Komentar berhasil ditambahkan." });
+    } catch (err: unknown) {
+      setSaveNotice({
+        type: "error",
+        msg: err instanceof Error ? err.message : "Gagal menambahkan komentar tugas."
+      });
+      throw err;
+    } finally {
+      setIsSavingTaskComment(false);
     }
   };
 
@@ -1022,6 +1121,7 @@ export function ProjectDetail() {
                     phase_id: "",
                     assignee: "",
                     priority: "Medium",
+                    progress_percentage: 0,
                     start_date: "",
                     end_date: ""
                   });
@@ -1096,6 +1196,24 @@ export function ProjectDetail() {
                     </select>
                   </div>
                   <div>
+                    <label className="block text-xs text-slate-500 mb-1">Progress (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={taskForm.progress_percentage}
+                      onChange={(event) =>
+                        setTaskForm((current) => ({
+                          ...current,
+                          progress_percentage: Number.isNaN(Number(event.target.value))
+                            ? 0
+                            : Math.max(0, Math.min(100, Number(event.target.value)))
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-xs text-slate-500 mb-1">Tanggal Mulai</label>
                     <input
                       type="date"
@@ -1154,9 +1272,11 @@ export function ProjectDetail() {
                           <th className="px-4 py-3 font-medium text-left">Judul</th>
                           <th className="px-4 py-3 font-medium text-left">Fase</th>
                           <th className="px-4 py-3 font-medium text-left">Prioritas</th>
+                          <th className="px-4 py-3 font-medium text-left">Progress</th>
                           <th className="px-4 py-3 font-medium text-left">Assignee</th>
                           <th className="px-4 py-3 font-medium text-left">Mulai</th>
                           <th className="px-4 py-3 font-medium text-left">Selesai</th>
+                          <th className="px-4 py-3 font-medium text-right">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1176,11 +1296,26 @@ export function ProjectDetail() {
                                   {task.priority}
                                 </span>
                               </td>
+                              <td className="px-4 py-3">
+                                <TaskProgressControl
+                                  value={task.progress_percentage}
+                                  onChange={(next) => void handleTaskProgressChange(task.id, next)}
+                                />
+                              </td>
                               <td className="px-4 py-3 text-slate-600">
                                 {resolveAssigneeLabel(task.assignee) || <span className="text-slate-300">-</span>}
                               </td>
                               <td className="px-4 py-3 text-slate-600">{formatDate(task.start_date)}</td>
                               <td className="px-4 py-3 text-slate-600">{formatDate(task.end_date)}</td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleOpenTaskDetail(task.id)}
+                                  className="inline-flex px-3 py-1.5 rounded-md border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                                >
+                                  Detail
+                                </button>
+                              </td>
                             </tr>
                           );
                         })}
@@ -1230,6 +1365,22 @@ export function ProjectDetail() {
                                             </span>
                                           </div>
                                           <h4 className="font-medium text-slate-900 mb-2 text-sm">{task.title}</h4>
+                                          <button
+                                            type="button"
+                                            onMouseDown={(event) => event.stopPropagation()}
+                                            onClick={() => void handleOpenTaskDetail(task.id)}
+                                            className="mb-2 inline-flex px-2.5 py-1 text-[11px] rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100"
+                                          >
+                                            Buka Detail
+                                          </button>
+                                          <div className="mb-2">
+                                            <label className="block text-[11px] text-slate-500 mb-1">Progress</label>
+                                            <TaskProgressControl
+                                              value={task.progress_percentage}
+                                              onChange={(next) => void handleTaskProgressChange(task.id, next)}
+                                              compact
+                                            />
+                                          </div>
                                           <p className="text-xs text-slate-500">
                                             Assignee: {resolveAssigneeLabel(task.assignee) || "-"}
                                           </p>
@@ -1528,6 +1679,33 @@ export function ProjectDetail() {
         )}
       </div>
 
+      {selectedTask && (
+        <TaskDetailModal
+          task={{
+            id: selectedTask.id,
+            title: selectedTask.title,
+            priority: selectedTask.priority,
+            assignee: selectedTask.assignee,
+            createdBy: selectedTask.created_by,
+            project: selectedTask.project_id,
+            phaseId: selectedTask.phase_id,
+            startDate: selectedTask.start_date,
+            endDate: selectedTask.end_date,
+            progressPercentage: selectedTask.progress_percentage,
+            createdAt: selectedTask.created_at,
+            updatedAt: selectedTask.updated_at
+          }}
+          projectName={project.name}
+          phaseName={phasesSorted.find((phase) => phase.id === selectedTask.phase_id)?.name ?? "Tanpa Fase"}
+          assigneeName={resolveAssigneeLabel(selectedTask.assignee) || selectedTask.assignee}
+          comments={taskComments[selectedTask.id] ?? []}
+          isLoadingComments={isLoadingTaskComments}
+          isSavingComment={isSavingTaskComment}
+          onClose={() => setSelectedTaskId(null)}
+          onSubmitComment={handleSubmitTaskComment}
+        />
+      )}
+
       {previewFile && (
         <div
           className="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-4"
@@ -1687,5 +1865,50 @@ function MemberRow({
         </button>
       </td>
     </tr>
+  );
+}
+
+function TaskProgressControl({
+  value,
+  onChange,
+  compact = false
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  compact?: boolean;
+}) {
+  const safeValue = Math.max(0, Math.min(100, value));
+  const barColorClass =
+    safeValue >= 100
+      ? "bg-emerald-500"
+      : safeValue >= 70
+        ? "bg-blue-500"
+        : safeValue >= 40
+          ? "bg-amber-500"
+          : "bg-slate-500";
+
+  return (
+    <div className={compact ? "space-y-1.5" : "min-w-[170px] space-y-1.5"}>
+      <div className="flex items-center gap-2">
+        <div className="h-2 flex-1 rounded-full bg-slate-200 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${barColorClass}`}
+            style={{ width: `${safeValue}%` }}
+          />
+        </div>
+        <span className="text-[11px] font-semibold text-slate-600 w-10 text-right">{safeValue}%</span>
+      </div>
+      <select
+        value={safeValue}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="w-full px-2 py-1 border border-slate-300 rounded-md text-xs bg-white"
+      >
+        {TASK_PROGRESS_OPTIONS.map((optionValue) => (
+          <option key={optionValue} value={optionValue}>
+            {optionValue}%
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }

@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Filter, GitCommit, Layers3, List, Search, Settings2, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import { teamMembers } from "../../data/mockData";
-import { fetchPhases, fetchProjects, fetchTasks } from "../../services/taskApi";
+import {
+  createTaskComment,
+  fetchPhases,
+  fetchProjects,
+  fetchTaskComments,
+  fetchTasks,
+  type ApiTaskComment
+} from "../../services/taskApi";
+import { TaskDetailModal } from "./TaskDetailModal";
 
 type Project = { id: string; name: string; status: string };
 type Phase = { id: string; projectId: string; name: string; order: number };
@@ -16,7 +24,11 @@ type Task = {
   phaseId: string;
   startDate: string | null;
   endDate: string | null;
+  progressPercentage: number;
+  createdAt: string;
+  updatedAt: string;
 };
+type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
 type NoticeState = { type: "success" | "error"; message: string } | null;
 type DateStatus = "upcoming" | "on_progress" | "overdue";
 
@@ -34,6 +46,9 @@ function toTask(raw: {
   phase_id: string;
   start_date: string | null;
   end_date: string | null;
+  progress_percentage: number;
+  created_at: string;
+  updated_at: string;
 }): Task {
   return {
     id: raw.id,
@@ -44,7 +59,19 @@ function toTask(raw: {
     project: raw.project_id,
     phaseId: raw.phase_id,
     startDate: raw.start_date,
-    endDate: raw.end_date
+    endDate: raw.end_date,
+    progressPercentage: raw.progress_percentage,
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at
+  };
+}
+
+function toTaskComment(raw: ApiTaskComment): TaskComment {
+  return {
+    id: raw.id,
+    authorName: raw.author_name,
+    content: raw.content,
+    createdAt: raw.created_at
   };
 }
 
@@ -84,6 +111,10 @@ export function TaskList() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [notice, setNotice] = useState<NoticeState>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [isSavingComment, setIsSavingComment] = useState(false);
 
   const phasesForProject = useMemo(
     () =>
@@ -112,6 +143,10 @@ export function TaskList() {
   }, [phaseById, searchQuery, selectedProjectId, tasks]);
 
   const hasSearchInput = searchInput.trim().length > 0;
+  const selectedTask = useMemo(
+    () => tasks.find((task) => task.id === selectedTaskId) ?? null,
+    [selectedTaskId, tasks]
+  );
 
   const reloadProjectData = async (projectId: string, query = searchQuery) => {
     if (!projectId) return;
@@ -163,6 +198,40 @@ export function TaskList() {
   const handleClearSearch = () => {
     setSearchInput("");
     setSearchQuery("");
+  };
+
+  const loadTaskComments = async (taskId: string) => {
+    setIsLoadingComments(true);
+    try {
+      const commentRows = await fetchTaskComments(taskId);
+      setTaskComments((current) => ({ ...current, [taskId]: commentRows.map(toTaskComment) }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Gagal memuat komentar tugas.";
+      setNotice({ type: "error", message });
+    } finally {
+      setIsLoadingComments(false);
+    }
+  };
+
+  const handleOpenTaskDetail = async (taskId: string) => {
+    setSelectedTaskId(taskId);
+    await loadTaskComments(taskId);
+  };
+
+  const handleSubmitTaskComment = async (content: string) => {
+    if (!selectedTaskId) return;
+    setIsSavingComment(true);
+    try {
+      await createTaskComment(selectedTaskId, { content });
+      await loadTaskComments(selectedTaskId);
+      setNotice({ type: "success", message: "Komentar berhasil ditambahkan." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Gagal menambahkan komentar.";
+      setNotice({ type: "error", message });
+      throw error;
+    } finally {
+      setIsSavingComment(false);
+    }
   };
 
   return (
@@ -301,6 +370,7 @@ export function TaskList() {
                   <th className="px-4 py-3 font-medium">Tanggal Selesai</th>
                   <th className="px-4 py-3 font-medium">Status Waktu</th>
                   <th className="px-4 py-3 font-medium">Prioritas</th>
+                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -350,6 +420,15 @@ export function TaskList() {
                         {task.priority}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenTaskDetail(task.id)}
+                        className="inline-flex px-3 py-1.5 rounded-md border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                      >
+                        Detail
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -370,8 +449,14 @@ export function TaskList() {
                   .filter((task) => task.phaseId === phase.id)
                   .map((task) => (
                     <div key={task.id} className="px-6 py-3 hover:bg-slate-50">
-                      <span className="text-slate-400 w-12 text-xs mr-3">{task.id}</span>
-                      {task.title}
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenTaskDetail(task.id)}
+                        className="text-left w-full"
+                      >
+                        <span className="text-slate-400 w-12 text-xs mr-3">{task.id}</span>
+                        <span className="text-slate-700">{task.title}</span>
+                      </button>
                     </div>
                   ))}
               </div>
@@ -379,6 +464,20 @@ export function TaskList() {
           </div>
         )}
       </div>
+
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          projectName={projects.find((project) => project.id === selectedTask.project)?.name ?? selectedTask.project}
+          phaseName={phaseById[selectedTask.phaseId]?.name ?? "Tanpa Fase"}
+          assigneeName={teamMembers.find((member) => member.id === selectedTask.assignee)?.name ?? selectedTask.assignee}
+          comments={taskComments[selectedTask.id] ?? []}
+          isLoadingComments={isLoadingComments}
+          isSavingComment={isSavingComment}
+          onClose={() => setSelectedTaskId(null)}
+          onSubmitComment={handleSubmitTaskComment}
+        />
+      )}
     </div>
   );
 }

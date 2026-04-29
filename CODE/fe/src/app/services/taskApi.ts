@@ -24,8 +24,18 @@ export type ApiTask = {
   created_at: string;
   updated_at: string;
   phase_updated_at: string | null;
+  progress_percentage: number;
   start_date: string | null;
   end_date: string | null;
+};
+
+export type ApiTaskComment = {
+  id: number;
+  task_id: string;
+  author_name: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
 };
 
 type ApiMutationResult<T> = {
@@ -79,6 +89,7 @@ export async function createTask(payload: {
   assignee: string;
   project_id: string;
   phase_id: string;
+  progress_percentage?: number;
   start_date?: string | null;
   end_date?: string | null;
 }): Promise<ApiMutationResult<ApiTask>> {
@@ -93,10 +104,24 @@ export async function updateTask(
     priority: "Low" | "Medium" | "High" | "Critical";
     assignee: string;
     phase_id: string;
+    progress_percentage: number;
     start_date: string | null;
     end_date: string | null;
   }>
 ) {
   const result = await apiRequest<ApiTask>(`/tasks/${taskId}`, { method: "PATCH", body: payload });
   return result.data;
+}
+
+export async function fetchTaskComments(taskId: string) {
+  const result = await apiRequest<ApiTaskComment[]>(`/tasks/${taskId}/comments`, { method: "GET" });
+  return result.data;
+}
+
+export async function createTaskComment(taskId: string, payload: { content: string }) {
+  const result = await apiRequest<ApiTaskComment>(`/tasks/${taskId}/comments`, {
+    method: "POST",
+    body: payload
+  });
+  return { data: result.data, message: result.message };
 }

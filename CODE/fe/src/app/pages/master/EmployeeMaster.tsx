@@ -266,8 +266,8 @@ export function EmployeeMaster() {
     try {
       if (modalMode === "create") {
         const created = await createEmployee(payload);
-        setEmployees((current) => [created, ...current]);
-        setNotice(`Pegawai ${payload.name} berhasil ditambahkan.`);
+        setEmployees((current) => [created.data, ...current]);
+        setNotice(created.message ?? `Pegawai ${payload.name} berhasil ditambahkan.`);
       } else if (editingEmployeeId) {
         const updated = await updateEmployee(editingEmployeeId, payload);
         setEmployees((current) => current.map((item) => (item.id === editingEmployeeId ? updated : item)));
@@ -571,6 +571,11 @@ export function EmployeeMaster() {
                   ]}
                 />
               </div>
+              {modalMode === "create" && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Info akun login pegawai akan otomatis dibuat. Password default ditampilkan pada notifikasi setelah data berhasil disimpan.
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={closeModal} className="px-4 py-2 border border-slate-300 rounded-md text-sm">

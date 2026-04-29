@@ -1,4 +1,5 @@
 from app.services import (
+    audit_trail_service,
     auth_service,
     employee_service,
     issue_service,
@@ -12,6 +13,7 @@ from app.services import (
 )
 
 __all__ = [
+    "audit_trail_service",
     "auth_service",
     "employee_service",
     "issue_service",

@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 from flask_jwt_extended import JWTManager
 from werkzeug.exceptions import HTTPException
 
@@ -6,6 +6,7 @@ from app.api.v1 import register_api_routes
 from app.config import Config
 from app.extensions import cors, db, jwt, migrate
 from app.models import *  # noqa: F401,F403
+from app.services import audit_trail_service
 from app.services.seed_service import seed_database
 from app.utils.exceptions import ApiError
 from app.utils.http import error_response
@@ -26,6 +27,7 @@ def create_app(config_object: dict | None = None):
     app.register_blueprint(api_v1)
 
     _register_error_handlers(app)
+    _register_hooks(app)
     _register_cli(app)
 
     return app
@@ -67,3 +69,10 @@ def _register_cli(app: Flask):
         db.create_all()
         seed_database(force_reset=False)
         print("Database berhasil di-reset dan di-seed.")
+
+
+def _register_hooks(app: Flask):
+    @app.after_request
+    def capture_audit_trail(response):
+        audit_trail_service.record_from_request(request, response)
+        return response

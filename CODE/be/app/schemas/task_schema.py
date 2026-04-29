@@ -10,6 +10,7 @@ class TaskSchema(Schema):
     project_id = fields.String(required=True)
     phase_id = fields.String(required=True)
     phase_updated_at = fields.DateTime(allow_none=True)
+    progress_percentage = fields.Integer(required=True)
     start_date = fields.Date(allow_none=True)
     end_date = fields.Date(allow_none=True)
     created_at = fields.DateTime()
