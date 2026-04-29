@@ -13,6 +13,7 @@ import { hasPermission } from "../../utils/permissions";
 
 type ModalMode = "create" | "edit";
 type RoleFormState = Omit<Role, "id">;
+const permissionKeys: Array<keyof PermissionSet> = ["view", "create", "edit", "delete", "restore"];
 
 function createEmptyPermissionSet(): PermissionSet {
   return { view: false, create: false, edit: false, delete: false, restore: false };
@@ -176,6 +177,27 @@ export function RoleMaster() {
       }
     }));
   };
+
+  const updateAllPermissionsByAction = (permissionKey: keyof PermissionSet, checked: boolean) => {
+    setForm((current) => ({
+      ...current,
+      permissions: (Object.keys(current.permissions) as ModuleKey[]).reduce<Record<ModuleKey, PermissionSet>>(
+        (acc, moduleKey) => {
+          acc[moduleKey] = {
+            ...current.permissions[moduleKey],
+            [permissionKey]: checked
+          };
+          return acc;
+        },
+        {} as Record<ModuleKey, PermissionSet>
+      )
+    }));
+  };
+
+  const isAllCheckedForAction = (permissionKey: keyof PermissionSet) =>
+    (Object.keys(form.permissions) as ModuleKey[]).every(
+      (moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey])
+    );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -362,15 +384,19 @@ export function RoleMaster() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={closeModal}>
-          <div className="w-full max-w-5xl bg-white rounded-xl border border-slate-200 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div
+            className="w-full max-w-5xl max-h-[90vh] bg-white rounded-xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
               <h2 className="text-base font-bold text-slate-900">{modalMode === "create" ? "Tambah Role" : "Edit Role"}</h2>
               <button type="button" onClick={closeModal} className="p-1 rounded hover:bg-slate-100 text-slate-500">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+            <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto p-5 space-y-4">
               {formError && (
                 <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div>
               )}
@@ -414,16 +440,27 @@ export function RoleMaster() {
                 <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
                   <h3 className="text-sm font-semibold text-slate-900">Permission Matrix</h3>
                 </div>
-                <div className="overflow-auto">
+                <div className="max-h-[42vh] overflow-auto">
                   <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                    <thead className="sticky top-0 z-10 text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200 shadow-sm">
                       <tr>
                         <th className="px-4 py-3 font-medium">Modul</th>
-                        <th className="px-4 py-3 font-medium text-center">View</th>
-                        <th className="px-4 py-3 font-medium text-center">Create</th>
-                        <th className="px-4 py-3 font-medium text-center">Edit</th>
-                        <th className="px-4 py-3 font-medium text-center">Delete</th>
-                        <th className="px-4 py-3 font-medium text-center">Restore</th>
+                        {permissionKeys.map((permissionKey) => (
+                          <th key={`header-${permissionKey}`} className="px-4 py-3 font-medium text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <span>{permissionKey}</span>
+                              <label className="inline-flex items-center gap-1 normal-case text-[10px] text-slate-500">
+                                <input
+                                  type="checkbox"
+                                  checked={isAllCheckedForAction(permissionKey)}
+                                  onChange={(event) => updateAllPermissionsByAction(permissionKey, event.target.checked)}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                Select all
+                              </label>
+                            </div>
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -432,7 +469,7 @@ export function RoleMaster() {
                         return (
                           <tr key={moduleKey}>
                             <td className="px-4 py-3 font-medium text-slate-800">{label}</td>
-                            {(["view", "create", "edit", "delete", "restore"] as Array<keyof PermissionSet>).map((permissionKey) => (
+                            {permissionKeys.map((permissionKey) => (
                               <td key={`${moduleKey}-${permissionKey}`} className="px-4 py-3 text-center">
                                 <input
                                   type="checkbox"
@@ -451,8 +488,9 @@ export function RoleMaster() {
                   </table>
                 </div>
               </div>
+              </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4 shrink-0">
                 <button type="button" onClick={closeModal} className="px-4 py-2 border border-slate-300 rounded-md text-sm">
                   Batal
                 </button>
