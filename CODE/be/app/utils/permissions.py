@@ -6,6 +6,14 @@ from app.models import User
 from app.utils.exceptions import ApiError
 
 PERMISSION_ACTIONS = ("view", "create", "edit", "delete", "restore")
+PERMISSION_FALLBACKS = {
+    "projectPhases": ("masterProjects",),
+    "projectMembers": ("masterProjects",),
+    "projectIssues": ("issues", "masterProjects"),
+    "projectTasks": ("tasks", "masterProjects"),
+    "projectTaskComments": ("tasks", "masterProjects"),
+    "projectAttachments": ("masterProjects",),
+}
 
 MODULE_KEYS = (
     "dashboard",
@@ -149,7 +157,11 @@ def user_has_permission(user: User, module: str, action: str):
     if module not in MODULE_KEYS or action not in PERMISSION_ACTIONS:
         return False
     permissions = get_user_permissions(user)
-    return permissions.get(module, {}).get(action, False)
+    if permissions.get(module, {}).get(action, False):
+        return True
+
+    fallback_modules = PERMISSION_FALLBACKS.get(module, ())
+    return any(permissions.get(fallback_module, {}).get(action, False) for fallback_module in fallback_modules)
 
 
 def require_permission(module: str, action: str):

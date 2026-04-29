@@ -104,6 +104,68 @@ def test_employee_crud(client, auth_headers):
     assert status.get_json()["data"]["status"] == "Inactive"
 
 
+def test_employee_reset_password(client, auth_headers):
+    created = client.post(
+        "/api/v1/employees",
+        headers=auth_headers,
+        json={
+            "nip": "20000101-996",
+            "name": "Reset Password Pegawai",
+            "email": "reset.password@company.co.id",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+            "role_id": "role-001",
+            "status": "Active",
+        },
+    )
+    assert created.status_code == 201
+    employee_id = created.get_json()["data"]["id"]
+
+    login_default = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reset.password@company.co.id", "password": "Welcome123!"},
+    )
+    assert login_default.status_code == 200
+    employee_access_token = login_default.get_json()["data"]["access_token"]
+
+    change_response = client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {employee_access_token}"},
+        json={
+            "current_password": "Welcome123!",
+            "new_password": "ResetMe123!",
+            "confirm_password": "ResetMe123!",
+        },
+    )
+    assert change_response.status_code == 200
+
+    login_changed = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reset.password@company.co.id", "password": "ResetMe123!"},
+    )
+    assert login_changed.status_code == 200
+
+    reset_response = client.post(
+        f"/api/v1/employees/{employee_id}/reset-password",
+        headers=auth_headers,
+    )
+    assert reset_response.status_code == 200
+    assert "Password pegawai berhasil direset" in reset_response.get_json().get("message", "")
+
+    login_old_changed = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reset.password@company.co.id", "password": "ResetMe123!"},
+    )
+    assert login_old_changed.status_code == 401
+
+    login_reset = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reset.password@company.co.id", "password": "Welcome123!"},
+    )
+    assert login_reset.status_code == 200
+
+
 def test_organization_crud(client, auth_headers):
     created = client.post(
         "/api/v1/organizations",

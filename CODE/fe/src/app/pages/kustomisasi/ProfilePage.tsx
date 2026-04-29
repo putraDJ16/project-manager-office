@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Activity, Briefcase, Building2, Calendar, FolderKanban, KeyRound, Mail, Shield, User, Users } from "lucide-react";
+import { Activity, Briefcase, Building2, Calendar, Clock3, FolderKanban, KeyRound, Mail, Shield, User, Users } from "lucide-react";
 import { changePassword, fetchMyProjects, getMe, type MyProjectResponse } from "../../services/authApi";
+import { fetchUserAuditTrails, type ApiAuditTrail } from "../../services/auditTrailApi";
 
 type ProfileState = {
+  id: number;
   name: string;
   email: string;
   role: string | null;
@@ -14,9 +16,12 @@ type ProfileState = {
 export function ProfilePage() {
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [projects, setProjects] = useState<MyProjectResponse[]>([]);
+  const [activities, setActivities] = useState<ApiAuditTrail[]>([]);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
@@ -32,11 +37,14 @@ export function ProfilePage() {
     const loadProfile = async () => {
       setIsLoadingProfile(true);
       setIsLoadingProjects(true);
+      setIsLoadingActivities(true);
       setError(null);
+      setActivityError(null);
       try {
-        const [profileData, projectData] = await Promise.all([getMe(), fetchMyProjects()]);
+        const profileData = await getMe();
         if (isCancelled) return;
         setProfile({
+          id: profileData.id,
           name: profileData.name,
           email: profileData.email,
           role: profileData.role ?? null,
@@ -44,7 +52,26 @@ export function ProfilePage() {
           unit_organization: profileData.unit_organization ?? null,
           position: profileData.position ?? null
         });
-        setProjects(projectData);
+
+        const [projectResult, activityResult] = await Promise.allSettled([
+          fetchMyProjects(),
+          fetchUserAuditTrails(profileData.id, 25),
+        ]);
+        if (isCancelled) return;
+
+        if (projectResult.status === "fulfilled") {
+          setProjects(projectResult.value);
+        } else {
+          setError(projectResult.reason instanceof Error ? projectResult.reason.message : "Gagal memuat project.");
+        }
+
+        if (activityResult.status === "fulfilled") {
+          setActivities(activityResult.value.filter((item) => item.method !== "GET"));
+        } else {
+          setActivityError(
+            activityResult.reason instanceof Error ? activityResult.reason.message : "Gagal memuat riwayat aktivitas."
+          );
+        }
       } catch (loadError) {
         if (isCancelled) return;
         setError(loadError instanceof Error ? loadError.message : "Gagal memuat profile.");
@@ -52,6 +79,7 @@ export function ProfilePage() {
         if (!isCancelled) {
           setIsLoadingProfile(false);
           setIsLoadingProjects(false);
+          setIsLoadingActivities(false);
         }
       }
     };
@@ -126,7 +154,9 @@ export function ProfilePage() {
           <span className="font-medium text-slate-700">Profile</span>
         </div>
         <h1 className="text-2xl font-bold text-slate-900">Profile Saya</h1>
-        <p className="text-sm text-slate-500 mt-1">Data diri, ubah password, dan informasi project yang Anda miliki.</p>
+        <p className="text-sm text-slate-500 mt-1">
+          Data diri, ubah password, informasi project, dan riwayat aktivitas akun Anda.
+        </p>
       </div>
 
       {error && (
@@ -267,9 +297,123 @@ export function ProfilePage() {
             </div>
           )}
         </section>
+
+        <section className="xl:col-span-2 rounded-xl border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Riwayat Aktivitas</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                Tindakan yang Anda lakukan.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
+              <Clock3 className="w-3.5 h-3.5" />
+              {activities.length} aktivitas
+            </span>
+          </div>
+
+          {activityError && (
+            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              {activityError}
+            </div>
+          )}
+
+          {isLoadingActivities ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              Memuat riwayat aktivitas...
+            </div>
+          ) : activities.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              Belum ada aktivitas yang tercatat.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {activities.map((activity) => {
+                const activityLabel = resolveActivityLabel(activity);
+                const activityDescription = resolveActivityDescription(activity);
+                return (
+                  <div key={activity.id} className="rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-800">{activityLabel}</p>
+                      <div className="flex items-center gap-2">
+                        <span className={statusBadgeClassName(activity.status_code)}>
+                          {activity.status_code >= 400 ? "Gagal" : "Berhasil"}
+                        </span>
+                        <span className="text-xs text-slate-500">{formatDateTime(activity.created_at)}</span>
+                      </div>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">{activityDescription}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
+}
+
+function resolveActivityLabel(activity: ApiAuditTrail) {
+  const method = activity.method.toUpperCase();
+  const path = activity.path;
+
+  if (method === "POST" && path === "/api/v1/projects") return "Membuat proyek";
+  if (method === "POST" && path === "/api/v1/tasks") return "Membuat tugas";
+  if (method === "POST" && /^\/api\/v1\/tasks\/[^/]+\/comments$/.test(path)) return "Menambahkan komentar tugas";
+  if (method === "PATCH" && /^\/api\/v1\/tasks\/[^/]+$/.test(path)) return "Memperbarui tugas";
+
+  const masterLabels: Record<string, string> = {
+    "/api/v1/organizations": "organisasi",
+    "/api/v1/organization-units": "unit organisasi",
+    "/api/v1/positions": "jabatan",
+    "/api/v1/roles": "role",
+    "/api/v1/employees": "pegawai",
+  };
+  const masterEntry = Object.entries(masterLabels).find(([masterPath]) => path.startsWith(masterPath));
+  if (masterEntry) {
+    const [, entityLabel] = masterEntry;
+    if (method === "POST") return `Menambah data master ${entityLabel}`;
+    if (method === "PATCH" || method === "PUT") return `Mengubah data master ${entityLabel}`;
+    if (method === "DELETE") return `Menghapus data master ${entityLabel}`;
+  }
+
+  const verbMap: Record<string, string> = {
+    POST: "Membuat data",
+    PATCH: "Memperbarui data",
+    PUT: "Memperbarui data",
+    DELETE: "Menghapus data",
+    GET: "Melihat data",
+  };
+  return verbMap[method] ?? "Aktivitas sistem";
+}
+
+function resolveActivityDescription(activity: ApiAuditTrail) {
+  const rawBody = activity.request_body;
+  const body =
+    rawBody && typeof rawBody === "object" && !Array.isArray(rawBody) ? (rawBody as Record<string, unknown>) : null;
+  const highlightedValue = body?.name ?? body?.title ?? body?.content ?? body?.status ?? null;
+  if (typeof highlightedValue === "string" && highlightedValue.trim()) {
+    return `${activity.method} ${activity.path} - ${highlightedValue}`;
+  }
+  return `${activity.method} ${activity.path}`;
+}
+
+function statusBadgeClassName(statusCode: number) {
+  if (statusCode >= 400) {
+    return "inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700";
+  }
+  return "inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700";
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function ProfileItem({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {

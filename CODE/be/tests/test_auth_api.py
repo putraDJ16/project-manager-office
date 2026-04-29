@@ -68,6 +68,7 @@ def test_auth_me_and_refresh(client):
     me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access}"})
     assert me.status_code == 200
     me_data = me.get_json()["data"]
+    assert me_data["id"] == login["data"]["user"]["id"]
     assert me_data["email"] == "admin@zoho.local"
     assert me_data["name"] == "Administrator"
     assert me_data["role"] == "Administrator"

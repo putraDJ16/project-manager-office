@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate } from "react-router";
 import { AppShell } from "./components/layout/AppShell";
 import { routes } from "./routes";
@@ -12,6 +12,7 @@ import {
   type AuthSession
 } from "./data/auth";
 import { hasPermission, normalizeSessionPermissions } from "./utils/permissions";
+import { applyTheme, getStoredTheme, type ThemeMode } from "./utils/theme";
 
 function PermissionGate({ route, session }: { route: AppRoute; session: AuthSession }) {
   if (route.module && !hasPermission(session, route.module, "view")) {
@@ -32,10 +33,19 @@ function PermissionGate({ route, session }: { route: AppRoute; session: AuthSess
 }
 
 export default function App() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredTheme());
   const [authSession, setAuthSession] = useState<AuthSession | null>(() => {
     const session = loadAuthSession();
     return session ? normalizeSessionPermissions(session) : null;
   });
+
+  useEffect(() => {
+    applyTheme(themeMode);
+  }, [themeMode]);
+
+  const handleToggleTheme = () => {
+    setThemeMode((current) => (current === "dark" ? "light" : "dark"));
+  };
 
   const handleLogin = (session: AuthSession) => {
     const normalizedSession = normalizeSessionPermissions(session);
@@ -53,12 +63,29 @@ export default function App() {
       <Routes>
         <Route
           path="/login"
-          element={authSession ? <Navigate to="/" replace /> : <LoginPage onLogin={handleLogin} />}
+          element={
+            authSession ? (
+              <Navigate to="/" replace />
+            ) : (
+              <LoginPage onLogin={handleLogin} themeMode={themeMode} onToggleTheme={handleToggleTheme} />
+            )
+          }
         />
 
         <Route
           path="/"
-          element={authSession ? <AppShell session={authSession} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+          element={
+            authSession ? (
+              <AppShell
+                session={authSession}
+                onLogout={handleLogout}
+                themeMode={themeMode}
+                onToggleTheme={handleToggleTheme}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         >
           {routes.map((route, index) => (
             <Route 

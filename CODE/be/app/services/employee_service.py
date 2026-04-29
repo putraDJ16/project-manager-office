@@ -162,3 +162,32 @@ def update_employee_status(employee_id: str, status: str):
     employee.status = status
     db.session.commit()
     return employee
+
+
+def reset_employee_password(employee_id: str):
+    employee = EmployeeRepository.get_by_id(employee_id)
+    if not employee:
+        raise ApiError("Pegawai tidak ditemukan.", status_code=404)
+
+    default_password = current_app.config.get("DEFAULT_EMPLOYEE_PASSWORD", "Welcome123!")
+    user = User.query.filter_by(employee_id=employee.id).first()
+
+    if not user:
+        user = User(
+            email=employee.email,
+            password_hash=generate_password_hash(default_password),
+            display_name=employee.name,
+            role_id=employee.role_id,
+            employee_id=employee.id,
+            is_active=employee.status == "Active",
+        )
+        db.session.add(user)
+    else:
+        user.password_hash = generate_password_hash(default_password)
+        user.email = employee.email
+        user.display_name = employee.name
+        user.role_id = employee.role_id
+        user.is_active = employee.status == "Active"
+
+    db.session.commit()
+    return default_password

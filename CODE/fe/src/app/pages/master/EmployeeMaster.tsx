@@ -5,6 +5,7 @@ import {
   Network,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   Shield,
   UserCheck,
@@ -19,6 +20,7 @@ import {
   createEmployee,
   fetchEmployees,
   fetchRoles,
+  resetEmployeePassword,
   updateEmployee,
   updateEmployeeStatus
 } from "../../services/masterApi";
@@ -288,6 +290,20 @@ export function EmployeeMaster() {
     }
   };
 
+  const handleResetPassword = async (employee: Employee) => {
+    if (!canEdit) return;
+    const shouldReset = window.confirm(`Reset password untuk ${employee.name}?`);
+    if (!shouldReset) return;
+
+    try {
+      const message = await resetEmployeePassword(employee.id);
+      setNotice(message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Gagal mereset password pegawai.";
+      setNotice(message);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -433,6 +449,13 @@ export function EmployeeMaster() {
                               className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-100"
                             >
                               <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleResetPassword(employee)}
+                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Reset Password
                             </button>
                             {employee.status === "Active" ? (
                               <button

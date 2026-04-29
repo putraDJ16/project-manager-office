@@ -37,6 +37,7 @@ export type RegisterOptionsResponse = {
 };
 
 type MeResponse = {
+  id: number;
   name: string;
   email: string;
   initials: string;

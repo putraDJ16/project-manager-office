@@ -45,3 +45,13 @@ def update_employee_status_handler(employee_id: str):
     payload = request.get_json(silent=True) or {}
     employee = employee_service.update_employee_status(employee_id, payload.get("status", ""))
     return success_response(employee_schema.dump(employee), message="Status pegawai berhasil diperbarui.")
+
+
+@api_v1.post("/employees/<string:employee_id>/reset-password")
+@jwt_required()
+@require_permission("masterEmployees", "edit")
+def reset_employee_password_handler(employee_id: str):
+    default_password = employee_service.reset_employee_password(employee_id)
+    return success_response(
+        message=f"Password pegawai berhasil direset. Password baru: {default_password}",
+    )

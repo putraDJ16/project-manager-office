@@ -1,10 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Building2, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { Building2, LockKeyhole, Mail, Moon, ShieldCheck, Sun, UserRound } from "lucide-react";
 import { type AuthSession } from "../../data/auth";
+import type { ThemeMode } from "../../utils/theme";
 import { fetchRegisterOptions, loginWithApi, registerWithApi, type RegisterOptionsResponse } from "../../services/authApi";
 
 type LoginPageProps = {
   onLogin: (session: AuthSession) => void;
+  themeMode: ThemeMode;
+  onToggleTheme: () => void;
 };
 
 type LoginFormState = {
@@ -22,7 +25,7 @@ type RegisterFormState = {
   position: string;
 };
 
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage({ onLogin, themeMode, onToggleTheme }: LoginPageProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [form, setForm] = useState<LoginFormState>({ email: "", password: "" });
   const [registerForm, setRegisterForm] = useState<RegisterFormState>({
@@ -166,7 +169,17 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-indigo-100 flex items-center justify-center p-6">
+    <div className="relative min-h-screen bg-gradient-to-br from-slate-100 via-white to-indigo-100 flex items-center justify-center p-6">
+      <button
+        type="button"
+        onClick={onToggleTheme}
+        className="absolute right-6 top-6 inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900"
+        aria-label={themeMode === "dark" ? "Aktifkan light mode" : "Aktifkan dark mode"}
+        title={themeMode === "dark" ? "Light mode" : "Dark mode"}
+      >
+        {themeMode === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </button>
+
       <div className="w-full max-w-5xl grid md:grid-cols-2 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
         <div className="hidden md:flex flex-col justify-between bg-indigo-950 text-indigo-100 p-8">
           <div>

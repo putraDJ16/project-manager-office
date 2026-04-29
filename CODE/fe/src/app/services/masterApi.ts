@@ -204,3 +204,10 @@ export async function updateEmployeeStatus(id: string, status: Employee["status"
   }
   return updated;
 }
+
+export async function resetEmployeePassword(id: string) {
+  const result = await apiRequest<null>(`/employees/${id}/reset-password`, {
+    method: "POST"
+  });
+  return result.message ?? "Password pegawai berhasil direset.";
+}

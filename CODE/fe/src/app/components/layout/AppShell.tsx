@@ -15,9 +15,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  LogOut
+  LogOut,
+  Moon,
+  Sun
 } from "lucide-react";
 import type { AuthSession } from "../../data/auth";
+import type { ThemeMode } from "../../utils/theme";
 import { hasPermission } from "../../utils/permissions";
 import {
   fetchNotifications,
@@ -29,9 +32,11 @@ import {
 type AppShellProps = {
   session: AuthSession;
   onLogout: () => void;
+  themeMode: ThemeMode;
+  onToggleTheme: () => void;
 };
 
-export function AppShell({ session, onLogout }: AppShellProps) {
+export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShellProps) {
   const navigate = useNavigate();
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
@@ -279,6 +284,16 @@ export function AppShell({ session, onLogout }: AppShellProps) {
           </div>
 
           <div className="flex items-center space-x-4">
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              aria-label={themeMode === "dark" ? "Aktifkan light mode" : "Aktifkan dark mode"}
+              title={themeMode === "dark" ? "Light mode" : "Dark mode"}
+            >
+              {themeMode === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+
             <div className="relative">
             <button
               type="button"

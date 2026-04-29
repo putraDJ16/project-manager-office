@@ -2,6 +2,14 @@ import type { AuthSession } from "../data/auth";
 import type { ModuleKey, PermissionSet } from "../data/masterData";
 
 const actions: Array<keyof PermissionSet> = ["view", "create", "edit", "delete", "restore"];
+const permissionFallbacks: Partial<Record<ModuleKey, ModuleKey[]>> = {
+  projectPhases: ["masterProjects"],
+  projectMembers: ["masterProjects"],
+  projectIssues: ["issues", "masterProjects"],
+  projectTasks: ["tasks", "masterProjects"],
+  projectTaskComments: ["tasks", "masterProjects"],
+  projectAttachments: ["masterProjects"]
+};
 
 export function hasPermission(
   session: AuthSession | null | undefined,
@@ -9,8 +17,10 @@ export function hasPermission(
   action: keyof PermissionSet
 ) {
   const permission = session?.permissions?.[module];
-  if (!permission) return false;
-  return Boolean(permission[action]);
+  if (permission?.[action]) return true;
+
+  const fallbacks = permissionFallbacks[module] ?? [];
+  return fallbacks.some((fallbackModule) => Boolean(session?.permissions?.[fallbackModule]?.[action]));
 }
 
 export function normalizeSessionPermissions(session: AuthSession): AuthSession {

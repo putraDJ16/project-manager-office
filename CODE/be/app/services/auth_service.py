@@ -141,6 +141,7 @@ def get_profile(user_id: str):
         employee = user.employee
 
     return {
+        "id": user.id,
         "name": user.display_name,
         "email": user.email,
         "initials": _initials(user.display_name),
