@@ -1,0 +1,42 @@
+services:
+  api:
+    build:
+      context: ./CODE/be
+      dockerfile: Dockerfile.prod
+    container_name: zoho_pmo_api
+    env_file:
+      - .env.prod
+    environment:
+      FLASK_ENV: production
+      FLASK_APP: run.py
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      DEFAULT_EMPLOYEE_PASSWORD: ${DEFAULT_EMPLOYEE_PASSWORD}
+      ATTACHMENT_STORAGE_DIR: ${ATTACHMENT_STORAGE_DIR}
+      MAX_CONTENT_LENGTH: ${MAX_CONTENT_LENGTH}
+    volumes:
+      - attachment_storage:/app/storage
+    ports:
+      - "127.0.0.1:5000:5000"
+    cpus: "0.60"
+    mem_limit: 768m
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./CODE/fe
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    container_name: zoho_pmo_web
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:5173:80"
+    cpus: "0.25"
+    mem_limit: 256m
+    restart: unless-stopped
+
+volumes:
+  attachment_storage:
