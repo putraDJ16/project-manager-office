@@ -76,3 +76,53 @@ def test_projects_phases_tasks_flow(client, auth_headers):
     listed_comment_rows = listed_comments_after_create.get_json()["data"]
     assert len(listed_comment_rows) == 1
     assert listed_comment_rows[0]["content"] == "Komentar pertama untuk task ini."
+
+
+def test_project_task_comments_can_be_restricted_per_role(client, auth_headers):
+    role_response = client.post(
+        "/api/v1/roles",
+        headers=auth_headers,
+        json={
+            "name": "Task Viewer Without Comments",
+            "description": "Dapat melihat tugas proyek tanpa komentar.",
+            "status": "Active",
+            "permissions": {
+                "dashboard": {"view": True},
+                "masterProjects": {"view": True},
+                "projectPhases": {"view": True},
+                "projectTasks": {"view": True},
+                "projectTaskComments": {"view": False, "create": False, "edit": False, "delete": False, "restore": False},
+            },
+        },
+    )
+    assert role_response.status_code == 201
+    role_id = role_response.get_json()["data"]["id"]
+
+    employee_response = client.post(
+        "/api/v1/employees",
+        headers=auth_headers,
+        json={
+            "nip": "20000101-997",
+            "name": "Komentar Terbatas",
+            "email": "komentar.terbatas@company.co.id",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+            "role_id": role_id,
+            "status": "Active",
+        },
+    )
+    assert employee_response.status_code == 201
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "komentar.terbatas@company.co.id", "password": "Welcome123!"},
+    )
+    assert login_response.status_code == 200
+    headers = {"Authorization": f"Bearer {login_response.get_json()['data']['access_token']}"}
+
+    tasks = client.get("/api/v1/tasks?project_id=p1", headers=headers)
+    assert tasks.status_code == 200
+
+    comments = client.get("/api/v1/tasks/T-101/comments", headers=headers)
+    assert comments.status_code == 403

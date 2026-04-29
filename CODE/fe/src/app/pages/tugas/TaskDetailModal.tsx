@@ -31,6 +31,7 @@ type TaskDetailModalProps = {
   comments: TaskComment[];
   isLoadingComments: boolean;
   isSavingComment: boolean;
+  canCreateComment?: boolean;
   onClose: () => void;
   onSubmitComment: (content: string) => Promise<void>;
 };
@@ -62,6 +63,7 @@ export function TaskDetailModal({
   comments,
   isLoadingComments,
   isSavingComment,
+  canCreateComment = true,
   onClose,
   onSubmitComment
 }: TaskDetailModalProps) {
@@ -152,27 +154,33 @@ export function TaskDetailModal({
             </div>
           )}
 
-          <form onSubmit={(event) => void handleSubmit(event)} className="mt-4">
-            <textarea
-              value={draftComment}
-              onChange={(event) => setDraftComment(event.target.value)}
-              rows={3}
-              placeholder="Tulis komentar seperti di Trello..."
-              className="w-full rounded-lg border border-slate-300 text-sm p-3 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-y"
-              maxLength={2000}
-            />
-            <div className="mt-2 flex items-center justify-between">
-              <p className="text-xs text-slate-500">{draftComment.length}/2000 karakter</p>
-              <button
-                type="submit"
-                disabled={isSavingComment || draftComment.trim().length === 0}
-                className="inline-flex items-center px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-4 h-4 mr-1.5" />
-                {isSavingComment ? "Mengirim..." : "Kirim Komentar"}
-              </button>
+          {canCreateComment ? (
+            <form onSubmit={(event) => void handleSubmit(event)} className="mt-4">
+              <textarea
+                value={draftComment}
+                onChange={(event) => setDraftComment(event.target.value)}
+                rows={3}
+                placeholder="Tulis komentar seperti di Trello..."
+                className="w-full rounded-lg border border-slate-300 text-sm p-3 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-y"
+                maxLength={2000}
+              />
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-xs text-slate-500">{draftComment.length}/2000 karakter</p>
+                <button
+                  type="submit"
+                  disabled={isSavingComment || draftComment.trim().length === 0}
+                  className="inline-flex items-center px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4 mr-1.5" />
+                  {isSavingComment ? "Mengirim..." : "Kirim Komentar"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+              Role Anda hanya dapat melihat komentar, belum dapat menambahkan komentar baru.
             </div>
-          </form>
+          )}
         </div>
       </div>
     </div>

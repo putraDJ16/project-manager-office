@@ -1,6 +1,7 @@
 from app.extensions import db
 from app.models import Issue, SlaRule
 from app.repositories import IssueRepository
+from app.services.notification_service import notify_employee
 from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
 
@@ -19,10 +20,10 @@ def list_issues(project_id: str | None = None):
     return IssueRepository.list_issues(project_id=project_id)
 
 
-def create_issue(payload: dict):
+def create_issue(payload: dict, reporter_from_claim: str | None = None):
     title = (payload.get("title") or "").strip()
     project_id = (payload.get("project_id") or "").strip()
-    reporter = (payload.get("reporter") or "").strip()
+    reporter = (reporter_from_claim or payload.get("reporter") or "").strip()
     severity = (payload.get("severity") or "Major").strip()
     if not title or not project_id or not reporter:
         raise ApiError("Project, judul, dan pelapor wajib diisi.")
@@ -45,6 +46,15 @@ def create_issue(payload: dict):
         attachments=_normalize_list(payload.get("attachments")),
     )
     db.session.add(issue)
+    if issue.assignee:
+        notify_employee(
+            employee_name=issue.assignee,
+            title="Isu baru ditugaskan kepada Anda",
+            message=f"Anda menjadi assignee untuk isu {issue.title}.",
+            entity_type="issue",
+            entity_id=issue.id,
+            target_url=f"/proyek/{issue.project_id}",
+        )
     db.session.commit()
     return issue
 

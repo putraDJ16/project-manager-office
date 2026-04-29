@@ -60,6 +60,8 @@ import {
   type ApiAttachmentFolder
 } from "../../services/projectAttachmentApi";
 import type { Employee } from "../../data/masterData";
+import { loadAuthSession } from "../../data/auth";
+import { hasPermission } from "../../utils/permissions";
 import { TaskDetailModal } from "../tugas/TaskDetailModal";
 import { ProjectIssuePanel } from "./ProjectIssuePanel";
 
@@ -103,6 +105,23 @@ function toTaskComment(raw: ApiTaskComment): TaskComment {
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const session = loadAuthSession();
+  const canEditProject = hasPermission(session, "masterProjects", "edit");
+  const canViewPhases = hasPermission(session, "projectPhases", "view");
+  const canCreateMembers = hasPermission(session, "projectMembers", "create");
+  const canDeleteMembers = hasPermission(session, "projectMembers", "delete");
+  const canViewTasks = hasPermission(session, "projectTasks", "view");
+  const canCreateTasks = hasPermission(session, "projectTasks", "create");
+  const canEditTasks = hasPermission(session, "projectTasks", "edit");
+  const canViewTaskComments = hasPermission(session, "projectTaskComments", "view");
+  const canCreateTaskComments = hasPermission(session, "projectTaskComments", "create");
+  const canViewIssues = hasPermission(session, "projectIssues", "view");
+  const canCreateIssues = hasPermission(session, "projectIssues", "create");
+  const canEditIssues = hasPermission(session, "projectIssues", "edit");
+  const canViewAttachments = hasPermission(session, "projectAttachments", "view");
+  const canCreateAttachments = hasPermission(session, "projectAttachments", "create");
+  const canEditAttachments = hasPermission(session, "projectAttachments", "edit");
+  const canDeleteAttachments = hasPermission(session, "projectAttachments", "delete");
 
   const [project, setProject] = useState<ApiProjectDetail | null>(null);
   const [phases, setPhases] = useState<ApiPhase[]>([]);
@@ -182,10 +201,10 @@ export function ProjectDetail() {
     setLoading(true);
     Promise.all([
       getProject(id),
-      fetchPhases(id),
-      fetchTasks(id, ""),
+      canViewPhases ? fetchPhases(id) : Promise.resolve([]),
+      canViewTasks ? fetchTasks(id, "") : Promise.resolve([]),
       fetchEmployees(),
-      fetchAttachmentFolders(id)
+      canViewAttachments ? fetchAttachmentFolders(id) : Promise.resolve([])
     ])
       .then(([projectResult, phaseResult, taskResult, employeeResult, folderResult]) => {
         setProject(projectResult);
@@ -196,16 +215,20 @@ export function ProjectDetail() {
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, canViewAttachments, canViewPhases, canViewTasks]);
 
   useEffect(() => {
     if (!id) return;
+    if (!canViewAttachments) {
+      setAttachmentFiles([]);
+      return;
+    }
     setAttachmentLoading(true);
     fetchAttachmentFiles(id, selectedFolderId)
       .then((files) => setAttachmentFiles(files))
       .catch((err: Error) => setAttachmentError(err.message))
       .finally(() => setAttachmentLoading(false));
-  }, [id, selectedFolderId]);
+  }, [id, selectedFolderId, canViewAttachments]);
 
   const memberEmployeeIds = useMemo(
     () => new Set(project?.members.map((member) => member.employee_id) ?? []),
@@ -243,17 +266,19 @@ export function ProjectDetail() {
   }, [selectedTaskId, tasks]);
 
   const refreshAttachmentFolders = async (projectId: string) => {
+    if (!canViewAttachments) return;
     const folders = await fetchAttachmentFolders(projectId);
     setAttachmentFolders(folders);
   };
 
   const refreshAttachmentFiles = async (projectId: string, folderId: string | null) => {
+    if (!canViewAttachments) return;
     const files = await fetchAttachmentFiles(projectId, folderId);
     setAttachmentFiles(files);
   };
 
   const handleCreateFolder = async () => {
-    if (!id) return;
+    if (!id || !canCreateAttachments) return;
     const name = newFolderName.trim();
     if (!name) return;
     try {
@@ -269,7 +294,7 @@ export function ProjectDetail() {
   };
 
   const handleUploadAttachment = async () => {
-    if (!id || !uploadForm.file) return;
+    if (!id || !uploadForm.file || !canCreateAttachments) return;
     try {
       setAttachmentError(null);
       await uploadAttachmentFile(id, {
@@ -289,7 +314,7 @@ export function ProjectDetail() {
   };
 
   const handleDeleteFolder = async (folderId: string) => {
-    if (!id) return;
+    if (!id || !canDeleteAttachments) return;
     try {
       await deleteAttachmentFolder(id, folderId);
       if (selectedFolderId === folderId) {
@@ -304,7 +329,7 @@ export function ProjectDetail() {
   };
 
   const handleDeleteFile = async (fileId: string) => {
-    if (!id) return;
+    if (!id || !canDeleteAttachments) return;
     try {
       await deleteAttachmentFile(id, fileId);
       await refreshAttachmentFiles(id, selectedFolderId);
@@ -315,7 +340,7 @@ export function ProjectDetail() {
   };
 
   const handleSaveSelectedFolder = async () => {
-    if (!id || !selectedFolder) return;
+    if (!id || !selectedFolder || !canEditAttachments) return;
     if (!folderEditName.trim()) {
       setAttachmentError("Nama folder wajib diisi.");
       return;
@@ -333,7 +358,7 @@ export function ProjectDetail() {
   };
 
   const handleMoveFileToFolder = async (fileId: string, targetFolderId: string | null) => {
-    if (!id) return;
+    if (!id || !canEditAttachments) return;
     try {
       await updateAttachmentFile(id, fileId, { folder_id: targetFolderId });
       await refreshAttachmentFiles(id, selectedFolderId);
@@ -344,7 +369,7 @@ export function ProjectDetail() {
   };
 
   const handleUpdateFileDescription = async (fileId: string, description: string) => {
-    if (!id) return false;
+    if (!id || !canEditAttachments) return false;
     try {
       await updateAttachmentFile(id, fileId, { description });
       await refreshAttachmentFiles(id, selectedFolderId);
@@ -357,7 +382,7 @@ export function ProjectDetail() {
   };
 
   const handleDownloadFile = async (fileId: string, filename: string) => {
-    if (!id) return;
+    if (!id || !canViewAttachments) return;
     try {
       await downloadAttachmentFile(id, fileId, filename);
     } catch (err: unknown) {
@@ -366,7 +391,7 @@ export function ProjectDetail() {
   };
 
   const handlePreviewFile = async (file: ApiAttachmentFile) => {
-    if (!id) return;
+    if (!id || !canViewAttachments) return;
     try {
       setAttachmentError(null);
       if (previewFile) {
@@ -393,6 +418,7 @@ export function ProjectDetail() {
   };
 
   const openDescriptionModal = (file: ApiAttachmentFile) => {
+    if (!canEditAttachments) return;
     setDescriptionModal({
       fileId: file.id,
       filename: file.original_name,
@@ -413,6 +439,7 @@ export function ProjectDetail() {
   };
 
   const handleDropzoneDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!canCreateAttachments) return;
     event.preventDefault();
     event.stopPropagation();
     if (!isDropzoneActive) {
@@ -427,6 +454,7 @@ export function ProjectDetail() {
   };
 
   const handleDropzoneDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!canCreateAttachments) return;
     event.preventDefault();
     event.stopPropagation();
     setIsDropzoneActive(false);
@@ -536,7 +564,7 @@ export function ProjectDetail() {
   }, [attachmentFolders, selectedFolder]);
 
   const openEdit = () => {
-    if (!project) return;
+    if (!project || !canEditProject) return;
     setEditForm({
       name: project.name,
       description: project.description ?? "",
@@ -551,7 +579,7 @@ export function ProjectDetail() {
   };
 
   const handleSaveEdit = async () => {
-    if (!id || !project) return;
+    if (!id || !project || !canEditProject) return;
     setSaving(true);
     setSaveNotice(null);
     try {
@@ -576,7 +604,7 @@ export function ProjectDetail() {
   };
 
   const handleAddMember = async () => {
-    if (!id || !selectedEmployeeId) return;
+    if (!id || !selectedEmployeeId || !canCreateMembers) return;
     setMemberSaving(true);
     setMemberError(null);
     try {
@@ -596,7 +624,7 @@ export function ProjectDetail() {
   };
 
   const handleRemoveMember = async (employeeId: string) => {
-    if (!id) return;
+    if (!id || !canDeleteMembers) return;
     setRemovingId(employeeId);
     try {
       await removeProjectMember(id, employeeId);
@@ -615,7 +643,7 @@ export function ProjectDetail() {
   };
 
   const handleAddTask = async () => {
-    if (!id || !taskForm.title.trim()) return;
+    if (!id || !taskForm.title.trim() || !canCreateTasks) return;
     if (!taskForm.phase_id) {
       setTaskError("Pilih fase untuk tugas ini.");
       return;
@@ -657,7 +685,7 @@ export function ProjectDetail() {
   };
 
   const handleTaskKanbanDragEnd = async (result: DropResult) => {
-    if (!id || !result.destination) return;
+    if (!id || !result.destination || !canEditTasks) return;
     const destinationPhaseId = result.destination.droppableId;
     const sourcePhaseId = result.source.droppableId;
     const taskId = result.draggableId;
@@ -682,7 +710,7 @@ export function ProjectDetail() {
   };
 
   const handleTaskProgressChange = async (taskId: string, nextProgress: number) => {
-    if (!id) return;
+    if (!id || !canEditTasks) return;
     const sanitized = Math.max(0, Math.min(100, nextProgress));
     const previousTask = tasks.find((task) => task.id === taskId);
     if (!previousTask || previousTask.progress_percentage === sanitized) return;
@@ -705,6 +733,7 @@ export function ProjectDetail() {
   };
 
   const loadTaskComments = async (taskId: string) => {
+    if (!canViewTaskComments) return;
     setIsLoadingTaskComments(true);
     try {
       const rows = await fetchTaskComments(taskId);
@@ -721,11 +750,13 @@ export function ProjectDetail() {
 
   const handleOpenTaskDetail = async (taskId: string) => {
     setSelectedTaskId(taskId);
-    await loadTaskComments(taskId);
+    if (canViewTaskComments) {
+      await loadTaskComments(taskId);
+    }
   };
 
   const handleSubmitTaskComment = async (content: string) => {
-    if (!selectedTaskId) return;
+    if (!selectedTaskId || !canCreateTaskComments) return;
     setIsSavingTaskComment(true);
     try {
       await createTaskComment(selectedTaskId, { content });
@@ -850,14 +881,14 @@ export function ProjectDetail() {
                 Simpan
               </button>
             </>
-          ) : (
+          ) : canEditProject ? (
             <button
               onClick={openEdit}
               className="flex items-center px-4 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 text-slate-600"
             >
               <Edit2 className="w-4 h-4 mr-1.5" /> Edit Proyek
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -940,11 +971,13 @@ export function ProjectDetail() {
       <div className="px-6 border-b border-slate-200 flex items-center gap-0">
         {([
           { key: "ringkasan", label: "Ringkasan", icon: Layers },
-          { key: "anggota", label: `Anggota (${project.member_count})`, icon: Users },
-          { key: "tugas", label: `Tugas (${tasks.length})`, icon: CheckSquare },
-          { key: "isu", label: "Isu & Bug", icon: Bug },
-          { key: "lampiran", label: `Lampiran (${attachmentFiles.length})`, icon: FolderClosed }
-        ] as { key: Tab; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
+          { key: "anggota", label: `Anggota (${project.member_count})`, icon: Users, visible: hasPermission(session, "projectMembers", "view") },
+          { key: "tugas", label: `Tugas (${tasks.length})`, icon: CheckSquare, visible: canViewTasks },
+          { key: "isu", label: "Isu & Bug", icon: Bug, visible: canViewIssues },
+          { key: "lampiran", label: `Lampiran (${attachmentFiles.length})`, icon: FolderClosed, visible: canViewAttachments }
+        ] as { key: Tab; label: string; icon: React.ElementType; visible?: boolean }[])
+          .filter((tab) => tab.visible !== false)
+          .map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
@@ -1009,16 +1042,18 @@ export function ProjectDetail() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-slate-700">Anggota Tim</h3>
-              <button
-                onClick={() => {
-                  setShowAddMember(true);
-                  setMemberError(null);
-                  setSelectedEmployeeId("");
-                }}
-                className="flex items-center px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
-              >
-                <Plus className="w-4 h-4 mr-1" /> Tambah Anggota
-              </button>
+              {canCreateMembers && (
+                <button
+                  onClick={() => {
+                    setShowAddMember(true);
+                    setMemberError(null);
+                    setSelectedEmployeeId("");
+                  }}
+                  className="flex items-center px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Tambah Anggota
+                </button>
+              )}
             </div>
 
             {showAddMember && (
@@ -1070,7 +1105,7 @@ export function ProjectDetail() {
                       <th className="px-4 py-3 font-medium text-left">Jabatan</th>
                       <th className="px-4 py-3 font-medium text-left">Unit</th>
                       <th className="px-4 py-3 font-medium text-left">Bergabung</th>
-                      <th className="px-4 py-3 font-medium text-right">Aksi</th>
+                      {canDeleteMembers && <th className="px-4 py-3 font-medium text-right">Aksi</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1079,7 +1114,7 @@ export function ProjectDetail() {
                         key={member.employee_id}
                         member={member}
                         removing={removingId === member.employee_id}
-                        onRemove={() => handleRemoveMember(member.employee_id)}
+                        onRemove={canDeleteMembers ? () => handleRemoveMember(member.employee_id) : undefined}
                       />
                     ))}
                   </tbody>
@@ -1115,24 +1150,26 @@ export function ProjectDetail() {
                   </button>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setShowAddTask(true);
-                  setTaskError(null);
-                  setTaskForm({
-                    title: "",
-                    phase_id: "",
-                    assignee: "",
-                    priority: "Medium",
-                    progress_percentage: 0,
-                    start_date: "",
-                    end_date: ""
-                  });
-                }}
-                className="flex items-center px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
-              >
-                <Plus className="w-4 h-4 mr-1" /> Tambah Tugas
-              </button>
+              {canCreateTasks && (
+                <button
+                  onClick={() => {
+                    setShowAddTask(true);
+                    setTaskError(null);
+                    setTaskForm({
+                      title: "",
+                      phase_id: "",
+                      assignee: "",
+                      priority: "Medium",
+                      progress_percentage: 0,
+                      start_date: "",
+                      end_date: ""
+                    });
+                  }}
+                  className="flex items-center px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Tambah Tugas
+                </button>
+              )}
             </div>
 
             {showAddTask && (
@@ -1262,7 +1299,9 @@ export function ProjectDetail() {
             {tasks.length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 <CheckSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p className="text-sm">Belum ada tugas. Klik <strong>Tambah Tugas</strong> untuk mulai.</p>
+                <p className="text-sm">
+                  {canCreateTasks ? <>Belum ada tugas. Klik <strong>Tambah Tugas</strong> untuk mulai.</> : "Belum ada tugas."}
+                </p>
               </div>
             ) : (
               <>
@@ -1303,6 +1342,7 @@ export function ProjectDetail() {
                                 <TaskProgressControl
                                   value={task.progress_percentage}
                                   onChange={(next) => void handleTaskProgressChange(task.id, next)}
+                                  disabled={!canEditTasks}
                                 />
                               </td>
                               <td className="px-4 py-3 text-slate-600">
@@ -1382,6 +1422,7 @@ export function ProjectDetail() {
                                               value={task.progress_percentage}
                                               onChange={(next) => void handleTaskProgressChange(task.id, next)}
                                               compact
+                                              disabled={!canEditTasks}
                                             />
                                           </div>
                                           <p className="text-xs text-slate-500">
@@ -1421,6 +1462,9 @@ export function ProjectDetail() {
                 ].filter((name) => name.trim().length > 0)
               )
             )}
+            canCreate={canCreateIssues}
+            canEdit={canEditIssues}
+            canUploadAttachment={canCreateAttachments}
             onNotice={setSaveNotice}
           />
         )}
@@ -1720,6 +1764,7 @@ export function ProjectDetail() {
           comments={taskComments[selectedTask.id] ?? []}
           isLoadingComments={isLoadingTaskComments}
           isSavingComment={isSavingTaskComment}
+          canCreateComment={canCreateTaskComments}
           onClose={() => setSelectedTaskId(null)}
           onSubmitComment={handleSubmitTaskComment}
         />
@@ -1856,7 +1901,7 @@ function MemberRow({
 }: {
   member: ApiProjectMember;
   removing: boolean;
-  onRemove: () => void;
+  onRemove?: () => void;
 }) {
   return (
     <tr className="hover:bg-slate-50 group">
@@ -1873,16 +1918,18 @@ function MemberRow({
       <td className="px-4 py-3 text-slate-400 text-xs">
         {new Date(member.joined_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
       </td>
-      <td className="px-4 py-3 text-right opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={onRemove}
-          disabled={removing}
-          className="text-red-400 hover:text-red-600 p-1 rounded disabled:opacity-50"
-          title="Hapus dari proyek"
-        >
-          {removing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-        </button>
-      </td>
+      {onRemove && (
+        <td className="px-4 py-3 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={onRemove}
+            disabled={removing}
+            className="text-red-400 hover:text-red-600 p-1 rounded disabled:opacity-50"
+            title="Hapus dari proyek"
+          >
+            {removing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </button>
+        </td>
+      )}
     </tr>
   );
 }
@@ -1890,11 +1937,13 @@ function MemberRow({
 function TaskProgressControl({
   value,
   onChange,
-  compact = false
+  compact = false,
+  disabled = false
 }: {
   value: number;
   onChange: (value: number) => void;
   compact?: boolean;
+  disabled?: boolean;
 }) {
   const safeValue = Math.max(0, Math.min(100, value));
   const barColorClass =
@@ -1920,7 +1969,8 @@ function TaskProgressControl({
       <select
         value={safeValue}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full px-2 py-1 border border-slate-300 rounded-md text-xs bg-white"
+        disabled={disabled}
+        className="w-full px-2 py-1 border border-slate-300 rounded-md text-xs bg-white disabled:bg-slate-100 disabled:text-slate-500"
       >
         {TASK_PROGRESS_OPTIONS.map((optionValue) => (
           <option key={optionValue} value={optionValue}>

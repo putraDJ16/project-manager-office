@@ -3,6 +3,7 @@ from app.models.employee import Employee
 from app.models.issue import Issue
 from app.models.organization import Organization
 from app.models.organization_unit import OrganizationUnit
+from app.models.notification import Notification
 from app.models.phase import Phase
 from app.models.project_attachment_file import ProjectAttachmentFile
 from app.models.project_attachment_folder import ProjectAttachmentFolder
@@ -29,6 +30,7 @@ __all__ = [
     "TaskComment",
     "Issue",
     "SlaRule",
+    "Notification",
     "Organization",
     "OrganizationUnit",
     "Position",

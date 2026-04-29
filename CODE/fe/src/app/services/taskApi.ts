@@ -83,6 +83,15 @@ export async function fetchTasks(projectId: string, searchQuery: string) {
   return result.data;
 }
 
+export async function fetchAllTasks(searchQuery = "") {
+  const search = searchQuery.trim();
+  const query = new URLSearchParams();
+  if (search) query.set("search", search);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const result = await apiRequest<ApiTask[]>(`/tasks${suffix}`, { method: "GET" });
+  return result.data;
+}
+
 export async function createTask(payload: {
   title: string;
   priority: "Low" | "Medium" | "High" | "Critical";

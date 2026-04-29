@@ -1,3 +1,5 @@
+import type { ModuleKey, PermissionSet } from "./masterData";
+
 export const AUTH_STORAGE_KEY = "pm-saas-auth-session";
 
 export type AuthSession = {
@@ -5,6 +7,9 @@ export type AuthSession = {
   name: string;
   email: string;
   initials: string;
+  roleId?: string | null;
+  role?: string | null;
+  permissions?: Partial<Record<ModuleKey, PermissionSet>>;
   loggedInAt: string;
   accessToken: string;
   refreshToken: string;
@@ -42,6 +47,9 @@ export function loadAuthSession(): AuthSession | null {
       name: parsed.name,
       email: parsed.email,
       initials: parsed.initials,
+      roleId: parsed.roleId,
+      role: parsed.role,
+      permissions: parsed.permissions,
       loggedInAt: parsed.loggedInAt,
       accessToken: parsed.accessToken,
       refreshToken: parsed.refreshToken

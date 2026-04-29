@@ -4,6 +4,7 @@ from app.models.base import utcnow
 from app.extensions import db
 from app.models import Task, TaskComment
 from app.repositories import ProjectRepository, TaskRepository
+from app.services.notification_service import notify_employee
 from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
 
@@ -61,6 +62,15 @@ def create_task(payload: dict, created_by: str = "System"):
         end_date=_parse_date(payload.get("end_date")),
     )
     db.session.add(task)
+    notify_employee(
+        employee_id=data["assignee"],
+        employee_name=data["assignee"],
+        title="Tugas baru ditugaskan kepada Anda",
+        message=f"Anda mendapat tugas {task.title}.",
+        entity_type="task",
+        entity_id=task.id,
+        target_url=f"/proyek/{task.project_id}",
+    )
     db.session.commit()
     return task
 

@@ -10,6 +10,7 @@ def register_api_routes():
         auth,
         employees,
         issues,
+        notifications,
         organization_units,
         organizations,
         project_attachments,

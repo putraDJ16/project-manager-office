@@ -11,6 +11,9 @@ import type {
   MasterReferenceStatus,
   MasterReferenceType
 } from "../../data/masterReferenceData";
+import { loadAuthSession } from "../../data/auth";
+import type { ModuleKey } from "../../data/masterData";
+import { hasPermission } from "../../utils/permissions";
 
 type ModalMode = "create" | "edit";
 type ReferenceFormState = {
@@ -35,6 +38,12 @@ function normalizeValue(value: string) {
   return value.trim().toLowerCase();
 }
 
+const moduleByType: Record<MasterReferenceType, ModuleKey> = {
+  organization: "masterOrganizations",
+  unitOrganization: "masterOrganizationUnits",
+  position: "masterPositions"
+};
+
 export function ReferenceMaster({
   type,
   title,
@@ -42,6 +51,10 @@ export function ReferenceMaster({
   addLabel,
   placeholder
 }: ReferenceMasterProps) {
+  const session = loadAuthSession();
+  const moduleKey = moduleByType[type];
+  const canCreate = hasPermission(session, moduleKey, "create");
+  const canEdit = hasPermission(session, moduleKey, "edit");
   const [items, setItems] = useState<MasterReferenceItem[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
@@ -99,6 +112,7 @@ export function ReferenceMaster({
   };
 
   const openCreateModal = () => {
+    if (!canCreate) return;
     setModalMode("create");
     setEditingItemId(null);
     setFormError("");
@@ -107,6 +121,7 @@ export function ReferenceMaster({
   };
 
   const openEditModal = (item: MasterReferenceItem) => {
+    if (!canEdit) return;
     setModalMode("edit");
     setEditingItemId(item.id);
     setFormError("");
@@ -123,6 +138,7 @@ export function ReferenceMaster({
   };
 
   const handleStatusUpdate = async (item: MasterReferenceItem, status: MasterReferenceStatus) => {
+    if (!canEdit) return;
     try {
       const updated = await updateMasterReferenceStatus(type, item.id, status);
       setItems((current) => current.map((value) => (value.id === updated.id ? updated : value)));
@@ -188,13 +204,15 @@ export function ReferenceMaster({
           </div>
           <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
         </div>
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700"
-        >
-          <Plus className="w-4 h-4 mr-2" /> {addLabel}
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700"
+          >
+            <Plus className="w-4 h-4 mr-2" /> {addLabel}
+          </button>
+        )}
       </div>
 
       <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 flex items-center gap-4">
@@ -262,7 +280,7 @@ export function ReferenceMaster({
                 <tr>
                   <th className="px-4 py-3 font-medium">Nama</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
+                  {canEdit && <th className="px-4 py-3 font-medium text-right">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -277,34 +295,36 @@ export function ReferenceMaster({
                       </div>
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(item)}
-                          className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-100"
-                        >
-                          <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
-                        </button>
-                        {item.status === "Active" ? (
+                    {canEdit && (
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => void handleStatusUpdate(item, "Inactive")}
-                            className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-red-200 text-red-700 hover:bg-red-50"
+                            onClick={() => openEditModal(item)}
+                            className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-100"
                           >
-                            <UserX className="w-3.5 h-3.5 mr-1.5" /> Nonaktifkan
+                            <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
                           </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => void handleStatusUpdate(item, "Active")}
-                            className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                          >
-                            <UserCheck className="w-3.5 h-3.5 mr-1.5" /> Aktifkan
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                          {item.status === "Active" ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleStatusUpdate(item, "Inactive")}
+                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-red-200 text-red-700 hover:bg-red-50"
+                            >
+                              <UserX className="w-3.5 h-3.5 mr-1.5" /> Nonaktifkan
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void handleStatusUpdate(item, "Active")}
+                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                            >
+                              <UserCheck className="w-3.5 h-3.5 mr-1.5" /> Aktifkan
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

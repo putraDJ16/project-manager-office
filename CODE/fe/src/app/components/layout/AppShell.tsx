@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Outlet, Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Outlet, Link, useNavigate } from "react-router";
 import {
   Bell,
   Search,
@@ -18,6 +18,13 @@ import {
   LogOut
 } from "lucide-react";
 import type { AuthSession } from "../../data/auth";
+import { hasPermission } from "../../utils/permissions";
+import {
+  fetchNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type ApiNotification
+} from "../../services/notificationApi";
 
 type AppShellProps = {
   session: AuthSession;
@@ -25,11 +32,65 @@ type AppShellProps = {
 };
 
 export function AppShell({ session, onLogout }: AppShellProps) {
+  const navigate = useNavigate();
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<ApiNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
   const navItemClass = `flex items-center py-2 text-sm font-medium rounded-md transition-colors ${
     isSidebarMinimized ? "justify-center px-2" : "px-3"
   }`;
+  const canViewProjects = hasPermission(session, "masterProjects", "view");
+  const canViewIssues = hasPermission(session, "projectIssues", "view");
+  const canViewWorkload = hasPermission(session, "workload", "view");
+  const canViewMasterEmployees = hasPermission(session, "masterEmployees", "view");
+  const canViewMasterRoles = hasPermission(session, "masterRoles", "view");
+  const canViewMasterOrganizations = hasPermission(session, "masterOrganizations", "view");
+  const canViewMasterUnits = hasPermission(session, "masterOrganizationUnits", "view");
+  const canViewMasterPositions = hasPermission(session, "masterPositions", "view");
+  const canViewAnyMaster =
+    canViewMasterEmployees ||
+    canViewMasterRoles ||
+    canViewMasterOrganizations ||
+    canViewMasterUnits ||
+    canViewMasterPositions;
+
+  const loadNotifications = async () => {
+    try {
+      const payload = await fetchNotifications();
+      setNotifications(payload.items);
+      setUnreadCount(payload.unread_count);
+      setNotificationError(null);
+    } catch (error) {
+      setNotificationError(error instanceof Error ? error.message : "Gagal memuat notifikasi.");
+    }
+  };
+
+  useEffect(() => {
+    void loadNotifications();
+    const interval = window.setInterval(() => {
+      void loadNotifications();
+    }, 30000);
+    return () => window.clearInterval(interval);
+  }, [session.userId, session.accessToken]);
+
+  const handleNotificationClick = async (notification: ApiNotification) => {
+    if (!notification.is_read) {
+      await markNotificationRead(notification.id);
+    }
+    setIsNotificationOpen(false);
+    await loadNotifications();
+    if (notification.target_url) {
+      navigate(notification.target_url);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    await markAllNotificationsRead();
+    await loadNotifications();
+  };
 
   return (
     <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-slate-900">
@@ -69,42 +130,58 @@ export function AppShell({ session, onLogout }: AppShellProps) {
 
             {isSidebarMinimized && <div className="pt-2" />}
 
-            <Link to="/proyek/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Proyek">
-              <FolderKanban className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
-              {!isSidebarMinimized && "Proyek"}
-            </Link>
+            {canViewProjects && (
+              <Link to="/proyek/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Proyek">
+                <FolderKanban className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                {!isSidebarMinimized && "Proyek"}
+              </Link>
+            )}
 
-            <Link to="/isu/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Isu & Bug">
-              <Bug className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
-              {!isSidebarMinimized && "Isu & Bug"}
-            </Link>
+            {canViewIssues && (
+              <Link to="/isu/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Isu & Bug">
+                <Bug className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                {!isSidebarMinimized && "Isu & Bug"}
+              </Link>
+            )}
 
-            <Link to="/sdm/workload" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="SDM & Kapabilitas">
-              <Users className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
-              {!isSidebarMinimized && "SDM & Kapabilitas"}
-            </Link>
+            {canViewWorkload && (
+              <Link to="/sdm/workload" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="SDM & Kapabilitas">
+                <Users className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                {!isSidebarMinimized && "SDM & Kapabilitas"}
+              </Link>
+            )}
 
             {/* Master submenu */}
-            {isSidebarMinimized ? (
+            {canViewAnyMaster && isSidebarMinimized ? (
               <>
                 <div className="pt-2" />
-                <Link to="/master/pegawai" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Pegawai">
-                  <User className="w-5 h-5 opacity-75" />
-                </Link>
-                <Link to="/master/role" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Role">
-                  <Shield className="w-5 h-5 opacity-75" />
-                </Link>
-                <Link to="/master/organisasi" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Organisasi">
-                  <Building2 className="w-5 h-5 opacity-75" />
-                </Link>
-                <Link to="/master/unit-organisasi" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Unit Organisasi">
-                  <Network className="w-5 h-5 opacity-75" />
-                </Link>
-                <Link to="/master/jabatan" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Jabatan">
-                  <BriefcaseBusiness className="w-5 h-5 opacity-75" />
-                </Link>
+                {canViewMasterEmployees && (
+                  <Link to="/master/pegawai" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Pegawai">
+                    <User className="w-5 h-5 opacity-75" />
+                  </Link>
+                )}
+                {canViewMasterRoles && (
+                  <Link to="/master/role" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Role">
+                    <Shield className="w-5 h-5 opacity-75" />
+                  </Link>
+                )}
+                {canViewMasterOrganizations && (
+                  <Link to="/master/organisasi" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Organisasi">
+                    <Building2 className="w-5 h-5 opacity-75" />
+                  </Link>
+                )}
+                {canViewMasterUnits && (
+                  <Link to="/master/unit-organisasi" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Unit Organisasi">
+                    <Network className="w-5 h-5 opacity-75" />
+                  </Link>
+                )}
+                {canViewMasterPositions && (
+                  <Link to="/master/jabatan" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Jabatan">
+                    <BriefcaseBusiness className="w-5 h-5 opacity-75" />
+                  </Link>
+                )}
               </>
-            ) : (
+            ) : canViewAnyMaster ? (
               <div className="mt-1">
                 {!isSidebarMinimized && (
                   <div className="pt-3 pb-1">
@@ -125,45 +202,55 @@ export function AppShell({ session, onLogout }: AppShellProps) {
 
                 {isMasterMenuOpen && (
                   <div className="mt-1 pl-11 pr-2">
-                    <Link
-                      to="/master/pegawai"
-                      className="flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
-                    >
-                      <User className="w-4 h-4 mr-2 opacity-80" />
-                      Pegawai
-                    </Link>
-                    <Link
-                      to="/master/role"
-                      className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
-                    >
-                      <Shield className="w-4 h-4 mr-2 opacity-80" />
-                      Role
-                    </Link>
-                    <Link
-                      to="/master/organisasi"
-                      className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
-                    >
-                      <Building2 className="w-4 h-4 mr-2 opacity-80" />
-                      Organisasi
-                    </Link>
-                    <Link
-                      to="/master/unit-organisasi"
-                      className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
-                    >
-                      <Network className="w-4 h-4 mr-2 opacity-80" />
-                      Unit Organisasi
-                    </Link>
-                    <Link
-                      to="/master/jabatan"
-                      className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
-                    >
-                      <BriefcaseBusiness className="w-4 h-4 mr-2 opacity-80" />
-                      Jabatan
-                    </Link>
+                    {canViewMasterEmployees && (
+                      <Link
+                        to="/master/pegawai"
+                        className="flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                      >
+                        <User className="w-4 h-4 mr-2 opacity-80" />
+                        Pegawai
+                      </Link>
+                    )}
+                    {canViewMasterRoles && (
+                      <Link
+                        to="/master/role"
+                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                      >
+                        <Shield className="w-4 h-4 mr-2 opacity-80" />
+                        Role
+                      </Link>
+                    )}
+                    {canViewMasterOrganizations && (
+                      <Link
+                        to="/master/organisasi"
+                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                      >
+                        <Building2 className="w-4 h-4 mr-2 opacity-80" />
+                        Organisasi
+                      </Link>
+                    )}
+                    {canViewMasterUnits && (
+                      <Link
+                        to="/master/unit-organisasi"
+                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                      >
+                        <Network className="w-4 h-4 mr-2 opacity-80" />
+                        Unit Organisasi
+                      </Link>
+                    )}
+                    {canViewMasterPositions && (
+                      <Link
+                        to="/master/jabatan"
+                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                      >
+                        <BriefcaseBusiness className="w-4 h-4 mr-2 opacity-80" />
+                        Jabatan
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
           </nav>
         </div>
 
@@ -192,10 +279,96 @@ export function AppShell({ session, onLogout }: AppShellProps) {
           </div>
 
           <div className="flex items-center space-x-4">
-            <button className="relative text-slate-500 hover:text-slate-700">
+            <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsNotificationOpen((current) => !current)}
+              className="relative text-slate-500 hover:text-slate-700"
+              aria-label="Buka notifikasi"
+            >
               <Bell className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center font-bold">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </button>
+
+            {isNotificationOpen && (
+              <div className="absolute right-0 top-9 w-96 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white shadow-xl z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Notifikasi</p>
+                    <p className="text-xs text-slate-500">{unreadCount} belum dibaca</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsNotificationOpen(false);
+                        navigate("/notifications");
+                      }}
+                      className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                    >
+                      Lihat semua
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleMarkAllRead()}
+                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+                      disabled={unreadCount === 0}
+                    >
+                      Tandai dibaca
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-96 overflow-y-auto">
+                  {notificationError && (
+                    <div className="px-4 py-3 text-sm text-red-600 bg-red-50">{notificationError}</div>
+                  )}
+
+                  {!notificationError && notifications.length === 0 && (
+                    <div className="px-4 py-8 text-center text-sm text-slate-500">
+                      Belum ada notifikasi.
+                    </div>
+                  )}
+
+                  {!notificationError &&
+                    notifications.map((notification) => (
+                      <button
+                        key={notification.id}
+                        type="button"
+                        onClick={() => void handleNotificationClick(notification)}
+                        className={`w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50 ${
+                          notification.is_read ? "bg-white" : "bg-indigo-50/60"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
+                              notification.is_read ? "bg-slate-300" : "bg-indigo-600"
+                            }`}
+                          />
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 truncate">{notification.title}</p>
+                            <p className="text-xs text-slate-600 mt-0.5 line-clamp-2">{notification.message}</p>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              {new Date(notification.created_at).toLocaleString("id-ID", {
+                                day: "2-digit",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+            </div>
 
             <div className="hidden md:block text-right">
               <p className="text-sm font-semibold text-slate-800 leading-none">{session.name}</p>

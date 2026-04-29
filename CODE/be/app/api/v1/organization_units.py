@@ -5,10 +5,12 @@ from app.api.v1 import api_v1
 from app.schemas import organization_unit_schema, organization_units_schema
 from app.services import organization_unit_service
 from app.utils.http import success_response
+from app.utils.permissions import require_permission
 
 
 @api_v1.get("/organization-units")
 @jwt_required()
+@require_permission("masterOrganizationUnits", "view")
 def list_organization_units_handler():
     units = organization_unit_service.list_organization_units()
     return success_response(organization_units_schema.dump(units))
@@ -16,6 +18,7 @@ def list_organization_units_handler():
 
 @api_v1.post("/organization-units")
 @jwt_required()
+@require_permission("masterOrganizationUnits", "create")
 def create_organization_unit_handler():
     payload = request.get_json(silent=True) or {}
     unit = organization_unit_service.create_organization_unit(payload)
@@ -28,6 +31,7 @@ def create_organization_unit_handler():
 
 @api_v1.patch("/organization-units/<string:unit_id>")
 @jwt_required()
+@require_permission("masterOrganizationUnits", "edit")
 def update_organization_unit_handler(unit_id: str):
     payload = request.get_json(silent=True) or {}
     unit = organization_unit_service.update_organization_unit(unit_id, payload)
@@ -36,6 +40,7 @@ def update_organization_unit_handler(unit_id: str):
 
 @api_v1.patch("/organization-units/<string:unit_id>/status")
 @jwt_required()
+@require_permission("masterOrganizationUnits", "edit")
 def update_organization_unit_status_handler(unit_id: str):
     payload = request.get_json(silent=True) or {}
     unit = organization_unit_service.update_organization_unit_status(unit_id, payload.get("status", ""))

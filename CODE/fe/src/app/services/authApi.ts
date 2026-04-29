@@ -1,4 +1,5 @@
 import { apiRequest } from "./apiClient";
+import type { ModuleKey, PermissionSet } from "../data/masterData";
 
 type LoginResponse = {
   access_token: string;
@@ -8,7 +9,31 @@ type LoginResponse = {
     name: string;
     email: string;
     initials: string;
+    role_id?: string | null;
+    role?: string | null;
+    permissions?: Partial<Record<ModuleKey, PermissionSet>>;
   };
+};
+
+type RegisterPayload = {
+  name: string;
+  email: string;
+  password: string;
+  confirm_password: string;
+  organization?: string;
+  unit_organization?: string;
+  position?: string;
+};
+
+type RegisterOption = {
+  id: string;
+  name: string;
+};
+
+export type RegisterOptionsResponse = {
+  organizations: RegisterOption[];
+  organization_units: RegisterOption[];
+  positions: RegisterOption[];
 };
 
 type MeResponse = {
@@ -17,6 +42,7 @@ type MeResponse = {
   initials: string;
   role_id?: string;
   role?: string | null;
+  permissions?: Partial<Record<ModuleKey, PermissionSet>>;
   organization?: string | null;
   unit_organization?: string | null;
   position?: string | null;
@@ -69,6 +95,23 @@ export async function loginWithApi(email: string, password: string) {
 
     throw error;
   }
+}
+
+export async function registerWithApi(payload: RegisterPayload) {
+  const result = await apiRequest<LoginResponse>("/auth/register", {
+    method: "POST",
+    body: payload,
+    skipAuth: true
+  });
+  return result.data;
+}
+
+export async function fetchRegisterOptions() {
+  const result = await apiRequest<RegisterOptionsResponse>("/auth/register-options", {
+    method: "GET",
+    skipAuth: true
+  });
+  return result.data;
 }
 
 export async function getMe() {

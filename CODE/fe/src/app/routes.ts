@@ -8,20 +8,31 @@ import { RoleMaster } from "./pages/master/RoleMaster";
 import { OrganizationMaster } from "./pages/master/OrganizationMaster";
 import { OrganizationUnitMaster } from "./pages/master/OrganizationUnitMaster";
 import { PositionMaster } from "./pages/master/PositionMaster";
+import { NotificationsPage } from "./pages/kustomisasi/NotificationsPage";
 import { ProfilePage } from "./pages/kustomisasi/ProfilePage";
 import { SettingsPlaceholder } from "./pages/kustomisasi/SettingsPlaceholder";
+import type { ModuleKey } from "./data/masterData";
+import type { ComponentType } from "react";
 
-export const routes = [
-  { index: true, path: "/", component: HomeDashboard },
-  { path: "/isu/list", component: IssueList },
-  { path: "/sdm/workload", component: WorkloadHeatmap },
-  { path: "/proyek/list", component: ProjectList },
-  { path: "/proyek/:id", component: ProjectDetail },
-  { path: "/master/pegawai", component: EmployeeMaster },
-  { path: "/master/role", component: RoleMaster },
-  { path: "/master/organisasi", component: OrganizationMaster },
-  { path: "/master/unit-organisasi", component: OrganizationUnitMaster },
-  { path: "/master/jabatan", component: PositionMaster },
+export type AppRoute = {
+  index?: boolean;
+  path: string;
+  component: ComponentType;
+  module?: ModuleKey;
+};
+
+export const routes: AppRoute[] = [
+  { index: true, path: "/", component: HomeDashboard, module: "dashboard" },
+  { path: "/isu/list", component: IssueList, module: "projectIssues" },
+  { path: "/sdm/workload", component: WorkloadHeatmap, module: "workload" },
+  { path: "/proyek/list", component: ProjectList, module: "masterProjects" },
+  { path: "/proyek/:id", component: ProjectDetail, module: "masterProjects" },
+  { path: "/master/pegawai", component: EmployeeMaster, module: "masterEmployees" },
+  { path: "/master/role", component: RoleMaster, module: "masterRoles" },
+  { path: "/master/organisasi", component: OrganizationMaster, module: "masterOrganizations" },
+  { path: "/master/unit-organisasi", component: OrganizationUnitMaster, module: "masterOrganizationUnits" },
+  { path: "/master/jabatan", component: PositionMaster, module: "masterPositions" },
+  { path: "/notifications", component: NotificationsPage },
   { path: "/profile", component: ProfilePage },
   { path: "/settings", component: SettingsPlaceholder }
 ];

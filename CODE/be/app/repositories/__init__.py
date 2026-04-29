@@ -1,5 +1,6 @@
 from app.repositories.employee_repository import EmployeeRepository
 from app.repositories.issue_repository import IssueRepository
+from app.repositories.notification_repository import NotificationRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.organization_unit_repository import OrganizationUnitRepository
 from app.repositories.position_repository import PositionRepository
@@ -14,6 +15,7 @@ __all__ = [
     "ProjectRepository",
     "TaskRepository",
     "IssueRepository",
+    "NotificationRepository",
     "OrganizationRepository",
     "OrganizationUnitRepository",
     "PositionRepository",

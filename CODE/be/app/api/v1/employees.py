@@ -5,10 +5,12 @@ from app.api.v1 import api_v1
 from app.schemas import employee_schema, employees_schema
 from app.services import employee_service
 from app.utils.http import success_response
+from app.utils.permissions import require_permission
 
 
 @api_v1.get("/employees")
 @jwt_required()
+@require_permission("masterEmployees", "view")
 def list_employees_handler():
     employees = employee_service.list_employees()
     return success_response(employees_schema.dump(employees))
@@ -16,6 +18,7 @@ def list_employees_handler():
 
 @api_v1.post("/employees")
 @jwt_required()
+@require_permission("masterEmployees", "create")
 def create_employee_handler():
     payload = request.get_json(silent=True) or {}
     employee, default_password = employee_service.create_employee(payload)
@@ -28,6 +31,7 @@ def create_employee_handler():
 
 @api_v1.patch("/employees/<string:employee_id>")
 @jwt_required()
+@require_permission("masterEmployees", "edit")
 def update_employee_handler(employee_id: str):
     payload = request.get_json(silent=True) or {}
     employee = employee_service.update_employee(employee_id, payload)
@@ -36,6 +40,7 @@ def update_employee_handler(employee_id: str):
 
 @api_v1.patch("/employees/<string:employee_id>/status")
 @jwt_required()
+@require_permission("masterEmployees", "edit")
 def update_employee_status_handler(employee_id: str):
     payload = request.get_json(silent=True) or {}
     employee = employee_service.update_employee_status(employee_id, payload.get("status", ""))

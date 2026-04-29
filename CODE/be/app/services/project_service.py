@@ -2,6 +2,7 @@ from app.extensions import db
 from app.models import Employee, Phase, Project, ProjectMember
 from app.models.constants import PROJECT_PRIORITY, PROJECT_STATUS
 from app.repositories import ProjectRepository
+from app.services.notification_service import notify_employee
 from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
 
@@ -72,6 +73,16 @@ def create_project(payload: dict):
         )
         db.session.add(initial_phase)
 
+    if manager_id:
+        notify_employee(
+            employee_id=manager_id,
+            title="Anda ditetapkan sebagai manager project",
+            message=f"Anda ditugaskan mengelola project {project.name}.",
+            entity_type="project",
+            entity_id=project.id,
+            target_url=f"/proyek/{project.id}",
+        )
+
     db.session.commit()
     return project
 
@@ -101,11 +112,21 @@ def update_project(project_id: str, payload: dict):
             raise ApiError(f"Prioritas tidak valid. Pilihan: {', '.join(PROJECT_PRIORITY)}")
         project.priority = priority
 
+    previous_manager_id = project.manager_id
     if "manager_id" in payload:
         manager_id = payload.get("manager_id") or None
         if manager_id and not Employee.query.get(manager_id):
             raise ApiError("Manajer tidak ditemukan.")
         project.manager_id = manager_id
+        if manager_id and manager_id != previous_manager_id:
+            notify_employee(
+                employee_id=manager_id,
+                title="Anda ditetapkan sebagai manager project",
+                message=f"Anda ditugaskan mengelola project {project.name}.",
+                entity_type="project",
+                entity_id=project.id,
+                target_url=f"/proyek/{project.id}",
+            )
 
     if "start_date" in payload:
         project.start_date = payload.get("start_date") or None
@@ -172,6 +193,14 @@ def add_member(project_id: str, payload: dict):
 
     member = ProjectMember(project_id=project_id, employee_id=employee_id)
     db.session.add(member)
+    notify_employee(
+        employee_id=employee_id,
+        title="Anda ditambahkan ke project",
+        message=f"Anda ditambahkan sebagai anggota project {project.name}.",
+        entity_type="project",
+        entity_id=project.id,
+        target_url=f"/proyek/{project.id}",
+    )
     db.session.commit()
     return member
 

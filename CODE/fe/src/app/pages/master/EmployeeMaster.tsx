@@ -13,6 +13,7 @@ import {
   X
 } from "lucide-react";
 import { DEFAULT_ORGANIZATION_NAME, type Employee, type EmployeeStatus, type Role } from "../../data/masterData";
+import { loadAuthSession } from "../../data/auth";
 import type { MasterReferenceItem, MasterReferenceType } from "../../data/masterReferenceData";
 import {
   createEmployee,
@@ -22,6 +23,7 @@ import {
   updateEmployeeStatus
 } from "../../services/masterApi";
 import { fetchMasterReferences } from "../../services/masterReferenceApi";
+import { hasPermission } from "../../utils/permissions";
 
 type EmployeeTab = "data" | "structure";
 type ModalMode = "create" | "edit";
@@ -60,6 +62,9 @@ function buildReferenceOptions(
 }
 
 export function EmployeeMaster() {
+  const session = loadAuthSession();
+  const canCreate = hasPermission(session, "masterEmployees", "create");
+  const canEdit = hasPermission(session, "masterEmployees", "edit");
   const [activeTab, setActiveTab] = useState<EmployeeTab>("data");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -166,6 +171,7 @@ export function EmployeeMaster() {
   };
 
   const openCreateModal = () => {
+    if (!canCreate) return;
     const defaultRole = roles.find((role) => role.status === "Active");
     const defaultOrganization = buildReferenceOptions(masterReferences, "organization", "")[0] ?? DEFAULT_ORGANIZATION_NAME;
     const defaultUnitOrganization = buildReferenceOptions(masterReferences, "unitOrganization", "")[0] ?? "";
@@ -184,6 +190,7 @@ export function EmployeeMaster() {
   };
 
   const openEditModal = (employee: Employee) => {
+    if (!canEdit) return;
     setModalMode("edit");
     setEditingEmployeeId(employee.id);
     setFormError("");
@@ -206,6 +213,7 @@ export function EmployeeMaster() {
   };
 
   const handleStatusUpdate = async (employee: Employee, status: Employee["status"]) => {
+    if (!canEdit) return;
     try {
       const updated = await updateEmployeeStatus(employee.id, status);
       setEmployees((current) => current.map((item) => (item.id === updated.id ? updated : item)));
@@ -291,7 +299,7 @@ export function EmployeeMaster() {
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Master - Pegawai</h1>
         </div>
-        {activeTab === "data" && (
+        {activeTab === "data" && canCreate && (
           <button
             type="button"
             onClick={openCreateModal}
@@ -396,7 +404,7 @@ export function EmployeeMaster() {
                   <th className="px-4 py-3 font-medium">Jabatan</th>
                   <th className="px-4 py-3 font-medium">Role</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
+                  {canEdit && <th className="px-4 py-3 font-medium text-right">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -416,34 +424,36 @@ export function EmployeeMaster() {
                       <td className="px-4 py-3">
                         <StatusBadge status={employee.status} />
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(employee)}
-                            className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-100"
-                          >
-                            <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
-                          </button>
-                          {employee.status === "Active" ? (
+                      {canEdit && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => void handleStatusUpdate(employee, "Inactive")}
-                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-red-200 text-red-700 hover:bg-red-50"
+                              onClick={() => openEditModal(employee)}
+                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-100"
                             >
-                              <UserX className="w-3.5 h-3.5 mr-1.5" /> Nonaktifkan
+                              <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
                             </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => void handleStatusUpdate(employee, "Active")}
-                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                            >
-                              <UserCheck className="w-3.5 h-3.5 mr-1.5" /> Aktifkan
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                            {employee.status === "Active" ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleStatusUpdate(employee, "Inactive")}
+                                className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-red-200 text-red-700 hover:bg-red-50"
+                              >
+                                <UserX className="w-3.5 h-3.5 mr-1.5" /> Nonaktifkan
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => void handleStatusUpdate(employee, "Active")}
+                                className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              >
+                                <UserCheck className="w-3.5 h-3.5 mr-1.5" /> Aktifkan
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

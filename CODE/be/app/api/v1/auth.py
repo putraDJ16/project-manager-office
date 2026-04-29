@@ -3,7 +3,7 @@ from flask_jwt_extended import create_access_token, get_jwt, jwt_required
 
 from app.api.v1 import api_v1
 from app.schemas import projects_schema
-from app.services.auth_service import change_password, get_profile, list_my_projects, login
+from app.services.auth_service import change_password, get_profile, list_my_projects, login, register, register_options
 from app.utils.exceptions import ApiError
 from app.utils.http import success_response
 
@@ -13,6 +13,18 @@ def login_handler():
     payload = request.get_json(silent=True) or {}
     result = login(payload.get("email", ""), payload.get("password", ""))
     return success_response(result)
+
+
+@api_v1.post("/auth/register")
+def register_handler():
+    payload = request.get_json(silent=True) or {}
+    result = register(payload)
+    return success_response(result, message="Pendaftaran berhasil.", status_code=201)
+
+
+@api_v1.get("/auth/register-options")
+def register_options_handler():
+    return success_response(register_options())
 
 
 @api_v1.post("/auth/refresh")

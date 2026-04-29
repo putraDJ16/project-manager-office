@@ -1,14 +1,16 @@
 from flask import request
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import get_jwt, jwt_required
 
 from app.api.v1 import api_v1
 from app.schemas import issue_schema, issues_schema
 from app.services import issue_service
 from app.utils.http import success_response
+from app.utils.permissions import require_permission
 
 
 @api_v1.get("/issues")
 @jwt_required()
+@require_permission("projectIssues", "view")
 def list_issues_handler():
     project_id = (request.args.get("project_id") or "").strip() or None
     issues = issue_service.list_issues(project_id=project_id)
@@ -17,14 +19,17 @@ def list_issues_handler():
 
 @api_v1.post("/issues")
 @jwt_required()
+@require_permission("projectIssues", "create")
 def create_issue_handler():
     payload = request.get_json(silent=True) or {}
-    issue = issue_service.create_issue(payload)
+    claims = get_jwt()
+    issue = issue_service.create_issue(payload, reporter_from_claim=claims.get("name"))
     return success_response(issue_schema.dump(issue), message="Isu berhasil dibuat.", status_code=201)
 
 
 @api_v1.patch("/issues/<string:issue_id>/status")
 @jwt_required()
+@require_permission("projectIssues", "edit")
 def update_issue_status_handler(issue_id: str):
     payload = request.get_json(silent=True) or {}
     issue = issue_service.update_issue_status(issue_id, payload.get("status", ""))
@@ -33,6 +38,7 @@ def update_issue_status_handler(issue_id: str):
 
 @api_v1.post("/issues/<string:issue_id>/escalate")
 @jwt_required()
+@require_permission("projectIssues", "edit")
 def escalate_issue_handler(issue_id: str):
     issue = issue_service.escalate_issue(issue_id)
     return success_response(issue_schema.dump(issue), message="Isu berhasil dieskalasi.")

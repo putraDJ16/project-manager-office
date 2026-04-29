@@ -1,6 +1,7 @@
 from app.schemas.audit_trail_schema import AuditTrailSchema
 from app.schemas.employee_schema import EmployeeSchema
 from app.schemas.issue_schema import IssueSchema, SlaRuleSchema
+from app.schemas.notification_schema import NotificationSchema
 from app.schemas.organization_schema import OrganizationSchema
 from app.schemas.organization_unit_schema import OrganizationUnitSchema
 from app.schemas.position_schema import PositionSchema
@@ -31,6 +32,8 @@ issue_schema = IssueSchema()
 issues_schema = IssueSchema(many=True)
 sla_rule_schema = SlaRuleSchema()
 sla_rules_schema = SlaRuleSchema(many=True)
+notification_schema = NotificationSchema()
+notifications_schema = NotificationSchema(many=True)
 organization_schema = OrganizationSchema()
 organizations_schema = OrganizationSchema(many=True)
 organization_unit_schema = OrganizationUnitSchema()

@@ -5,10 +5,12 @@ from app.api.v1 import api_v1
 from app.schemas import position_schema, positions_schema
 from app.services import position_service
 from app.utils.http import success_response
+from app.utils.permissions import require_permission
 
 
 @api_v1.get("/positions")
 @jwt_required()
+@require_permission("masterPositions", "view")
 def list_positions_handler():
     positions = position_service.list_positions()
     return success_response(positions_schema.dump(positions))
@@ -16,6 +18,7 @@ def list_positions_handler():
 
 @api_v1.post("/positions")
 @jwt_required()
+@require_permission("masterPositions", "create")
 def create_position_handler():
     payload = request.get_json(silent=True) or {}
     position = position_service.create_position(payload)
@@ -24,6 +27,7 @@ def create_position_handler():
 
 @api_v1.patch("/positions/<string:position_id>")
 @jwt_required()
+@require_permission("masterPositions", "edit")
 def update_position_handler(position_id: str):
     payload = request.get_json(silent=True) or {}
     position = position_service.update_position(position_id, payload)
@@ -32,6 +36,7 @@ def update_position_handler(position_id: str):
 
 @api_v1.patch("/positions/<string:position_id>/status")
 @jwt_required()
+@require_permission("masterPositions", "edit")
 def update_position_status_handler(position_id: str):
     payload = request.get_json(silent=True) or {}
     position = position_service.update_position_status(position_id, payload.get("status", ""))

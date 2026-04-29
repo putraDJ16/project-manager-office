@@ -10,10 +10,12 @@ from app.schemas import (
 )
 from app.services import project_attachment_service
 from app.utils.http import success_response
+from app.utils.permissions import require_permission
 
 
 @api_v1.get("/projects/<string:project_id>/attachments/folders")
 @jwt_required()
+@require_permission("projectAttachments", "view")
 def list_attachment_folders_handler(project_id: str):
     folders = project_attachment_service.list_folders(project_id)
     return success_response(project_attachment_folders_schema.dump(folders))
@@ -21,6 +23,7 @@ def list_attachment_folders_handler(project_id: str):
 
 @api_v1.post("/projects/<string:project_id>/attachments/folders")
 @jwt_required()
+@require_permission("projectAttachments", "create")
 def create_attachment_folder_handler(project_id: str):
     payload = request.get_json(silent=True) or {}
     folder = project_attachment_service.create_folder(project_id, payload)
@@ -33,6 +36,7 @@ def create_attachment_folder_handler(project_id: str):
 
 @api_v1.patch("/projects/<string:project_id>/attachments/folders/<string:folder_id>")
 @jwt_required()
+@require_permission("projectAttachments", "edit")
 def update_attachment_folder_handler(project_id: str, folder_id: str):
     payload = request.get_json(silent=True) or {}
     folder = project_attachment_service.update_folder(project_id, folder_id, payload)
@@ -44,6 +48,7 @@ def update_attachment_folder_handler(project_id: str, folder_id: str):
 
 @api_v1.delete("/projects/<string:project_id>/attachments/folders/<string:folder_id>")
 @jwt_required()
+@require_permission("projectAttachments", "delete")
 def delete_attachment_folder_handler(project_id: str, folder_id: str):
     project_attachment_service.delete_folder(project_id, folder_id)
     return success_response(None, message="Folder lampiran berhasil dihapus.")
@@ -51,6 +56,7 @@ def delete_attachment_folder_handler(project_id: str, folder_id: str):
 
 @api_v1.get("/projects/<string:project_id>/attachments/files")
 @jwt_required()
+@require_permission("projectAttachments", "view")
 def list_attachment_files_handler(project_id: str):
     folder_id = (request.args.get("folder_id") or "").strip() or None
     files = project_attachment_service.list_files(project_id, folder_id=folder_id)
@@ -59,6 +65,7 @@ def list_attachment_files_handler(project_id: str):
 
 @api_v1.post("/projects/<string:project_id>/attachments/files")
 @jwt_required()
+@require_permission("projectAttachments", "create")
 def upload_attachment_file_handler(project_id: str):
     payload = {
         "folder_id": request.form.get("folder_id"),
@@ -77,6 +84,7 @@ def upload_attachment_file_handler(project_id: str):
 
 @api_v1.patch("/projects/<string:project_id>/attachments/files/<string:file_id>")
 @jwt_required()
+@require_permission("projectAttachments", "edit")
 def update_attachment_file_handler(project_id: str, file_id: str):
     payload = request.get_json(silent=True) or {}
     file_item = project_attachment_service.update_file(project_id, file_id, payload)
@@ -88,6 +96,7 @@ def update_attachment_file_handler(project_id: str, file_id: str):
 
 @api_v1.delete("/projects/<string:project_id>/attachments/files/<string:file_id>")
 @jwt_required()
+@require_permission("projectAttachments", "delete")
 def delete_attachment_file_handler(project_id: str, file_id: str):
     project_attachment_service.delete_file(project_id, file_id)
     return success_response(None, message="File lampiran berhasil dihapus.")
@@ -95,6 +104,7 @@ def delete_attachment_file_handler(project_id: str, file_id: str):
 
 @api_v1.get("/projects/<string:project_id>/attachments/files/<string:file_id>/download")
 @jwt_required()
+@require_permission("projectAttachments", "view")
 def download_attachment_file_handler(project_id: str, file_id: str):
     payload = project_attachment_service.get_download_payload(project_id, file_id)
     return send_from_directory(

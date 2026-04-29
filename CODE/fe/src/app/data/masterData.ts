@@ -8,6 +8,12 @@ export type ModuleKey =
   | "workload"
   | "masterEmployees"
   | "masterProjects"
+  | "projectPhases"
+  | "projectMembers"
+  | "projectTasks"
+  | "projectTaskComments"
+  | "projectIssues"
+  | "projectAttachments"
   | "masterRoles"
   | "masterOrganizations"
   | "masterOrganizationUnits"
@@ -52,7 +58,13 @@ export const modulePermissionLabels: Record<ModuleKey, string> = {
   issues: "Isu & Bug",
   workload: "SDM & Kapabilitas",
   masterEmployees: "Master - Pegawai",
-  masterProjects: "Master - Proyek",
+  masterProjects: "Proyek - Data Proyek",
+  projectPhases: "Proyek - Fase",
+  projectMembers: "Proyek - Anggota",
+  projectTasks: "Proyek - Tugas",
+  projectTaskComments: "Proyek - Komentar Tugas",
+  projectIssues: "Proyek - Isu & Bug",
+  projectAttachments: "Proyek - Lampiran",
   masterRoles: "Master - Role",
   masterOrganizations: "Master - Organisasi",
   masterOrganizationUnits: "Master - Unit Organisasi",
@@ -80,6 +92,12 @@ function createRolePermissions(
     workload: createPermissionSet(overrides?.workload),
     masterEmployees: createPermissionSet(overrides?.masterEmployees),
     masterProjects: createPermissionSet(overrides?.masterProjects),
+    projectPhases: createPermissionSet(overrides?.projectPhases),
+    projectMembers: createPermissionSet(overrides?.projectMembers),
+    projectTasks: createPermissionSet(overrides?.projectTasks),
+    projectTaskComments: createPermissionSet(overrides?.projectTaskComments),
+    projectIssues: createPermissionSet(overrides?.projectIssues),
+    projectAttachments: createPermissionSet(overrides?.projectAttachments),
     masterRoles: createPermissionSet(overrides?.masterRoles),
     masterOrganizations: createPermissionSet(overrides?.masterOrganizations),
     masterOrganizationUnits: createPermissionSet(overrides?.masterOrganizationUnits),
@@ -100,6 +118,12 @@ export const initialRoles: Role[] = [
       workload: { view: true, create: true, edit: true, delete: true, restore: true },
       masterEmployees: { view: true, create: true, edit: true, delete: true, restore: true },
       masterProjects: { view: true, create: true, edit: true, delete: true, restore: true },
+      projectPhases: { view: true, create: true, edit: true, delete: true, restore: true },
+      projectMembers: { view: true, create: true, edit: true, delete: true, restore: true },
+      projectTasks: { view: true, create: true, edit: true, delete: true, restore: true },
+      projectTaskComments: { view: true, create: true, edit: true, delete: true, restore: true },
+      projectIssues: { view: true, create: true, edit: true, delete: true, restore: true },
+      projectAttachments: { view: true, create: true, edit: true, delete: true, restore: true },
       masterRoles: { view: true, create: true, edit: true, delete: true, restore: true },
       masterOrganizations: { view: true, create: true, edit: true, delete: true, restore: true },
       masterOrganizationUnits: { view: true, create: true, edit: true, delete: true, restore: true },
@@ -116,7 +140,13 @@ export const initialRoles: Role[] = [
       tasks: { view: true, create: true, edit: true },
       issues: { view: true, create: true, edit: true },
       workload: { view: true },
-      masterProjects: { view: true, edit: true },
+      masterProjects: { view: true, create: true, edit: true },
+      projectPhases: { view: true, create: true, edit: true },
+      projectMembers: { view: true, create: true, delete: true },
+      projectTasks: { view: true, create: true, edit: true },
+      projectTaskComments: { view: true, create: true },
+      projectIssues: { view: true, create: true, edit: true },
+      projectAttachments: { view: true, create: true, edit: true, delete: true },
       masterOrganizations: { view: true },
       masterOrganizationUnits: { view: true },
       masterPositions: { view: true }
@@ -141,7 +171,7 @@ export const initialRoles: Role[] = [
     id: "role-004",
     name: "Viewer",
     description: "Akses baca untuk pemantauan dashboard dan master data.",
-    status: "Inactive",
+    status: "Active",
     permissions: createRolePermissions({
       dashboard: { view: true },
       tasks: { view: true },
@@ -149,6 +179,12 @@ export const initialRoles: Role[] = [
       workload: { view: true },
       masterEmployees: { view: true },
       masterProjects: { view: true },
+      projectPhases: { view: true },
+      projectMembers: { view: true },
+      projectTasks: { view: true },
+      projectTaskComments: { view: true },
+      projectIssues: { view: true },
+      projectAttachments: { view: true },
       masterRoles: { view: true },
       masterOrganizations: { view: true },
       masterOrganizationUnits: { view: true },

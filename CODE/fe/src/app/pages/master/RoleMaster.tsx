@@ -7,7 +7,9 @@ import {
   type Role,
   type RoleStatus
 } from "../../data/masterData";
+import { loadAuthSession } from "../../data/auth";
 import { createRole, fetchRoles, updateRole, updateRoleStatus } from "../../services/masterApi";
+import { hasPermission } from "../../utils/permissions";
 
 type ModalMode = "create" | "edit";
 type RoleFormState = Omit<Role, "id">;
@@ -24,6 +26,12 @@ function createEmptyPermissions(): Record<ModuleKey, PermissionSet> {
     workload: createEmptyPermissionSet(),
     masterEmployees: createEmptyPermissionSet(),
     masterProjects: createEmptyPermissionSet(),
+    projectPhases: createEmptyPermissionSet(),
+    projectMembers: createEmptyPermissionSet(),
+    projectTasks: createEmptyPermissionSet(),
+    projectTaskComments: createEmptyPermissionSet(),
+    projectIssues: createEmptyPermissionSet(),
+    projectAttachments: createEmptyPermissionSet(),
     masterRoles: createEmptyPermissionSet(),
     masterOrganizations: createEmptyPermissionSet(),
     masterOrganizationUnits: createEmptyPermissionSet(),
@@ -58,6 +66,9 @@ const emptyRoleFormState: RoleFormState = {
 };
 
 export function RoleMaster() {
+  const session = loadAuthSession();
+  const canCreate = hasPermission(session, "masterRoles", "create");
+  const canEdit = hasPermission(session, "masterRoles", "edit");
   const [roles, setRoles] = useState<Role[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
@@ -114,6 +125,7 @@ export function RoleMaster() {
   };
 
   const openCreateModal = () => {
+    if (!canCreate) return;
     setModalMode("create");
     setEditingRoleId(null);
     setFormError("");
@@ -122,6 +134,7 @@ export function RoleMaster() {
   };
 
   const openEditModal = (role: Role) => {
+    if (!canEdit) return;
     setModalMode("edit");
     setEditingRoleId(role.id);
     setFormError("");
@@ -140,6 +153,7 @@ export function RoleMaster() {
   };
 
   const handleStatusUpdate = async (role: Role, status: RoleStatus) => {
+    if (!canEdit) return;
     try {
       const updated = await updateRoleStatus(role.id, status);
       setRoles((current) => current.map((item) => (item.id === updated.id ? updated : item)));
@@ -206,13 +220,15 @@ export function RoleMaster() {
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Master - Role</h1>
         </div>
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700"
-        >
-          <Plus className="w-4 h-4 mr-2" /> Tambah Role
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Tambah Role
+          </button>
+        )}
       </div>
 
       <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 flex items-center gap-4">
@@ -280,7 +296,7 @@ export function RoleMaster() {
                   <th className="px-4 py-3 font-medium">Deskripsi</th>
                   <th className="px-4 py-3 font-medium">Akses Menu</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
+                  {canEdit && <th className="px-4 py-3 font-medium text-right">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -305,34 +321,36 @@ export function RoleMaster() {
                         </div>
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={role.status} /></td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(role)}
-                            className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-100"
-                          >
-                            <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
-                          </button>
-                          {role.status === "Active" ? (
+                      {canEdit && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => void handleStatusUpdate(role, "Inactive")}
-                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-red-200 text-red-700 hover:bg-red-50"
+                              onClick={() => openEditModal(role)}
+                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-100"
                             >
-                              <UserX className="w-3.5 h-3.5 mr-1.5" /> Nonaktifkan
+                              <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
                             </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => void handleStatusUpdate(role, "Active")}
-                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                            >
-                              <UserCheck className="w-3.5 h-3.5 mr-1.5" /> Aktifkan
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                            {role.status === "Active" ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleStatusUpdate(role, "Inactive")}
+                                className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-red-200 text-red-700 hover:bg-red-50"
+                              >
+                                <UserX className="w-3.5 h-3.5 mr-1.5" /> Nonaktifkan
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => void handleStatusUpdate(role, "Active")}
+                                className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              >
+                                <UserCheck className="w-3.5 h-3.5 mr-1.5" /> Aktifkan
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

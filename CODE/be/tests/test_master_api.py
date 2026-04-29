@@ -1,3 +1,10 @@
+def _login(client, email="pm@zoho.local", password="Pm123456!"):
+    response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert response.status_code == 200
+    token = response.get_json()["data"]["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_roles_crud(client, auth_headers):
     before = client.get("/api/v1/roles", headers=auth_headers)
     assert before.status_code == 200
@@ -22,6 +29,39 @@ def test_roles_crud(client, auth_headers):
     status = client.patch(f"/api/v1/roles/{role_id}/status", headers=auth_headers, json={"status": "Inactive"})
     assert status.status_code == 200
     assert status.get_json()["data"]["status"] == "Inactive"
+
+
+def test_project_manager_cannot_mutate_master_data(client):
+    pm_headers = _login(client)
+
+    can_view_organizations = client.get("/api/v1/organizations", headers=pm_headers)
+    assert can_view_organizations.status_code == 200
+
+    create_organization = client.post(
+        "/api/v1/organizations",
+        headers=pm_headers,
+        json={"name": "Tidak Boleh Dibuat", "status": "Active"},
+    )
+    assert create_organization.status_code == 403
+
+    create_employee = client.post(
+        "/api/v1/employees",
+        headers=pm_headers,
+        json={
+            "nip": "20000101-998",
+            "name": "Unauthorized Employee",
+            "email": "unauthorized.employee@company.co.id",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Lead Developer",
+            "role_id": "role-001",
+            "status": "Active",
+        },
+    )
+    assert create_employee.status_code == 403
+
+    edit_role = client.patch("/api/v1/roles/role-001", headers=pm_headers, json={"description": "Nope"})
+    assert edit_role.status_code == 403
 
 
 def test_employee_crud(client, auth_headers):

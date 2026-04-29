@@ -15,19 +15,18 @@ from app.models import (
     User,
 )
 from app.services.issue_service import DEFAULT_SLA_RULES, SEVERITY_ORDER
+from app.utils.permissions import DEFAULT_ROLE_PERMISSIONS_BY_NAME
 
-DEFAULT_ROLE_PERMISSIONS = {
-    "dashboard": {"view": True, "create": False, "edit": False, "delete": False, "restore": False},
-    "tasks": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
-    "issues": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
-    "workload": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
-    "masterEmployees": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
-    "masterProjects": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
-    "masterRoles": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
-    "masterOrganizations": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
-    "masterOrganizationUnits": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
-    "masterPositions": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
-}
+
+def sync_default_role_permissions():
+    for role_name, permissions in DEFAULT_ROLE_PERMISSIONS_BY_NAME.items():
+        role = Role.query.filter_by(name=role_name).first()
+        if not role:
+            continue
+        role.permissions = permissions
+        if role_name == "Viewer":
+            role.status = "Active"
+    db.session.commit()
 
 
 def seed_database(force_reset: bool = False):
@@ -36,6 +35,7 @@ def seed_database(force_reset: bool = False):
         db.create_all()
 
     if Role.query.first():
+        sync_default_role_permissions()
         return
 
     roles = [
@@ -44,28 +44,28 @@ def seed_database(force_reset: bool = False):
             name="Administrator",
             description="Akses penuh untuk seluruh menu aktif dan aksi pengelolaan data.",
             status="Active",
-            permissions=DEFAULT_ROLE_PERMISSIONS,
+            permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME["Administrator"],
         ),
         Role(
             id="role-002",
             name="Project Manager",
             description="Fokus pada manajemen tugas, proyek, dan pemantauan isu.",
             status="Active",
-            permissions=DEFAULT_ROLE_PERMISSIONS,
+            permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME["Project Manager"],
         ),
         Role(
             id="role-003",
             name="HR Admin",
             description="Mengelola data pegawai dan struktur organisasi.",
             status="Active",
-            permissions=DEFAULT_ROLE_PERMISSIONS,
+            permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME["HR Admin"],
         ),
         Role(
             id="role-004",
             name="Viewer",
             description="Akses baca untuk pemantauan dashboard dan master data.",
-            status="Inactive",
-            permissions=DEFAULT_ROLE_PERMISSIONS,
+            status="Active",
+            permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME["Viewer"],
         ),
     ]
     db.session.add_all(roles)

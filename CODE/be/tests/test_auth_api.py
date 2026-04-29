@@ -12,6 +12,54 @@ def test_login_fail(client):
     assert response.status_code == 401
 
 
+def test_register_success(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "User Mandiri",
+            "email": "user.mandiri@example.com",
+            "password": "Register123!",
+            "confirm_password": "Register123!",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+        },
+    )
+    assert response.status_code == 201
+    data = response.get_json()["data"]
+    assert data["access_token"]
+    assert data["refresh_token"]
+    assert data["user"]["email"] == "user.mandiri@example.com"
+
+    login = client.post("/api/v1/auth/login", json={"email": "user.mandiri@example.com", "password": "Register123!"})
+    assert login.status_code == 200
+
+
+def test_register_options(client):
+    response = client.get("/api/v1/auth/register-options")
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert {"id": "org-001", "name": "ZOHO PM SaaS"} in data["organizations"]
+    assert {"id": "unit-001", "name": "Engineering"} in data["organization_units"]
+    assert {"id": "pos-004", "name": "Backend Developer"} in data["positions"]
+
+
+def test_register_duplicate_email(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "Admin Duplicate",
+            "email": "admin@zoho.local",
+            "password": "Register123!",
+            "confirm_password": "Register123!",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+        },
+    )
+    assert response.status_code == 409
+
+
 def test_auth_me_and_refresh(client):
     login = client.post("/api/v1/auth/login", json={"email": "admin@zoho.local", "password": "Admin123!"}).get_json()
     access = login["data"]["access_token"]

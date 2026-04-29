@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import { FileWarning, KanbanSquare, List, Search, X } from "lucide-react";
+import { FileWarning, KanbanSquare, List, Paperclip, Search, X } from "lucide-react";
 import {
   ISSUE_SEVERITY_ORDER,
   ISSUE_STATUS_ORDER,
@@ -18,6 +18,8 @@ import {
   updateIssueStatus
 } from "../../services/issueService";
 import { getSlaIndicator, shouldAutoEscalate, type SlaIndicatorTone } from "../../services/issueSla";
+import { loadAuthSession } from "../../data/auth";
+import { uploadAttachmentFile } from "../../services/projectAttachmentApi";
 import { IssueDetailPanel } from "../isu/IssueDetailPanel";
 
 type ViewMode = "list" | "board";
@@ -33,29 +35,30 @@ type CreateIssueFormState = {
   reproductionSteps: string;
   actualResult: string;
   expectedResult: string;
-  attachments: string;
 };
 
 type ProjectIssuePanelProps = {
   projectId: string;
   projectName: string;
   assigneeOptions: string[];
+  canCreate: boolean;
+  canEdit: boolean;
+  canUploadAttachment: boolean;
   onNotice: (notice: { type: "success" | "error"; msg: string }) => void;
 };
 
-function getDefaultCreateForm(): CreateIssueFormState {
+function getDefaultCreateForm(defaultReporter = ""): CreateIssueFormState {
   return {
     title: "",
     severity: "Major",
-    reporter: "",
+    reporter: defaultReporter,
     assignee: "",
     module: "",
     environment: "",
     description: "",
     reproductionSteps: "",
     actualResult: "",
-    expectedResult: "",
-    attachments: ""
+    expectedResult: ""
   };
 }
 
@@ -66,14 +69,16 @@ function parseLines(value: string) {
     .filter((entry) => entry.length > 0);
 }
 
-function parseAttachments(value: string) {
-  return value
-    .split(/[\r\n,]+/)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-}
-
-export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onNotice }: ProjectIssuePanelProps) {
+export function ProjectIssuePanel({
+  projectId,
+  projectName,
+  assigneeOptions,
+  canCreate,
+  canEdit,
+  canUploadAttachment,
+  onNotice
+}: ProjectIssuePanelProps) {
+  const reporterName = useMemo(() => loadAuthSession()?.name ?? "System", []);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [slaConfig, setSlaConfig] = useState<SlaConfig | null>(null);
   const [view, setView] = useState<ViewMode>("list");
@@ -82,7 +87,8 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
   const [severityFilter, setSeverityFilter] = useState<IssueSeverity | "all">("all");
   const [statusFilter, setStatusFilter] = useState<IssueStatus | "all">("all");
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
-  const [createForm, setCreateForm] = useState<CreateIssueFormState>(() => getDefaultCreateForm());
+  const [createForm, setCreateForm] = useState<CreateIssueFormState>(() => getDefaultCreateForm(reporterName));
+  const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -196,7 +202,7 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
         projectId,
         title: createForm.title,
         severity: createForm.severity,
-        reporter: createForm.reporter,
+        reporter: reporterName,
         assignee: createForm.assignee || null,
         module: createForm.module,
         environment: createForm.environment,
@@ -204,11 +210,27 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
         reproductionSteps: parseLines(createForm.reproductionSteps),
         actualResult: createForm.actualResult,
         expectedResult: createForm.expectedResult,
-        attachments: parseAttachments(createForm.attachments)
+        attachments: []
       };
+      if (selectedAttachments.length > 0) {
+        if (!canUploadAttachment) {
+          onNotice({ type: "error", msg: "Role Anda belum memiliki izin upload lampiran." });
+          return;
+        }
+        const uploadedFiles = await Promise.all(
+          selectedAttachments.map((file) =>
+            uploadAttachmentFile(projectId, {
+              file,
+              description: `Lampiran isu: ${createForm.title.trim() || "Issue"}`
+            })
+          )
+        );
+        payload.attachments = uploadedFiles.map((item) => item.data.original_name);
+      }
       await createIssue(payload);
       await refreshIssues();
-      setCreateForm(getDefaultCreateForm());
+      setCreateForm(getDefaultCreateForm(reporterName));
+      setSelectedAttachments([]);
       setIsCreateModalOpen(false);
       onNotice({ type: "success", msg: "Isu baru berhasil dibuat." });
     } catch (error) {
@@ -219,6 +241,7 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
   };
 
   const handleStatusChange = async (issueId: string, status: IssueStatus) => {
+    if (!canEdit) return;
     try {
       await updateIssueStatus(issueId, status);
       await refreshIssues();
@@ -231,6 +254,7 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
   };
 
   const handleEscalate = async (issueId: string) => {
+    if (!canEdit) return;
     try {
       await escalateIssue(issueId);
       await refreshIssues();
@@ -241,6 +265,7 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
   };
 
   const handleBoardDragEnd = (result: DropResult) => {
+    if (!canEdit) return;
     if (!result.destination) return;
     const destinationStatus = result.destination.droppableId as IssueStatus;
     const issueId = result.draggableId;
@@ -275,16 +300,19 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
             </button>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setCreateForm(getDefaultCreateForm());
-            setIsCreateModalOpen(true);
-          }}
-          className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700"
-        >
-          <FileWarning className="w-4 h-4 mr-1.5" /> Lapor Bug
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={() => {
+              setCreateForm(getDefaultCreateForm(reporterName));
+              setSelectedAttachments([]);
+              setIsCreateModalOpen(true);
+            }}
+            className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700"
+          >
+            <FileWarning className="w-4 h-4 mr-1.5" /> Lapor Bug
+          </button>
+        )}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-center gap-3 flex-wrap">
@@ -478,14 +506,27 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
       )}
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setIsCreateModalOpen(false)}>
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => {
+            setSelectedAttachments([]);
+            setIsCreateModalOpen(false);
+          }}
+        >
           <div
             className="w-full max-w-3xl bg-white rounded-xl border border-slate-200 shadow-2xl max-h-[90vh] overflow-y-auto"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-base font-bold text-slate-900">Lapor Bug Proyek</h2>
-              <button type="button" onClick={() => setIsCreateModalOpen(false)} className="p-1 rounded hover:bg-slate-100 text-slate-500">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAttachments([]);
+                  setIsCreateModalOpen(false);
+                }}
+                className="p-1 rounded hover:bg-slate-100 text-slate-500"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -522,9 +563,8 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
                   <input
                     type="text"
                     value={createForm.reporter}
-                    onChange={(event) => setCreateForm((current) => ({ ...current, reporter: event.target.value }))}
-                    className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
-                    required
+                    readOnly
+                    className="w-full border border-slate-300 bg-slate-100 rounded-md px-3 py-2 text-sm text-slate-600"
                   />
                 </div>
                 <div>
@@ -611,18 +651,70 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
                 </div>
               </div>
 
+              {canUploadAttachment && (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Lampiran (nama file, pisahkan dengan koma/baris baru)</label>
-                <textarea
-                  rows={2}
-                  value={createForm.attachments}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, attachments: event.target.value }))}
-                  className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Lampiran Bukti</label>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    if (files.length === 0) return;
+                    setSelectedAttachments((current) => {
+                      const existing = new Set(
+                        current.map((file) => `${file.name}-${file.size}-${file.lastModified}`)
+                      );
+                      const merged = files.filter(
+                        (file) => !existing.has(`${file.name}-${file.size}-${file.lastModified}`)
+                      );
+                      return [...current, ...merged];
+                    });
+                    event.currentTarget.value = "";
+                  }}
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm bg-white"
                 />
+                <div className="mt-2 space-y-2">
+                  {selectedAttachments.length === 0 && (
+                    <div className="text-xs text-slate-500 border border-dashed border-slate-300 rounded-md px-3 py-2">
+                      Belum ada file dipilih.
+                    </div>
+                  )}
+                  {selectedAttachments.map((file, index) => (
+                    <div
+                      key={`${file.name}-${file.size}-${file.lastModified}`}
+                      className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 bg-slate-50"
+                    >
+                      <Paperclip className="w-4 h-4 text-slate-500" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-800 truncate">{file.name}</p>
+                        <p className="text-xs text-slate-500">{formatFileSize(file.size)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedAttachments((current) =>
+                            current.filter((_, attachmentIndex) => attachmentIndex !== index)
+                          )
+                        }
+                        className="inline-flex items-center px-2 py-1 text-xs rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 border border-slate-300 rounded-md text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAttachments([]);
+                    setIsCreateModalOpen(false);
+                  }}
+                  className="px-4 py-2 border border-slate-300 rounded-md text-sm"
+                >
                   Batal
                 </button>
                 <button
@@ -639,6 +731,12 @@ export function ProjectIssuePanel({ projectId, projectName, assigneeOptions, onN
       )}
     </div>
   );
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 function SeverityBadge({ severity }: { severity: IssueSeverity }) {
