@@ -13,6 +13,7 @@ import {
   FilePlus2,
   FolderClosed,
   FolderPlus,
+  GanttChartSquare,
   KanbanSquare,
   Layers,
   List,
@@ -84,7 +85,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   Low: "bg-green-100 text-green-700"
 };
 
-type Tab = "ringkasan" | "anggota" | "tugas" | "isu" | "lampiran";
+type Tab = "ringkasan" | "anggota" | "tugas" | "gantt" | "isu" | "lampiran";
 type TaskView = "list" | "kanban";
 type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
 
@@ -973,6 +974,7 @@ export function ProjectDetail() {
           { key: "ringkasan", label: "Ringkasan", icon: Layers },
           { key: "anggota", label: `Anggota (${project.member_count})`, icon: Users, visible: hasPermission(session, "projectMembers", "view") },
           { key: "tugas", label: `Tugas (${tasks.length})`, icon: CheckSquare, visible: canViewTasks },
+          { key: "gantt", label: "Gantt", icon: GanttChartSquare, visible: canViewTasks },
           { key: "isu", label: "Isu & Bug", icon: Bug, visible: canViewIssues },
           { key: "lampiran", label: `Lampiran (${attachmentFiles.length})`, icon: FolderClosed, visible: canViewAttachments }
         ] as { key: Tab; label: string; icon: React.ElementType; visible?: boolean }[])
@@ -1448,6 +1450,15 @@ export function ProjectDetail() {
               </>
             )}
           </div>
+        )}
+
+        {activeTab === "gantt" && (
+          <ProjectGanttChart
+            project={project}
+            tasks={tasks}
+            phases={phasesSorted}
+            resolveAssigneeLabel={resolveAssigneeLabel}
+          />
         )}
 
         {activeTab === "isu" && (
@@ -1931,6 +1942,250 @@ function MemberRow({
         </td>
       )}
     </tr>
+  );
+}
+
+function parseDateValue(value: string | null | undefined) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  const parsed = new Date(year, month - 1, day);
+  parsed.setHours(0, 0, 0, 0);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function addCalendarDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function daysBetween(start: Date, end: Date) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((end.getTime() - start.getTime()) / msPerDay);
+}
+
+function ganttDateLabel(date: Date) {
+  return date.toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
+}
+
+function ganttMonthLabel(date: Date) {
+  return date.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
+}
+
+function ganttPriorityClass(priority: ApiTask["priority"]) {
+  const styles: Record<ApiTask["priority"], string> = {
+    Critical: "bg-red-500",
+    High: "bg-orange-500",
+    Medium: "bg-blue-500",
+    Low: "bg-emerald-500"
+  };
+  return styles[priority];
+}
+
+function ProjectGanttChart({
+  project,
+  tasks,
+  phases,
+  resolveAssigneeLabel
+}: {
+  project: ApiProjectDetail;
+  tasks: ApiTask[];
+  phases: ApiPhase[];
+  resolveAssigneeLabel: (assigneeValue: string) => string;
+}) {
+  const scheduledTasks = tasks
+    .map((task) => ({
+      task,
+      start: parseDateValue(task.start_date),
+      end: parseDateValue(task.end_date)
+    }))
+    .filter((item): item is { task: ApiTask; start: Date; end: Date } => Boolean(item.start && item.end && item.end >= item.start))
+    .sort((left, right) => left.start.getTime() - right.start.getTime() || left.task.title.localeCompare(right.task.title, "id"));
+
+  const unscheduledTasks = tasks.filter((task) => {
+    const start = parseDateValue(task.start_date);
+    const end = parseDateValue(task.end_date);
+    return !start || !end || end < start;
+  });
+
+  const projectStart = parseDateValue(project.start_date);
+  const projectEnd = parseDateValue(project.end_date);
+  const timelineDates = [
+    ...scheduledTasks.flatMap((item) => [item.start, item.end]),
+    ...(projectStart ? [projectStart] : []),
+    ...(projectEnd ? [projectEnd] : [])
+  ];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const minDate = timelineDates.length
+    ? new Date(Math.min(...timelineDates.map((date) => date.getTime())))
+    : today;
+  const maxDate = timelineDates.length
+    ? new Date(Math.max(...timelineDates.map((date) => date.getTime())))
+    : addCalendarDays(today, 14);
+  const timelineStart = addCalendarDays(minDate, -2);
+  const timelineEnd = addCalendarDays(maxDate, 2);
+  const totalDays = Math.max(1, daysBetween(timelineStart, timelineEnd) + 1);
+  const timelineWidth = Math.max(760, totalDays * (totalDays > 120 ? 10 : totalDays > 60 ? 14 : 24));
+  const tickStep = totalDays > 120 ? 30 : totalDays > 60 ? 14 : 7;
+  const ticks = Array.from({ length: Math.ceil(totalDays / tickStep) + 1 }, (_, index) =>
+    addCalendarDays(timelineStart, index * tickStep)
+  ).filter((date) => date <= timelineEnd);
+  const todayOffset = today >= timelineStart && today <= timelineEnd
+    ? (daysBetween(timelineStart, today) / totalDays) * 100
+    : null;
+
+  const scheduledByPhase = phases
+    .map((phase) => ({
+      phase,
+      tasks: scheduledTasks.filter((item) => item.task.phase_id === phase.id)
+    }))
+    .filter((group) => group.tasks.length > 0);
+  const orphanScheduled = scheduledTasks.filter((item) => !phases.some((phase) => phase.id === item.task.phase_id));
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-800">Gantt Chart Project</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Visualisasi timeline berdasarkan tanggal mulai, tanggal selesai, progress, fase, dan assignee tugas.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 font-medium text-blue-700">
+            {scheduledTasks.length} tugas terjadwal
+          </span>
+          <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-medium text-amber-700">
+            {unscheduledTasks.length} perlu tanggal
+          </span>
+        </div>
+      </div>
+
+      {scheduledTasks.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+          Belum ada tugas dengan tanggal mulai dan tanggal selesai yang valid.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <div className="min-w-max">
+            <div className="flex border-b border-slate-200 bg-slate-50">
+              <div className="w-80 shrink-0 px-4 py-3 text-xs font-semibold uppercase text-slate-500">
+                Tugas
+              </div>
+              <div className="relative h-14 shrink-0" style={{ width: timelineWidth }}>
+                {ticks.map((tick) => {
+                  const offset = (daysBetween(timelineStart, tick) / totalDays) * 100;
+                  return (
+                    <div
+                      key={tick.toISOString()}
+                      className="absolute top-0 h-full border-l border-slate-200 pl-2 pt-2 text-[11px] font-medium text-slate-500"
+                      style={{ left: `${offset}%` }}
+                    >
+                      {totalDays > 120 ? ganttMonthLabel(tick) : ganttDateLabel(tick)}
+                    </div>
+                  );
+                })}
+                {todayOffset !== null && (
+                  <div className="absolute top-0 h-full border-l-2 border-red-400" style={{ left: `${todayOffset}%` }}>
+                    <span className="absolute left-1 top-8 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
+                      Hari ini
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {[...scheduledByPhase, ...(orphanScheduled.length ? [{ phase: null, tasks: orphanScheduled }] : [])].map((group) => (
+              <div key={group.phase?.id ?? "tanpa-fase"}>
+                <div className="flex border-b border-slate-200 bg-slate-100/70">
+                  <div className="w-80 shrink-0 px-4 py-2 text-xs font-semibold text-slate-700">
+                    {group.phase?.name ?? "Tanpa Fase"}
+                  </div>
+                  <div className="px-3 py-2 text-xs text-slate-500" style={{ width: timelineWidth }}>
+                    {group.tasks.length} tugas
+                  </div>
+                </div>
+                {group.tasks.map(({ task, start, end }) => {
+                  const left = (daysBetween(timelineStart, start) / totalDays) * 100;
+                  const width = Math.max(1.5, ((daysBetween(start, end) + 1) / totalDays) * 100);
+                  const progressWidth = Math.max(0, Math.min(100, task.progress_percentage));
+                  return (
+                    <div key={task.id} className="flex border-b border-slate-100 hover:bg-slate-50">
+                      <div className="w-80 shrink-0 px-4 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-900">{task.title}</p>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {task.id} | {resolveAssigneeLabel(task.assignee) || "-"}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                            {task.progress_percentage}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="relative h-16 shrink-0" style={{ width: timelineWidth }}>
+                        {ticks.map((tick) => (
+                          <div
+                            key={`${task.id}-${tick.toISOString()}`}
+                            className="absolute top-0 h-full border-l border-slate-100"
+                            style={{ left: `${(daysBetween(timelineStart, tick) / totalDays) * 100}%` }}
+                          />
+                        ))}
+                        {todayOffset !== null && (
+                          <div className="absolute top-0 h-full border-l border-red-300" style={{ left: `${todayOffset}%` }} />
+                        )}
+                        <div
+                          className={`absolute top-5 h-6 overflow-hidden rounded-md shadow-sm ${ganttPriorityClass(task.priority)}`}
+                          style={{ left: `${left}%`, width: `${width}%` }}
+                          title={`${task.title} (${formatDate(task.start_date)} - ${formatDate(task.end_date)})`}
+                        >
+                          <div className="h-full bg-white/35" style={{ width: `${progressWidth}%` }} />
+                        </div>
+                        <div
+                          className="absolute top-12 text-[11px] font-medium text-slate-500"
+                          style={{ left: `${left}%` }}
+                        >
+                          {formatDate(task.start_date)} - {formatDate(task.end_date)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {unscheduledTasks.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h4 className="text-sm font-semibold text-amber-900">Tugas Belum Siap Masuk Gantt</h4>
+            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+              {unscheduledTasks.length} tugas
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            {unscheduledTasks.slice(0, 8).map((task) => (
+              <div key={task.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+                <p className="truncate text-sm font-medium text-slate-800">{task.title}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {task.id} | Mulai: {formatDate(task.start_date)} | Selesai: {formatDate(task.end_date)}
+                </p>
+              </div>
+            ))}
+          </div>
+          {unscheduledTasks.length > 8 && (
+            <p className="mt-2 text-xs text-amber-700">+{unscheduledTasks.length - 8} tugas lain perlu dilengkapi tanggal.</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
