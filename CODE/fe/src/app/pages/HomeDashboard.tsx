@@ -8,8 +8,10 @@ import {
   FolderKanban,
   ShieldAlert,
   Target,
-  TrendingUp
+  TrendingUp,
+  UserRound
 } from "lucide-react";
+import { teamMembers } from "../data/mockData";
 import {
   Bar,
   BarChart,
@@ -60,6 +62,10 @@ function formatDate(value: string | null) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "-";
   return parsed.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function resolveAssigneeDisplay(assignee: string) {
+  return teamMembers.find((member) => member.id === assignee)?.name ?? assignee;
 }
 
 function monthLabel(value: Date) {
@@ -294,6 +300,7 @@ export function HomeDashboard() {
               <tr>
                 <th className="px-4 py-3 text-left font-medium">Task</th>
                 <th className="px-4 py-3 text-left font-medium">Project</th>
+                <th className="px-4 py-3 text-left font-medium">Assignee</th>
                 <th className="px-4 py-3 text-left font-medium">Progress</th>
                 <th className="px-4 py-3 text-right font-medium">Deadline</th>
               </tr>
@@ -306,6 +313,12 @@ export function HomeDashboard() {
                     <p className="text-xs text-slate-500">{task.id} | {task.priority}</p>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{projectById[task.project_id]?.name ?? task.project_id}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    <span className="inline-flex items-center gap-1.5">
+                      <UserRound className="h-3.5 w-3.5 text-slate-400" />
+                      {resolveAssigneeDisplay(task.assignee)}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700">
                       {task.progress_percentage}%
@@ -316,7 +329,7 @@ export function HomeDashboard() {
               ))}
               {nearTimelineTasks.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
                     Tidak ada task yang mendekati deadline minggu ini.
                   </td>
                 </tr>

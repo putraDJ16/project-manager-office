@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  ListTodo,
   LogOut,
   Moon,
   Sun
@@ -134,6 +135,11 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
             )}
 
             {isSidebarMinimized && <div className="pt-2" />}
+
+            <Link to="/tugas-saya" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Tugas Saya">
+              <ListTodo className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+              {!isSidebarMinimized && "Tugas Saya"}
+            </Link>
 
             {canViewProjects && (
               <Link to="/proyek/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Proyek">

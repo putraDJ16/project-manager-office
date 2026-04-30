@@ -58,3 +58,12 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
 python run.py
 ```
+
+## Session Timeout
+
+Session timeout defaults to 480 minutes (8 hours). Set the same value for frontend and backend deployments:
+
+- Backend: `SESSION_TIMEOUT_MINUTES=480`
+- Frontend: `VITE_SESSION_TIMEOUT_MINUTES=480`
+
+Access tokens are short-lived by default. You can tune them separately with `JWT_ACCESS_TOKEN_EXPIRES_MINUTES=15`.

@@ -148,6 +148,8 @@ def get_profile(user_id: str):
         "role_id": user.role_id,
         "role": user.role.name if user.role else None,
         "permissions": get_user_permissions(user),
+        "employee_id": employee.id if employee else None,
+        "employee_name": employee.name if employee else None,
         "organization": employee.organization if employee else None,
         "unit_organization": employee.unit_organization if employee else None,
         "position": employee.position if employee else None,

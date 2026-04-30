@@ -1,5 +1,6 @@
 import { HomeDashboard } from "./pages/HomeDashboard";
 import { IssueList } from "./pages/isu/IssueList";
+import { MyTasksPage } from "./pages/tugas/MyTasksPage";
 import { WorkloadHeatmap } from "./pages/sdm/WorkloadHeatmap";
 import { ProjectList } from "./pages/proyek/ProjectList";
 import { ProjectDetail } from "./pages/proyek/ProjectDetail";
@@ -23,6 +24,7 @@ export type AppRoute = {
 
 export const routes: AppRoute[] = [
   { index: true, path: "/", component: HomeDashboard, module: "dashboard" },
+  { path: "/tugas-saya", component: MyTasksPage },
   { path: "/isu/list", component: IssueList, module: "projectIssues" },
   { path: "/sdm/workload", component: WorkloadHeatmap, module: "workload" },
   { path: "/proyek/list", component: ProjectList, module: "masterProjects" },

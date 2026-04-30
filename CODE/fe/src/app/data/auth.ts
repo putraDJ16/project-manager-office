@@ -1,6 +1,8 @@
 import type { ModuleKey, PermissionSet } from "./masterData";
 
 export const AUTH_STORAGE_KEY = "pm-saas-auth-session";
+const SESSION_TIMEOUT_MINUTES = Number(import.meta.env.VITE_SESSION_TIMEOUT_MINUTES ?? "480");
+export const SESSION_TIMEOUT_MS = Math.max(1, SESSION_TIMEOUT_MINUTES) * 60 * 1000;
 
 export type AuthSession = {
   userId?: string | number;
@@ -14,6 +16,16 @@ export type AuthSession = {
   accessToken: string;
   refreshToken: string;
 };
+
+export function getSessionExpiresAt(session: Pick<AuthSession, "loggedInAt">) {
+  const startedAt = new Date(session.loggedInAt).getTime();
+  if (!Number.isFinite(startedAt)) return 0;
+  return startedAt + SESSION_TIMEOUT_MS;
+}
+
+export function isSessionExpired(session: Pick<AuthSession, "loggedInAt">) {
+  return Date.now() >= getSessionExpiresAt(session);
+}
 
 export function getInitials(name: string) {
   const parts = name
@@ -42,7 +54,7 @@ export function loadAuthSession(): AuthSession | null {
     ) {
       return null;
     }
-    return {
+    const session = {
       userId: parsed.userId,
       name: parsed.name,
       email: parsed.email,
@@ -54,6 +66,11 @@ export function loadAuthSession(): AuthSession | null {
       accessToken: parsed.accessToken,
       refreshToken: parsed.refreshToken
     };
+    if (isSessionExpired(session)) {
+      clearAuthSession();
+      return null;
+    }
+    return session;
   } catch {
     return null;
   }

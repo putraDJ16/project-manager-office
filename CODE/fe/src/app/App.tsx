@@ -7,6 +7,8 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import type { AppRoute } from "./routes";
 import {
   clearAuthSession,
+  getSessionExpiresAt,
+  isSessionExpired,
   loadAuthSession,
   saveAuthSession,
   type AuthSession
@@ -42,6 +44,37 @@ export default function App() {
   useEffect(() => {
     applyTheme(themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    if (!authSession) return;
+
+    if (isSessionExpired(authSession)) {
+      clearAuthSession();
+      setAuthSession(null);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      clearAuthSession();
+      setAuthSession(null);
+    }, Math.max(0, getSessionExpiresAt(authSession) - Date.now()));
+
+    return () => window.clearTimeout(timeout);
+  }, [authSession]);
+
+  useEffect(() => {
+    const syncSession = () => {
+      const session = loadAuthSession();
+      setAuthSession(session ? normalizeSessionPermissions(session) : null);
+    };
+
+    window.addEventListener("storage", syncSession);
+    window.addEventListener("focus", syncSession);
+    return () => {
+      window.removeEventListener("storage", syncSession);
+      window.removeEventListener("focus", syncSession);
+    };
+  }, []);
 
   const handleToggleTheme = () => {
     setThemeMode((current) => (current === "dark" ? "light" : "dark"));

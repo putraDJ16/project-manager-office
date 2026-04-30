@@ -44,6 +44,8 @@ type MeResponse = {
   role_id?: string;
   role?: string | null;
   permissions?: Partial<Record<ModuleKey, PermissionSet>>;
+  employee_id?: string | null;
+  employee_name?: string | null;
   organization?: string | null;
   unit_organization?: string | null;
   position?: string | null;
