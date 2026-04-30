@@ -88,6 +88,13 @@ const PRIORITY_COLORS: Record<string, string> = {
 type Tab = "ringkasan" | "anggota" | "tugas" | "gantt" | "isu" | "lampiran";
 type TaskView = "list" | "kanban";
 type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
+type GanttScale = "day" | "week" | "month";
+
+const GANTT_SCALE_OPTIONS: Array<{ key: GanttScale; label: string; dayWidth: number }> = [
+  { key: "day", label: "Harian", dayWidth: 28 },
+  { key: "week", label: "Mingguan", dayWidth: 12 },
+  { key: "month", label: "Bulanan", dayWidth: 4 }
+];
 
 function formatDate(value: string | null) {
   if (!value) return "-";
@@ -1961,6 +1968,23 @@ function addCalendarDays(date: Date, days: number) {
   return next;
 }
 
+function addCalendarMonths(date: Date, months: number) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function firstOfMonth(date: Date) {
+  const next = new Date(date.getFullYear(), date.getMonth(), 1);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function isSameMonth(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth();
+}
+
 function daysBetween(start: Date, end: Date) {
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.round((end.getTime() - start.getTime()) / msPerDay);
@@ -1972,6 +1996,48 @@ function ganttDateLabel(date: Date) {
 
 function ganttMonthLabel(date: Date) {
   return date.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
+}
+
+function buildGanttTicks(start: Date, end: Date, scale: GanttScale) {
+  if (scale === "month") {
+    const ticks: Date[] = [];
+    let cursor = firstOfMonth(start);
+    if (cursor < start) cursor = addCalendarMonths(cursor, 1);
+    while (cursor <= end) {
+      ticks.push(cursor);
+      cursor = addCalendarMonths(cursor, 1);
+    }
+    return ticks.length > 0 ? ticks : [start];
+  }
+
+  const step = scale === "day" ? 1 : 7;
+  return Array.from({ length: Math.ceil((daysBetween(start, end) + 1) / step) + 1 }, (_, index) =>
+    addCalendarDays(start, index * step)
+  ).filter((date) => date <= end);
+}
+
+function buildGanttMonthBands(start: Date, end: Date) {
+  const bands: Array<{ date: Date; left: number; width: number; label: string }> = [];
+  let cursor = firstOfMonth(start);
+  if (cursor < start) cursor = start;
+  const totalDays = Math.max(1, daysBetween(start, end) + 1);
+
+  while (cursor <= end) {
+    const monthEnd = addCalendarDays(addCalendarMonths(firstOfMonth(cursor), 1), -1);
+    const bandEnd = monthEnd > end ? end : monthEnd;
+    const left = (daysBetween(start, cursor) / totalDays) * 100;
+    const width = ((daysBetween(cursor, bandEnd) + 1) / totalDays) * 100;
+    bands.push({ date: cursor, left, width, label: ganttMonthLabel(cursor) });
+    cursor = addCalendarDays(bandEnd, 1);
+  }
+
+  return bands;
+}
+
+function ganttTickLabel(date: Date, scale: GanttScale) {
+  if (scale === "month") return ganttMonthLabel(date);
+  if (scale === "day") return date.toLocaleDateString("id-ID", { day: "2-digit" });
+  return ganttDateLabel(date);
 }
 
 function ganttPriorityClass(priority: ApiTask["priority"]) {
@@ -1995,6 +2061,7 @@ function ProjectGanttChart({
   phases: ApiPhase[];
   resolveAssigneeLabel: (assigneeValue: string) => string;
 }) {
+  const [scale, setScale] = useState<GanttScale>("week");
   const scheduledTasks = tasks
     .map((task) => ({
       task,
@@ -2029,11 +2096,10 @@ function ProjectGanttChart({
   const timelineStart = addCalendarDays(minDate, -2);
   const timelineEnd = addCalendarDays(maxDate, 2);
   const totalDays = Math.max(1, daysBetween(timelineStart, timelineEnd) + 1);
-  const timelineWidth = Math.max(760, totalDays * (totalDays > 120 ? 10 : totalDays > 60 ? 14 : 24));
-  const tickStep = totalDays > 120 ? 30 : totalDays > 60 ? 14 : 7;
-  const ticks = Array.from({ length: Math.ceil(totalDays / tickStep) + 1 }, (_, index) =>
-    addCalendarDays(timelineStart, index * tickStep)
-  ).filter((date) => date <= timelineEnd);
+  const scaleConfig = GANTT_SCALE_OPTIONS.find((option) => option.key === scale) ?? GANTT_SCALE_OPTIONS[1];
+  const timelineWidth = Math.max(760, totalDays * scaleConfig.dayWidth);
+  const ticks = buildGanttTicks(timelineStart, timelineEnd, scale);
+  const monthBands = scale === "day" ? buildGanttMonthBands(timelineStart, timelineEnd) : [];
   const todayOffset = today >= timelineStart && today <= timelineEnd
     ? (daysBetween(timelineStart, today) / totalDays) * 100
     : null;
@@ -2056,6 +2122,22 @@ function ProjectGanttChart({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="mr-1 grid grid-cols-3 rounded-lg border border-slate-200 bg-white p-1">
+            {GANTT_SCALE_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setScale(option.key)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  scale === option.key
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 font-medium text-blue-700">
             {scheduledTasks.length} tugas terjadwal
           </span>
@@ -2077,15 +2159,32 @@ function ProjectGanttChart({
                 Tugas
               </div>
               <div className="relative h-14 shrink-0" style={{ width: timelineWidth }}>
+                {scale === "day" &&
+                  monthBands.map((band) => (
+                    <div
+                      key={band.date.toISOString()}
+                      className="absolute top-0 h-6 border-l border-slate-200 bg-slate-100/70 px-2 pt-1 text-[11px] font-semibold text-slate-600"
+                      style={{ left: `${band.left}%`, width: `${band.width}%` }}
+                    >
+                      {band.label}
+                    </div>
+                  ))}
                 {ticks.map((tick) => {
                   const offset = (daysBetween(timelineStart, tick) / totalDays) * 100;
+                  const isDailyTick = scale === "day";
+                  const isMonthStart = isDailyTick && (tick.getDate() === 1 || isSameMonth(tick, timelineStart));
                   return (
                     <div
                       key={tick.toISOString()}
-                      className="absolute top-0 h-full border-l border-slate-200 pl-2 pt-2 text-[11px] font-medium text-slate-500"
+                      className={`absolute h-full border-l border-slate-200 text-[11px] font-medium text-slate-500 ${
+                        isDailyTick ? "top-6 w-7 -translate-x-1/2 pt-1 text-center" : "top-0 pl-2 pt-2"
+                      }`}
                       style={{ left: `${offset}%` }}
+                      title={formatDate(tick.toISOString().slice(0, 10))}
                     >
-                      {totalDays > 120 ? ganttMonthLabel(tick) : ganttDateLabel(tick)}
+                      <span className={isMonthStart ? "font-bold text-slate-700" : ""}>
+                        {ganttTickLabel(tick, scale)}
+                      </span>
                     </div>
                   );
                 })}
