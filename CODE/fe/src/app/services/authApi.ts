@@ -63,6 +63,12 @@ export type MyProjectResponse = {
   end_date: string | null;
 };
 
+export type MyAssignmentCounterResponse = {
+  active_tasks: number;
+  active_issues: number;
+  total_active: number;
+};
+
 export async function loginWithApi(email: string, password: string) {
   // Mock eksplisit untuk mode demo/testing tertentu.
   if (import.meta.env.VITE_USE_MOCK === "true") {
@@ -136,5 +142,10 @@ export async function changePassword(payload: {
 
 export async function fetchMyProjects() {
   const result = await apiRequest<MyProjectResponse[]>("/auth/my-projects", { method: "GET" });
+  return result.data;
+}
+
+export async function fetchMyAssignmentCounter() {
+  const result = await apiRequest<MyAssignmentCounterResponse>("/auth/my-assignment-counter", { method: "GET" });
   return result.data;
 }

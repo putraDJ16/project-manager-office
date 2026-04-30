@@ -113,3 +113,48 @@ def test_my_projects(client):
     ids = {project["id"] for project in response.get_json()["data"]}
     assert "p1" in ids
     assert "p3" in ids
+
+
+def test_my_assignment_counter(client):
+    login = client.post("/api/v1/auth/login", json={"email": "admin@zoho.local", "password": "Admin123!"}).get_json()
+    access = login["data"]["access_token"]
+
+    task_response = client.post(
+        "/api/v1/tasks",
+        headers={"Authorization": f"Bearer {access}"},
+        json={
+            "title": "Counter assigned task",
+            "priority": "Medium",
+            "assignee": "emp-001",
+            "project_id": "p1",
+            "phase_id": "ph-101",
+            "progress_percentage": 20,
+        },
+    )
+    assert task_response.status_code == 201
+
+    issue_response = client.post(
+        "/api/v1/issues",
+        headers={"Authorization": f"Bearer {access}"},
+        json={
+            "project_id": "p1",
+            "title": "Counter assigned issue",
+            "severity": "Major",
+            "assignee": "Andi Jatmiko",
+            "description": "Issue untuk menguji counter assignment.",
+            "module": "Dashboard",
+            "environment": "Testing",
+            "reproduction_steps": ["Buka dashboard"],
+            "actual_result": "Counter belum tampil",
+            "expected_result": "Counter tampil",
+            "attachments": [],
+        },
+    )
+    assert issue_response.status_code == 201
+
+    response = client.get("/api/v1/auth/my-assignment-counter", headers={"Authorization": f"Bearer {access}"})
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["active_tasks"] >= 1
+    assert data["active_issues"] >= 1
+    assert data["total_active"] == data["active_tasks"] + data["active_issues"]

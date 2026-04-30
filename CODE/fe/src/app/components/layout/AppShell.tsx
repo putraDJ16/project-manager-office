@@ -23,6 +23,7 @@ import {
 import type { AuthSession } from "../../data/auth";
 import type { ThemeMode } from "../../utils/theme";
 import { hasPermission } from "../../utils/permissions";
+import { fetchMyAssignmentCounter, type MyAssignmentCounterResponse } from "../../services/authApi";
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -44,6 +45,11 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [assignmentCounter, setAssignmentCounter] = useState<MyAssignmentCounterResponse>({
+    active_tasks: 0,
+    active_issues: 0,
+    total_active: 0
+  });
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const navItemClass = `flex items-center py-2 text-sm font-medium rounded-md transition-colors ${
     isSidebarMinimized ? "justify-center px-2" : "px-3"
@@ -74,10 +80,21 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
     }
   };
 
+  const loadAssignmentCounter = async () => {
+    try {
+      const payload = await fetchMyAssignmentCounter();
+      setAssignmentCounter(payload);
+    } catch {
+      setAssignmentCounter({ active_tasks: 0, active_issues: 0, total_active: 0 });
+    }
+  };
+
   useEffect(() => {
     void loadNotifications();
+    void loadAssignmentCounter();
     const interval = window.setInterval(() => {
       void loadNotifications();
+      void loadAssignmentCounter();
     }, 30000);
     return () => window.clearInterval(interval);
   }, [session.userId, session.accessToken]);
@@ -136,9 +153,34 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
 
             {isSidebarMinimized && <div className="pt-2" />}
 
-            <Link to="/tugas-saya" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Tugas Saya">
-              <ListTodo className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
-              {!isSidebarMinimized && "Tugas Saya"}
+            <Link
+              to="/tugas-saya"
+              className={`${navItemClass} relative hover:bg-indigo-900 hover:text-white`}
+              title={
+                assignmentCounter.total_active > 0
+                  ? `Tugas aktif: ${assignmentCounter.active_tasks}, Isu aktif: ${assignmentCounter.active_issues}`
+                  : "Tugas Saya"
+              }
+            >
+              <span className="relative inline-flex">
+                <ListTodo className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                {assignmentCounter.total_active > 0 && isSidebarMinimized && (
+                  <span className="absolute -right-2 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                    {assignmentCounter.total_active > 9 ? "9+" : assignmentCounter.total_active}
+                  </span>
+                )}
+              </span>
+              {!isSidebarMinimized && (
+                <>
+                  <span className="min-w-0 flex-1">Tugas Saya</span>
+                  {assignmentCounter.total_active > 0 && (
+                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold leading-none text-white">
+                      <Bell className="h-3 w-3" />
+                      {assignmentCounter.total_active}
+                    </span>
+                  )}
+                </>
+              )}
             </Link>
 
             {canViewProjects && (

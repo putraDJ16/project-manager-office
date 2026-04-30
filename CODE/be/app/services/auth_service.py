@@ -3,7 +3,7 @@ from sqlalchemy import or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
-from app.models import Employee, Organization, OrganizationUnit, Position, Project, ProjectMember, Role, User
+from app.models import Employee, Issue, Organization, OrganizationUnit, Position, Project, ProjectMember, Role, Task, User
 from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
 from app.utils.permissions import get_user_permissions
@@ -14,6 +14,41 @@ def _initials(name: str):
     if not parts:
         return "US"
     return "".join(part[0].upper() for part in parts)
+
+
+def _abbreviated_name(name: str | None):
+    parts = [part for part in (name or "").strip().split(" ") if part]
+    if len(parts) < 2:
+        return parts[0] if parts else None
+    return f"{parts[0]} {parts[1][0]}."
+
+
+def _assignment_aliases(user: User):
+    employee = user.employee if user.employee_id else None
+    raw_aliases = [
+        str(user.id),
+        user.display_name,
+        user.email,
+        user.employee_id,
+        employee.id if employee else None,
+        employee.name if employee else None,
+        employee.email if employee else None,
+        _abbreviated_name(user.display_name),
+        _abbreviated_name(employee.name if employee else None),
+    ]
+    return sorted({alias.strip() for alias in raw_aliases if isinstance(alias, str) and alias.strip()})
+
+
+def _get_active_user(user_id: str):
+    try:
+        normalized_user_id = int(user_id)
+    except (TypeError, ValueError):
+        raise ApiError("Token user tidak valid.", status_code=401)
+
+    user = User.query.filter_by(id=normalized_user_id).first()
+    if not user or not user.is_active:
+        raise ApiError("User tidak ditemukan atau tidak aktif.", status_code=404)
+    return user
 
 
 def login(email: str, password: str):
@@ -127,15 +162,7 @@ def register(payload: dict):
 
 
 def get_profile(user_id: str):
-    try:
-        normalized_user_id = int(user_id)
-    except (TypeError, ValueError):
-        raise ApiError("Token user tidak valid.", status_code=401)
-
-    user = User.query.filter_by(id=normalized_user_id).first()
-    if not user or not user.is_active:
-        raise ApiError("User tidak ditemukan atau tidak aktif.", status_code=404)
-
+    user = _get_active_user(user_id)
     employee = None
     if user.employee_id:
         employee = user.employee
@@ -157,14 +184,7 @@ def get_profile(user_id: str):
 
 
 def change_password(user_id: str, current_password: str, new_password: str):
-    try:
-        normalized_user_id = int(user_id)
-    except (TypeError, ValueError):
-        raise ApiError("Token user tidak valid.", status_code=401)
-
-    user = User.query.filter_by(id=normalized_user_id).first()
-    if not user or not user.is_active:
-        raise ApiError("User tidak ditemukan atau tidak aktif.", status_code=404)
+    user = _get_active_user(user_id)
 
     if not check_password_hash(user.password_hash, current_password):
         raise ApiError("Password saat ini tidak sesuai.", status_code=400)
@@ -181,14 +201,7 @@ def change_password(user_id: str, current_password: str, new_password: str):
 
 
 def list_my_projects(user_id: str):
-    try:
-        normalized_user_id = int(user_id)
-    except (TypeError, ValueError):
-        raise ApiError("Token user tidak valid.", status_code=401)
-
-    user = User.query.filter_by(id=normalized_user_id).first()
-    if not user or not user.is_active:
-        raise ApiError("User tidak ditemukan atau tidak aktif.", status_code=404)
+    user = _get_active_user(user_id)
 
     if not user.employee_id:
         return []
@@ -206,3 +219,29 @@ def list_my_projects(user_id: str):
         .order_by(Project.updated_at.desc(), Project.name.asc())
         .all()
     )
+
+
+def get_my_assignment_counter(user_id: str):
+    user = _get_active_user(user_id)
+    aliases = _assignment_aliases(user)
+    if not aliases:
+        return {
+            "active_tasks": 0,
+            "active_issues": 0,
+            "total_active": 0,
+        }
+
+    task_count = Task.query.filter(
+        Task.assignee.in_(aliases),
+        Task.progress_percentage < 100,
+    ).count()
+    issue_count = Issue.query.filter(
+        Issue.assignee.in_(aliases),
+        Issue.status != "Resolved",
+    ).count()
+
+    return {
+        "active_tasks": task_count,
+        "active_issues": issue_count,
+        "total_active": task_count + issue_count,
+    }
