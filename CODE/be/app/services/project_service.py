@@ -11,6 +11,10 @@ from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
 
 
+RASCI_LIST_KEYS = ("responsible", "support", "consulted", "informed")
+RASCI_ROLE_KEYS = (*RASCI_LIST_KEYS, "accountable")
+
+
 def list_projects():
     return ProjectRepository.list_projects()
 
@@ -20,6 +24,104 @@ def get_project(project_id: str):
     if not project:
         raise ApiError("Project tidak ditemukan.", status_code=404)
     return project
+
+
+def _normalize_id_list(value) -> list[str]:
+    if value is None or value == "":
+        return []
+    if isinstance(value, str):
+        values = [value]
+    elif isinstance(value, list):
+        values = value
+    else:
+        values = []
+    return list(dict.fromkeys(str(item).strip() for item in values if str(item).strip()))
+
+
+def _validate_employee_ids(employee_ids: set[str]):
+    if not employee_ids:
+        return
+    existing_ids = {
+        employee.id
+        for employee in Employee.query.with_entities(Employee.id).filter(Employee.id.in_(employee_ids)).all()
+    }
+    missing_ids = sorted(employee_ids - existing_ids)
+    if missing_ids:
+        raise ApiError("Pegawai RASCI tidak ditemukan.", errors={"rasci": missing_ids})
+
+
+def _normalize_rasci(payload: dict | None, manager_id: str | None = None, prefer_manager: bool = False):
+    payload = payload or {}
+    payload_accountable = payload.get("accountable") or payload.get("accountable_id") or None
+    accountable = (manager_id or payload_accountable) if prefer_manager else (payload_accountable or manager_id)
+    accountable = str(accountable).strip() if accountable else None
+
+    normalized = {
+        "responsible": _normalize_id_list(payload.get("responsible") or payload.get("responsible_ids")),
+        "accountable": accountable,
+        "support": _normalize_id_list(payload.get("support") or payload.get("support_ids")),
+        "consulted": _normalize_id_list(payload.get("consulted") or payload.get("consulted_ids")),
+        "informed": _normalize_id_list(payload.get("informed") or payload.get("informed_ids")),
+    }
+    employee_ids = set(normalized["responsible"])
+    employee_ids.update(normalized["support"])
+    employee_ids.update(normalized["consulted"])
+    employee_ids.update(normalized["informed"])
+    if normalized["accountable"]:
+        employee_ids.add(normalized["accountable"])
+    _validate_employee_ids(employee_ids)
+    return normalized
+
+
+def _rasci_employee_ids(rasci: dict | None) -> set[str]:
+    rasci = rasci or {}
+    employee_ids = set()
+    for key in RASCI_LIST_KEYS:
+        employee_ids.update(_normalize_id_list(rasci.get(key)))
+    accountable = (rasci.get("accountable") or "").strip()
+    if accountable:
+        employee_ids.add(accountable)
+    return employee_ids
+
+
+def _add_rasci_members(project_id: str, rasci: dict | None):
+    for employee_id in _rasci_employee_ids(rasci):
+        if not ProjectRepository.get_member(project_id, employee_id):
+            db.session.add(ProjectMember(project_id=project_id, employee_id=employee_id))
+
+
+def _normalize_rasci_roles(value) -> set[str]:
+    if value is None or value == "":
+        return set()
+    values = [value] if isinstance(value, str) else value if isinstance(value, list) else []
+    roles = {str(item).strip() for item in values if str(item).strip()}
+    invalid_roles = sorted(roles - set(RASCI_ROLE_KEYS))
+    if invalid_roles:
+        raise ApiError("Role RASCI tidak valid.", errors={"rasci_roles": invalid_roles})
+    return roles
+
+
+def _assign_employee_to_rasci(project: Project, employee_id: str, roles: set[str]):
+    if not roles:
+        return
+    rasci = _normalize_rasci(project.rasci, project.manager_id)
+    for role in RASCI_LIST_KEYS:
+        if role in roles and employee_id not in rasci[role]:
+            rasci[role].append(employee_id)
+    if "accountable" in roles:
+        rasci["accountable"] = employee_id
+        project.manager_id = employee_id
+    project.rasci = rasci
+
+
+def _remove_employee_from_rasci(project: Project, employee_id: str):
+    rasci = _normalize_rasci(project.rasci, project.manager_id)
+    for role in RASCI_LIST_KEYS:
+        rasci[role] = [item for item in rasci[role] if item != employee_id]
+    if rasci["accountable"] == employee_id:
+        rasci["accountable"] = None
+        project.manager_id = None
+    project.rasci = rasci
 
 
 def create_project(payload: dict):
@@ -35,9 +137,10 @@ def create_project(payload: dict):
     if priority and priority not in PROJECT_PRIORITY:
         raise ApiError(f"Prioritas tidak valid. Pilihan: {', '.join(PROJECT_PRIORITY)}")
 
-    manager_id = payload.get("manager_id") or None
-    if manager_id and not Employee.query.get(manager_id):
-        raise ApiError("Manajer tidak ditemukan.")
+    raw_rasci = payload.get("rasci") or {}
+    manager_id = payload.get("manager_id") or raw_rasci.get("accountable") or raw_rasci.get("accountable_id") or None
+    rasci = _normalize_rasci(raw_rasci, manager_id)
+    manager_id = rasci["accountable"]
 
     ids = [project.id for project in Project.query.with_entities(Project.id).all()]
     project = Project(
@@ -47,11 +150,13 @@ def create_project(payload: dict):
         description=(payload.get("description") or "").strip() or None,
         priority=priority,
         manager_id=manager_id,
+        rasci=rasci,
         start_date=payload.get("start_date") or None,
         end_date=payload.get("end_date") or None,
     )
     db.session.add(project)
     db.session.flush()
+    _add_rasci_members(project.id, project.rasci)
 
     phase_ids = [phase.id for phase in Phase.query.with_entities(Phase.id).all()]
     phases_payload = payload.get("phases") or []
@@ -122,9 +227,27 @@ def update_project(project_id: str, payload: dict):
         if manager_id and not Employee.query.get(manager_id):
             raise ApiError("Manajer tidak ditemukan.")
         project.manager_id = manager_id
+        if "rasci" not in payload:
+            project.rasci = _normalize_rasci(project.rasci, manager_id, prefer_manager=True)
+            _add_rasci_members(project.id, project.rasci)
         if manager_id and manager_id != previous_manager_id:
             notify_employee(
                 employee_id=manager_id,
+                title="Anda ditetapkan sebagai manager project",
+                message=f"Anda ditugaskan mengelola project {project.name}.",
+                entity_type="project",
+                entity_id=project.id,
+                target_url=f"/proyek/{project.id}",
+            )
+
+    if "rasci" in payload:
+        rasci = _normalize_rasci(payload.get("rasci"), project.manager_id)
+        project.rasci = rasci
+        project.manager_id = rasci["accountable"]
+        _add_rasci_members(project.id, rasci)
+        if project.manager_id and project.manager_id != previous_manager_id:
+            notify_employee(
+                employee_id=project.manager_id,
                 title="Anda ditetapkan sebagai manager project",
                 message=f"Anda ditugaskan mengelola project {project.name}.",
                 entity_type="project",
@@ -197,6 +320,7 @@ def add_member(project_id: str, payload: dict):
 
     member = ProjectMember(project_id=project_id, employee_id=employee_id)
     db.session.add(member)
+    _assign_employee_to_rasci(project, employee_id, _normalize_rasci_roles(payload.get("rasci_roles")))
     notify_employee(
         employee_id=employee_id,
         title="Anda ditambahkan ke project",
@@ -218,6 +342,7 @@ def remove_member(project_id: str, employee_id: str):
     if not member:
         raise ApiError("Anggota tidak ditemukan dalam project ini.", status_code=404)
 
+    _remove_employee_from_rasci(project, employee_id)
     db.session.delete(member)
     db.session.commit()
 

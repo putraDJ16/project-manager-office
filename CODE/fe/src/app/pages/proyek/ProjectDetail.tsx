@@ -36,7 +36,9 @@ import {
   updateProject,
   type ApiProjectDetail,
   type ApiProjectHoliday,
-  type ApiProjectMember
+  type ApiProjectMember,
+  type RasciAssignment,
+  type RasciRole
 } from "../../services/projectApi";
 import { fetchEmployees } from "../../services/masterApi";
 import {
@@ -100,6 +102,22 @@ const GANTT_SCALE_OPTIONS: Array<{ key: GanttScale; label: string; dayWidth: num
   { key: "month", label: "Bulanan", dayWidth: 4 }
 ];
 
+const RASCI_ROLE_OPTIONS: Array<{ key: RasciRole; code: string; label: string }> = [
+  { key: "responsible", code: "R", label: "Responsible" },
+  { key: "accountable", code: "A", label: "Accountable" },
+  { key: "support", code: "S", label: "Support" },
+  { key: "consulted", code: "C", label: "Consulted" },
+  { key: "informed", code: "I", label: "Informed" }
+];
+
+const EMPTY_RASCI: RasciAssignment = {
+  responsible: [],
+  accountable: null,
+  support: [],
+  consulted: [],
+  informed: []
+};
+
 function formatDate(value: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
@@ -111,6 +129,51 @@ function toTaskComment(raw: ApiTaskComment): TaskComment {
     authorName: raw.author_name,
     content: raw.content,
     createdAt: raw.created_at
+  };
+}
+
+function normalizeRasci(rasci: RasciAssignment | null | undefined): RasciAssignment {
+  return {
+    responsible: rasci?.responsible ?? EMPTY_RASCI.responsible,
+    accountable: rasci?.accountable ?? EMPTY_RASCI.accountable,
+    support: rasci?.support ?? EMPTY_RASCI.support,
+    consulted: rasci?.consulted ?? EMPTY_RASCI.consulted,
+    informed: rasci?.informed ?? EMPTY_RASCI.informed
+  };
+}
+
+function getMemberRasciRoles(rasci: RasciAssignment | null | undefined, employeeId: string) {
+  const normalized = normalizeRasci(rasci);
+  return RASCI_ROLE_OPTIONS.filter((role) => {
+    if (role.key === "accountable") return normalized.accountable === employeeId;
+    return normalized[role.key].includes(employeeId);
+  });
+}
+
+function applyRasciRoles(rasci: RasciAssignment | null | undefined, employeeId: string, roles: RasciRole[]) {
+  const normalized = normalizeRasci(rasci);
+  const next: RasciAssignment = {
+    responsible: roles.includes("responsible")
+      ? Array.from(new Set([...normalized.responsible, employeeId]))
+      : normalized.responsible,
+    accountable: roles.includes("accountable") ? employeeId : normalized.accountable,
+    support: roles.includes("support") ? Array.from(new Set([...normalized.support, employeeId])) : normalized.support,
+    consulted: roles.includes("consulted")
+      ? Array.from(new Set([...normalized.consulted, employeeId]))
+      : normalized.consulted,
+    informed: roles.includes("informed") ? Array.from(new Set([...normalized.informed, employeeId])) : normalized.informed
+  };
+  return next;
+}
+
+function removeEmployeeFromRasci(rasci: RasciAssignment | null | undefined, employeeId: string) {
+  const normalized = normalizeRasci(rasci);
+  return {
+    responsible: normalized.responsible.filter((item) => item !== employeeId),
+    accountable: normalized.accountable === employeeId ? null : normalized.accountable,
+    support: normalized.support.filter((item) => item !== employeeId),
+    consulted: normalized.consulted.filter((item) => item !== employeeId),
+    informed: normalized.informed.filter((item) => item !== employeeId)
   };
 }
 
@@ -162,6 +225,7 @@ export function ProjectDetail() {
 
   const [showAddMember, setShowAddMember] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [selectedMemberRasciRoles, setSelectedMemberRasciRoles] = useState<RasciRole[]>([]);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberSaving, setMemberSaving] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -622,18 +686,34 @@ export function ProjectDetail() {
     }
   };
 
+  const toggleSelectedMemberRasciRole = (role: RasciRole) => {
+    setSelectedMemberRasciRoles((current) =>
+      current.includes(role) ? current.filter((item) => item !== role) : [...current, role]
+    );
+  };
+
   const handleAddMember = async () => {
     if (!id || !selectedEmployeeId || !canCreateMembers) return;
     setMemberSaving(true);
     setMemberError(null);
     try {
-      const result = await addProjectMember(id, selectedEmployeeId);
+      const result = await addProjectMember(id, selectedEmployeeId, selectedMemberRasciRoles);
       setProject((current) =>
         current
-          ? { ...current, members: [...current.members, result.data], member_count: current.member_count + 1 }
+          ? {
+              ...current,
+              members: [...current.members, result.data],
+              member_count: current.member_count + 1,
+              manager_id: selectedMemberRasciRoles.includes("accountable") ? selectedEmployeeId : current.manager_id,
+              manager_name: selectedMemberRasciRoles.includes("accountable")
+                ? result.data.employee_name
+                : current.manager_name,
+              rasci: applyRasciRoles(current.rasci, selectedEmployeeId, selectedMemberRasciRoles)
+            }
           : current
       );
       setSelectedEmployeeId("");
+      setSelectedMemberRasciRoles([]);
       setShowAddMember(false);
     } catch (err: unknown) {
       setMemberError(err instanceof Error ? err.message : "Gagal menambahkan anggota.");
@@ -652,7 +732,10 @@ export function ProjectDetail() {
           ? {
               ...current,
               members: current.members.filter((member) => member.employee_id !== employeeId),
-              member_count: current.member_count - 1
+              member_count: current.member_count - 1,
+              manager_id: current.manager_id === employeeId ? null : current.manager_id,
+              manager_name: current.manager_id === employeeId ? null : current.manager_name,
+              rasci: removeEmployeeFromRasci(current.rasci, employeeId)
             }
           : current
       );
@@ -1110,6 +1193,7 @@ export function ProjectDetail() {
                     setShowAddMember(true);
                     setMemberError(null);
                     setSelectedEmployeeId("");
+                    setSelectedMemberRasciRoles([]);
                   }}
                   className="flex items-center px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
                 >
@@ -1121,6 +1205,10 @@ export function ProjectDetail() {
             {showAddMember && (
               <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                 <p className="text-sm font-medium text-indigo-800 mb-2">Tambah Anggota Baru</p>
+                <p className="mb-3 text-xs text-indigo-700">
+                  RASCI memetakan peran kerja: Responsible mengerjakan, Accountable bertanggung jawab akhir,
+                  Support membantu, Consulted memberi masukan, dan Informed menerima informasi.
+                </p>
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedEmployeeId}
@@ -1134,6 +1222,30 @@ export function ProjectDetail() {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-indigo-800">Role RASCI</span>
+                  {RASCI_ROLE_OPTIONS.map((role) => (
+                    <label
+                      key={role.key}
+                      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium ${
+                        selectedMemberRasciRoles.includes(role.key)
+                          ? "border-indigo-300 bg-indigo-100 text-indigo-800"
+                          : "border-indigo-200 bg-white text-indigo-700"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMemberRasciRoles.includes(role.key)}
+                        onChange={() => toggleSelectedMemberRasciRole(role.key)}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span>{role.code}</span>
+                      <span>{role.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-2">
                   <button
                     onClick={handleAddMember}
                     disabled={!selectedEmployeeId || memberSaving}
@@ -1141,7 +1253,13 @@ export function ProjectDetail() {
                   >
                     {memberSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Tambah"}
                   </button>
-                  <button onClick={() => setShowAddMember(false)} className="p-2 text-slate-400 hover:text-slate-600">
+                  <button
+                    onClick={() => {
+                      setShowAddMember(false);
+                      setSelectedMemberRasciRoles([]);
+                    }}
+                    className="p-2 text-slate-400 hover:text-slate-600"
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -1164,6 +1282,7 @@ export function ProjectDetail() {
                   <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase">
                     <tr>
                       <th className="px-4 py-3 font-medium text-left">Nama</th>
+                      <th className="px-4 py-3 font-medium text-left">RASCI</th>
                       <th className="px-4 py-3 font-medium text-left">Jabatan</th>
                       <th className="px-4 py-3 font-medium text-left">Unit</th>
                       <th className="px-4 py-3 font-medium text-left">Bergabung</th>
@@ -1175,6 +1294,7 @@ export function ProjectDetail() {
                       <MemberRow
                         key={member.employee_id}
                         member={member}
+                        rasciRoles={getMemberRasciRoles(project.rasci, member.employee_id)}
                         removing={removingId === member.employee_id}
                         onRemove={canDeleteMembers ? () => handleRemoveMember(member.employee_id) : undefined}
                       />
@@ -1986,10 +2106,12 @@ function StatCard({
 
 function MemberRow({
   member,
+  rasciRoles,
   removing,
   onRemove
 }: {
   member: ApiProjectMember;
+  rasciRoles: Array<{ key: RasciRole; code: string; label: string }>;
   removing: boolean;
   onRemove?: () => void;
 }) {
@@ -2002,6 +2124,23 @@ function MemberRow({
           </div>
           <span className="font-medium text-slate-900">{member.employee_name ?? member.employee_id}</span>
         </div>
+      </td>
+      <td className="px-4 py-3">
+        {rasciRoles.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {rasciRoles.map((role) => (
+              <span
+                key={`${member.employee_id}-${role.key}`}
+                className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700"
+                title={role.label}
+              >
+                {role.code}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-xs text-slate-300">-</span>
+        )}
       </td>
       <td className="px-4 py-3 text-slate-600">{member.employee_position ?? "-"}</td>
       <td className="px-4 py-3 text-slate-500 text-xs">{member.employee_organization ?? "-"}</td>

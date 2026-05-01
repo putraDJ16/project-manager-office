@@ -8,6 +8,7 @@ export type ApiProject = {
   priority: string | null;
   manager_id: string | null;
   manager_name: string | null;
+  rasci: RasciAssignment | null;
   start_date: string | null;
   end_date: string | null;
   phase_count: number;
@@ -16,6 +17,16 @@ export type ApiProject = {
   created_at: string;
   updated_at: string;
 };
+
+export type RasciAssignment = {
+  responsible: string[];
+  accountable: string | null;
+  support: string[];
+  consulted: string[];
+  informed: string[];
+};
+
+export type RasciRole = keyof RasciAssignment;
 
 export type ApiProjectDetail = ApiProject & {
   members: ApiProjectMember[];
@@ -46,6 +57,7 @@ export type CreateProjectPayload = {
   status?: string;
   priority?: string;
   manager_id?: string;
+  rasci?: RasciAssignment;
   start_date?: string;
   end_date?: string;
   phases?: { name: string }[];
@@ -80,10 +92,14 @@ export async function fetchProjectMembers(projectId: string): Promise<ApiProject
   return result.data;
 }
 
-export async function addProjectMember(projectId: string, employeeId: string): Promise<MutationResult<ApiProjectMember>> {
+export async function addProjectMember(
+  projectId: string,
+  employeeId: string,
+  rasciRoles: RasciRole[] = []
+): Promise<MutationResult<ApiProjectMember>> {
   const result = await apiRequest<ApiProjectMember>(`/projects/${projectId}/members`, {
     method: "POST",
-    body: { employee_id: employeeId },
+    body: { employee_id: employeeId, rasci_roles: rasciRoles },
   });
   return { data: result.data, message: result.message };
 }

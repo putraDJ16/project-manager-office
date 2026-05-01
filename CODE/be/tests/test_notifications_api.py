@@ -27,6 +27,45 @@ def test_notification_created_for_project_assignment(client, auth_headers):
     assert read.get_json()["data"]["is_read"] is True
 
 
+def test_project_create_accepts_rasci_assignment(client, auth_headers):
+    created = client.post(
+        "/api/v1/projects",
+        headers=auth_headers,
+        json={
+            "name": "Project RASCI API",
+            "status": "Planning",
+            "rasci": {
+                "responsible": ["emp-001"],
+                "accountable": "emp-002",
+                "support": ["emp-003"],
+                "consulted": [],
+                "informed": [],
+            },
+        },
+    )
+    assert created.status_code == 201
+    data = created.get_json()["data"]
+    assert data["manager_id"] == "emp-002"
+    assert data["rasci"]["accountable"] == "emp-002"
+    assert data["rasci"]["responsible"] == ["emp-001"]
+    assert data["member_count"] == 3
+
+
+def test_project_member_can_be_added_with_rasci_roles(client, auth_headers):
+    added = client.post(
+        "/api/v1/projects/p2/members",
+        headers=auth_headers,
+        json={"employee_id": "emp-003", "rasci_roles": ["support", "consulted"]},
+    )
+    assert added.status_code == 201
+
+    project = client.get("/api/v1/projects/p2", headers=auth_headers)
+    assert project.status_code == 200
+    data = project.get_json()["data"]
+    assert "emp-003" in data["rasci"]["support"]
+    assert "emp-003" in data["rasci"]["consulted"]
+
+
 def test_notification_created_for_issue_assignment(client, auth_headers):
     created = client.post(
         "/api/v1/issues",

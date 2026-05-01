@@ -208,14 +208,12 @@ def list_my_projects(user_id: str):
 
     return (
         Project.query
-        .outerjoin(ProjectMember, ProjectMember.project_id == Project.id)
         .filter(
             or_(
                 Project.manager_id == user.employee_id,
-                ProjectMember.employee_id == user.employee_id,
+                Project.members.any(ProjectMember.employee_id == user.employee_id),
             )
         )
-        .distinct()
         .order_by(Project.updated_at.desc(), Project.name.asc())
         .all()
     )

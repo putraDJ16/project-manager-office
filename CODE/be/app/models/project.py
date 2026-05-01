@@ -1,4 +1,4 @@
-from sqlalchemy import Date, Enum, ForeignKey, String, Text
+from sqlalchemy import Date, Enum, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel, TimestampMixin
@@ -20,6 +20,7 @@ class Project(BaseModel, TimestampMixin):
     manager_id: Mapped[str | None] = mapped_column(
         String(32), ForeignKey("employees.id", ondelete="SET NULL"), nullable=True
     )
+    rasci: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     start_date: Mapped[str | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[str | None] = mapped_column(Date, nullable=True)
 

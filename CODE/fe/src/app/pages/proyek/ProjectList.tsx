@@ -5,9 +5,11 @@ import {
   Activity, Calendar, Users, X, ChevronRight, ChevronLeft, Loader2,
   AlertCircle, Trash2
 } from "lucide-react";
-import { fetchProjects, createProject, type ApiProject } from "../../services/projectApi";
+import { fetchProjects, createProject, type ApiProject, type RasciAssignment } from "../../services/projectApi";
 import { fetchEmployees } from "../../services/masterApi";
 import type { Employee } from "../../data/masterData";
+import { loadAuthSession } from "../../data/auth";
+import { hasPermission } from "../../utils/permissions";
 
 const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 const PROJECT_PRIORITIES = ["Low", "Medium", "High", "Critical"];
@@ -28,30 +30,69 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 type PhaseInput = { name: string };
 
+type RasciListKey = "responsible_ids" | "support_ids" | "consulted_ids" | "informed_ids";
+type RasciSingleKey = "accountable_id";
+
+type RasciForm = {
+  responsible_ids: string[];
+  accountable_id: string;
+  support_ids: string[];
+  consulted_ids: string[];
+  informed_ids: string[];
+};
+
 type CreateForm = {
   name: string;
   description: string;
   status: string;
   priority: string;
-  manager_id: string;
+  rasci: RasciForm;
   start_date: string;
   end_date: string;
   phases: PhaseInput[];
 };
 
-const EMPTY_FORM: CreateForm = {
+type RasciField =
+  | { key: RasciListKey; code: string; label: string; multiple: true }
+  | { key: RasciSingleKey; code: string; label: string; multiple: false };
+
+const RASCI_FIELDS: RasciField[] = [
+  { key: "responsible_ids", code: "R", label: "Responsible", multiple: true },
+  { key: "accountable_id", code: "A", label: "Accountable", multiple: false },
+  { key: "support_ids", code: "S", label: "Support", multiple: true },
+  { key: "consulted_ids", code: "C", label: "Consulted", multiple: true },
+  { key: "informed_ids", code: "I", label: "Informed", multiple: true },
+];
+
+const createEmptyForm = (): CreateForm => ({
   name: "",
   description: "",
   status: "Planning",
   priority: "",
-  manager_id: "",
+  rasci: {
+    responsible_ids: [],
+    accountable_id: "",
+    support_ids: [],
+    consulted_ids: [],
+    informed_ids: [],
+  },
   start_date: "",
   end_date: "",
   phases: [{ name: "" }],
-};
+});
+
+const buildRasciPayload = (rasci: RasciForm): RasciAssignment => ({
+  responsible: rasci.responsible_ids,
+  accountable: rasci.accountable_id || null,
+  support: rasci.support_ids,
+  consulted: rasci.consulted_ids,
+  informed: rasci.informed_ids,
+});
 
 export function ProjectList() {
   const navigate = useNavigate();
+  const session = loadAuthSession();
+  const canCreateProject = hasPermission(session, "masterProjects", "create");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [projects, setProjects] = useState<ApiProject[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -62,8 +103,10 @@ export function ProjectList() {
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
-  const [modalStep, setModalStep] = useState<1 | 2>(1);
-  const [form, setForm] = useState<CreateForm>(EMPTY_FORM);
+  const [modalStep, setModalStep] = useState<1 | 2 | 3>(1);
+  const [form, setForm] = useState<CreateForm>(createEmptyForm);
+  const [rasciOrganizationFilter, setRasciOrganizationFilter] = useState("");
+  const [rasciSearch, setRasciSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -86,14 +129,74 @@ export function ProjectList() {
     );
   }, [projects, searchQuery]);
 
+  const activeEmployees = useMemo(() => employees.filter((employee) => employee.status === "Active"), [employees]);
+
+  const employeeById = useMemo(
+    () => activeEmployees.reduce<Record<string, Employee>>((acc, employee) => ({ ...acc, [employee.id]: employee }), {}),
+    [activeEmployees]
+  );
+
+  const rasciOrganizations = useMemo(
+    () => Array.from(new Set(activeEmployees.map((employee) => employee.organization).filter(Boolean))).sort(),
+    [activeEmployees]
+  );
+
+  const filteredRasciEmployees = useMemo(() => {
+    const query = rasciSearch.trim().toLowerCase();
+    return activeEmployees.filter((employee) => {
+      const matchesOrganization = !rasciOrganizationFilter || employee.organization === rasciOrganizationFilter;
+      const searchable = `${employee.name} ${employee.nip} ${employee.email} ${employee.position} ${employee.organization}`.toLowerCase();
+      return matchesOrganization && (!query || searchable.includes(query));
+    });
+  }, [activeEmployees, rasciOrganizationFilter, rasciSearch]);
+
+  const getRasciOptions = (field: RasciField) => {
+    const selectedValue = form.rasci[field.key];
+    const selectedIds = Array.isArray(selectedValue) ? selectedValue : selectedValue ? [selectedValue] : [];
+    if (field.multiple) {
+      return filteredRasciEmployees.filter((employee) => !selectedIds.includes(employee.id));
+    }
+    const selectedId = selectedIds[0];
+    if (!selectedId || filteredRasciEmployees.some((employee) => employee.id === selectedId)) {
+      return filteredRasciEmployees;
+    }
+    const selectedEmployee = activeEmployees.find((employee) => employee.id === selectedId);
+    return selectedEmployee ? [selectedEmployee, ...filteredRasciEmployees] : filteredRasciEmployees;
+  };
+
+  const addRasciEmployee = (fieldKey: RasciListKey, employeeId: string) => {
+    if (!employeeId) return;
+    setForm((previous) => {
+      const selectedIds = previous.rasci[fieldKey];
+      if (selectedIds.includes(employeeId)) return previous;
+      return {
+        ...previous,
+        rasci: { ...previous.rasci, [fieldKey]: [...selectedIds, employeeId] },
+      };
+    });
+  };
+
+  const removeRasciEmployee = (fieldKey: RasciListKey, employeeId: string) => {
+    setForm((previous) => ({
+      ...previous,
+      rasci: {
+        ...previous.rasci,
+        [fieldKey]: previous.rasci[fieldKey].filter((selectedId) => selectedId !== employeeId),
+      },
+    }));
+  };
+
   const handleSearchSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSearchQuery(searchInput);
   };
 
   const openModal = () => {
-    setForm(EMPTY_FORM);
+    if (!canCreateProject) return;
+    setForm(createEmptyForm());
     setModalStep(1);
+    setRasciOrganizationFilter("");
+    setRasciSearch("");
     setSaveError(null);
     setShowModal(true);
   };
@@ -127,12 +230,14 @@ export function ProjectList() {
     setSaveError(null);
     try {
       const phases = form.phases.filter((p) => p.name.trim());
+      const rasci = buildRasciPayload(form.rasci);
       const result = await createProject({
         name: form.name.trim(),
         description: form.description.trim() || undefined,
         status: form.status,
         priority: form.priority || undefined,
-        manager_id: form.manager_id || undefined,
+        manager_id: rasci.accountable || undefined,
+        rasci,
         start_date: form.start_date || undefined,
         end_date: form.end_date || undefined,
         phases: phases.length ? phases : undefined,
@@ -174,13 +279,17 @@ export function ProjectList() {
               <List className="w-4 h-4 mr-2" /> List
             </button>
           </div>
-          <div className="w-px h-6 bg-slate-300 mx-1" />
-          <button
-            onClick={openModal}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 shadow-sm transition-colors"
-          >
-            <Plus className="w-4 h-4 mr-2" /> Proyek Baru
-          </button>
+          {canCreateProject && (
+            <>
+              <div className="w-px h-6 bg-slate-300 mx-1" />
+              <button
+                onClick={openModal}
+                className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 shadow-sm transition-colors"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Proyek Baru
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -228,7 +337,15 @@ export function ProjectList() {
         ) : filteredProjects.length === 0 ? (
           <div className="text-center py-24 text-slate-400">
             <FolderKanban className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="text-sm">Belum ada proyek. Klik <strong>Proyek Baru</strong> untuk mulai.</p>
+            <p className="text-sm">
+              {canCreateProject ? (
+                <>
+                  Belum ada proyek. Klik <strong>Proyek Baru</strong> untuk mulai.
+                </>
+              ) : (
+                "Belum ada proyek yang dapat ditampilkan."
+              )}
+            </p>
           </div>
         ) : view === "grid" ? (
           <GridView projects={filteredProjects} onOpen={(id) => navigate(`/proyek/${id}`)} />
@@ -240,13 +357,13 @@ export function ProjectList() {
       {/* Create Project Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Buat Proyek Baru</h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Langkah {modalStep} dari 2 — {modalStep === 1 ? "Informasi Proyek" : "Fase Proyek"}
+                  Langkah {modalStep} dari 3 - {modalStep === 1 ? "Informasi Proyek" : modalStep === 2 ? "RASCI" : "Fase Proyek"}
                 </p>
               </div>
               <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 p-1 rounded-md">
@@ -259,6 +376,8 @@ export function ProjectList() {
               <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${modalStep >= 1 ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"}`}>1</div>
               <div className={`flex-1 h-1 rounded-full ${modalStep >= 2 ? "bg-indigo-600" : "bg-slate-200"}`} />
               <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${modalStep >= 2 ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"}`}>2</div>
+              <div className={`flex-1 h-1 rounded-full ${modalStep >= 3 ? "bg-indigo-600" : "bg-slate-200"}`} />
+              <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${modalStep >= 3 ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"}`}>3</div>
             </div>
 
             {/* Step 1: Project Info */}
@@ -310,19 +429,6 @@ export function ProjectList() {
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Manajer Proyek</label>
-                  <select
-                    value={form.manager_id}
-                    onChange={(e) => setForm((p) => ({ ...p, manager_id: e.target.value }))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">— Pilih Manajer —</option>
-                    {employees.filter((e) => e.status === "Active").map((e) => (
-                      <option key={e.id} value={e.id}>{e.name} — {e.position}</option>
-                    ))}
-                  </select>
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal Mulai</label>
@@ -354,8 +460,147 @@ export function ProjectList() {
               </form>
             )}
 
-            {/* Step 2: Phases */}
+            {/* Step 2: RASCI */}
             {modalStep === 2 && (
+              <div className="px-6 py-5">
+                <div className="mb-4 rounded-md border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+                  <span className="font-semibold">RASCI</span> memetakan peran kerja: Responsible mengerjakan,
+                  Accountable bertanggung jawab akhir, Support membantu eksekusi, Consulted memberi masukan, dan
+                  Informed menerima informasi perkembangan.
+                </div>
+                <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Organisasi</label>
+                    <select
+                      value={rasciOrganizationFilter}
+                      onChange={(event) => setRasciOrganizationFilter(event.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Semua organisasi</option>
+                      {rasciOrganizations.map((organization) => (
+                        <option key={organization} value={organization}>
+                          {organization}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Cari Pegawai</label>
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={rasciSearch}
+                        onChange={(event) => setRasciSearch(event.target.value)}
+                        placeholder="Nama, NIP, email, atau jabatan"
+                        className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      {rasciSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setRasciSearch("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 hover:bg-slate-100"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {RASCI_FIELDS.map((field) => (
+                    <div
+                      key={field.key}
+                      className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-sm font-bold text-indigo-700 shadow-sm">
+                        {field.code}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="mb-1 block text-xs font-medium text-slate-600">{field.label}</span>
+                        {field.multiple ? (
+                          <>
+                            <select
+                              value=""
+                              onChange={(event) => addRasciEmployee(field.key, event.target.value)}
+                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                              <option value="">Pilih pegawai</option>
+                              {getRasciOptions(field).map((employee) => (
+                                <option key={`${field.key}-${employee.id}`} value={employee.id}>
+                                  {employee.name} - {employee.position}
+                                </option>
+                              ))}
+                            </select>
+                            {form.rasci[field.key].length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {form.rasci[field.key].map((employeeId) => {
+                                  const employee = employeeById[employeeId];
+                                  return (
+                                    <span
+                                      key={`${field.key}-selected-${employeeId}`}
+                                      className="inline-flex max-w-full items-center gap-1 rounded-md border border-indigo-100 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700"
+                                    >
+                                      <span className="truncate">{employee?.name ?? employeeId}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => removeRasciEmployee(field.key, employeeId)}
+                                        className="rounded text-indigo-500 hover:bg-indigo-100 hover:text-indigo-800"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <select
+                            value={form.rasci[field.key]}
+                            onChange={(event) =>
+                              setForm((previous) => ({
+                                ...previous,
+                                rasci: { ...previous.rasci, [field.key]: event.target.value },
+                              }))
+                            }
+                            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="">Pilih pegawai</option>
+                            {getRasciOptions(field).map((employee) => (
+                              <option key={`${field.key}-${employee.id}`} value={employee.id}>
+                                {employee.name} - {employee.position}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-5">
+                  <button
+                    type="button"
+                    onClick={() => setModalStep(1)}
+                    className="flex items-center px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-md hover:bg-slate-50"
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-1" /> Kembali
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalStep(3)}
+                    className="flex items-center px-5 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700"
+                  >
+                    Berikutnya <ChevronRight className="w-4 h-4 ml-1" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Phases */}
+            {modalStep === 3 && (
               <div className="px-6 py-5">
                 <p className="text-sm text-slate-600 mb-4">
                   Tambahkan fase-fase proyek (opsional). Anda bisa menambah lebih banyak fase setelah proyek dibuat.
@@ -400,7 +645,7 @@ export function ProjectList() {
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-4">
                   <button
                     type="button"
-                    onClick={() => setModalStep(1)}
+                    onClick={() => setModalStep(2)}
                     className="flex items-center px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-md hover:bg-slate-50"
                   >
                     <ChevronLeft className="w-4 h-4 mr-1" /> Kembali

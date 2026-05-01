@@ -24,6 +24,7 @@ type EmployeeWorkload = {
 };
 
 type StatTone = "blue" | "emerald" | "amber" | "rose";
+type ProjectCountFilter = "all" | "none" | "one" | "multiple";
 
 const SEVERE_ISSUES = new Set<IssueSeverity>(["Blocker", "Critical"]);
 
@@ -77,6 +78,8 @@ export function WorkloadHeatmap() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [organizationFilter, setOrganizationFilter] = useState("all");
+  const [positionFilter, setPositionFilter] = useState("all");
+  const [projectCountFilter, setProjectCountFilter] = useState<ProjectCountFilter>("all");
   const [issueFilter, setIssueFilter] = useState<"all" | "with_issue" | "severe">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +124,10 @@ export function WorkloadHeatmap() {
     return Array.from(new Set(activeEmployees.map((employee) => employee.organization).filter(Boolean))).sort();
   }, [activeEmployees]);
 
+  const positionOptions = useMemo(() => {
+    return Array.from(new Set(activeEmployees.map((employee) => employee.position).filter(Boolean))).sort();
+  }, [activeEmployees]);
+
   const workloads = useMemo<EmployeeWorkload[]>(() => {
     return activeEmployees.map((employee) => {
       const employeeName = normalize(employee.name);
@@ -159,6 +166,10 @@ export function WorkloadHeatmap() {
     return workloads
       .filter((item) => {
         if (organizationFilter !== "all" && item.employee.organization !== organizationFilter) return false;
+        if (positionFilter !== "all" && item.employee.position !== positionFilter) return false;
+        if (projectCountFilter === "none" && item.projects.length !== 0) return false;
+        if (projectCountFilter === "one" && item.projects.length !== 1) return false;
+        if (projectCountFilter === "multiple" && item.projects.length < 2) return false;
         if (issueFilter === "with_issue" && item.assignedIssues.filter(isOpenIssue).length === 0) return false;
         if (
           issueFilter === "severe" &&
@@ -179,7 +190,7 @@ export function WorkloadHeatmap() {
         if (right.projects.length !== left.projects.length) return right.projects.length - left.projects.length;
         return left.employee.name.localeCompare(right.employee.name, "id");
       });
-  }, [issueFilter, organizationFilter, searchQuery, workloads]);
+  }, [issueFilter, organizationFilter, positionFilter, projectCountFilter, searchQuery, workloads]);
 
   const activeProjectCount = projects.filter((project) => project.status !== "Completed").length;
   const peopleWithOpenIssues = workloads.filter((item) => item.assignedIssues.some(isOpenIssue)).length;
@@ -251,6 +262,30 @@ export function WorkloadHeatmap() {
               {organization}
             </option>
           ))}
+        </select>
+
+        <select
+          value={positionFilter}
+          onChange={(event) => setPositionFilter(event.target.value)}
+          className="border border-slate-300 rounded-md py-1.5 px-3 text-sm bg-white"
+        >
+          <option value="all">Jabatan: Semua</option>
+          {positionOptions.map((position) => (
+            <option key={position} value={position}>
+              {position}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={projectCountFilter}
+          onChange={(event) => setProjectCountFilter(event.target.value as ProjectCountFilter)}
+          className="border border-slate-300 rounded-md py-1.5 px-3 text-sm bg-white"
+        >
+          <option value="all">Project: Semua</option>
+          <option value="none">Belum punya project</option>
+          <option value="one">1 project</option>
+          <option value="multiple">2+ project</option>
         </select>
 
         <select

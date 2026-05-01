@@ -40,6 +40,7 @@ class ProjectSchema(Schema):
     priority = fields.String(allow_none=True)
     manager_id = fields.String(allow_none=True)
     manager_name = fields.Method("get_manager_name")
+    rasci = fields.Method("get_rasci")
     start_date = fields.Date(allow_none=True)
     end_date = fields.Date(allow_none=True)
     phase_count = fields.Method("get_phase_count")
@@ -50,6 +51,17 @@ class ProjectSchema(Schema):
 
     def get_manager_name(self, obj):
         return obj.manager.name if obj.manager else None
+
+    def get_rasci(self, obj):
+        if obj.rasci:
+            return obj.rasci
+        return {
+            "responsible": [],
+            "accountable": obj.manager_id,
+            "support": [],
+            "consulted": [],
+            "informed": [],
+        }
 
     def get_phase_count(self, obj):
         return len(obj.phases) if obj.phases is not None else 0
