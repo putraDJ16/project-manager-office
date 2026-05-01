@@ -1,5 +1,9 @@
 from app.extensions import db
-from app.models import Employee, Phase, Project, ProjectMember
+from datetime import date, timedelta
+
+from sqlalchemy.exc import IntegrityError
+
+from app.models import Employee, Phase, Project, ProjectHoliday, ProjectMember, Task
 from app.models.constants import PROJECT_PRIORITY, PROJECT_STATUS
 from app.repositories import ProjectRepository
 from app.services.notification_service import notify_employee
@@ -215,4 +219,83 @@ def remove_member(project_id: str, employee_id: str):
         raise ApiError("Anggota tidak ditemukan dalam project ini.", status_code=404)
 
     db.session.delete(member)
+    db.session.commit()
+
+
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _is_working_day(value: date, holidays: set[date]) -> bool:
+    return value.weekday() < 5 and value not in holidays
+
+
+def _calculate_end_date(start_date: date, mandays: int, holidays: set[date]) -> date:
+    cursor = start_date
+    remaining = mandays
+    while True:
+        if _is_working_day(cursor, holidays):
+            remaining -= 1
+            if remaining == 0:
+                return cursor
+        cursor = cursor + timedelta(days=1)
+
+
+def _recalculate_project_task_dates(project_id: str):
+    holidays = {holiday.holiday_date for holiday in ProjectRepository.list_holidays(project_id)}
+    tasks = Task.query.filter(
+        Task.project_id == project_id,
+        Task.start_date.isnot(None),
+        Task.mandays.isnot(None),
+    ).all()
+    for task in tasks:
+        task.end_date = _calculate_end_date(task.start_date, task.mandays, holidays)
+
+
+def list_holidays(project_id: str):
+    project = ProjectRepository.get_project(project_id)
+    if not project:
+        raise ApiError("Project tidak ditemukan.", status_code=404)
+    return ProjectRepository.list_holidays(project_id)
+
+
+def create_holiday(project_id: str, payload: dict):
+    project = ProjectRepository.get_project(project_id)
+    if not project:
+        raise ApiError("Project tidak ditemukan.", status_code=404)
+
+    holiday_date = _parse_date(payload.get("holiday_date"))
+    if not holiday_date:
+        raise ApiError("Tanggal libur wajib diisi dengan format tanggal yang valid.", errors={"holiday_date": "invalid"})
+
+    name = (payload.get("name") or "").strip() or "Hari libur"
+    holiday = ProjectHoliday(project_id=project_id, holiday_date=holiday_date, name=name)
+    db.session.add(holiday)
+    try:
+        db.session.flush()
+        _recalculate_project_task_dates(project_id)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ApiError("Tanggal libur sudah terdaftar untuk project ini.", status_code=409)
+    return holiday
+
+
+def delete_holiday(project_id: str, holiday_id: int):
+    project = ProjectRepository.get_project(project_id)
+    if not project:
+        raise ApiError("Project tidak ditemukan.", status_code=404)
+
+    holiday = ProjectRepository.get_holiday(project_id, holiday_id)
+    if not holiday:
+        raise ApiError("Hari libur tidak ditemukan.", status_code=404)
+
+    db.session.delete(holiday)
+    db.session.flush()
+    _recalculate_project_task_dates(project_id)
     db.session.commit()

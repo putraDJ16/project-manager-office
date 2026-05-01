@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, timedelta
 
 from app.models.base import utcnow
 from app.extensions import db
-from app.models import Task, TaskComment
+from app.models import ProjectHoliday, Task, TaskComment
 from app.repositories import ProjectRepository, TaskRepository
 from app.services.notification_service import notify_employee
 from app.utils.exceptions import ApiError
@@ -29,6 +29,39 @@ def _parse_progress(value) -> int:
     if progress < 0 or progress > 100:
         raise ApiError("Persentase progress harus di antara 0 sampai 100.", errors={"progress_percentage": "range"})
     return progress
+
+
+def _parse_mandays(value) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        mandays = int(value)
+    except (TypeError, ValueError):
+        raise ApiError("Mandays harus berupa angka minimal 1.", errors={"mandays": "invalid"})
+    if mandays < 1:
+        raise ApiError("Mandays harus minimal 1 hari kerja.", errors={"mandays": "range"})
+    return mandays
+
+
+def _project_holiday_dates(project_id: str) -> set[date]:
+    rows = ProjectHoliday.query.with_entities(ProjectHoliday.holiday_date).filter_by(project_id=project_id).all()
+    return {row[0] for row in rows}
+
+
+def _is_working_day(value: date, holidays: set[date]) -> bool:
+    return value.weekday() < 5 and value not in holidays
+
+
+def _calculate_end_date(start_date: date, mandays: int, project_id: str) -> date:
+    holidays = _project_holiday_dates(project_id)
+    cursor = start_date
+    remaining = mandays
+    while True:
+        if _is_working_day(cursor, holidays):
+            remaining -= 1
+            if remaining == 0:
+                return cursor
+        cursor = cursor + timedelta(days=1)
 
 
 def list_tasks(project_id: str | None = None, search: str | None = None):
@@ -58,9 +91,12 @@ def create_task(payload: dict, created_by: str = "System"):
         phase_id=data["phase_id"],
         created_by=created_by or "System",
         progress_percentage=_parse_progress(payload.get("progress_percentage")),
+        mandays=_parse_mandays(payload.get("mandays")),
         start_date=_parse_date(payload.get("start_date")),
         end_date=_parse_date(payload.get("end_date")),
     )
+    if task.start_date and task.mandays:
+        task.end_date = _calculate_end_date(task.start_date, task.mandays, task.project_id)
     db.session.add(task)
     notify_employee(
         employee_id=data["assignee"],
@@ -98,6 +134,9 @@ def update_task(task_id: str, payload: dict):
     if "progress_percentage" in payload:
         task.progress_percentage = _parse_progress(payload.get("progress_percentage"))
 
+    if "mandays" in payload:
+        task.mandays = _parse_mandays(payload.get("mandays"))
+
     if "start_date" in payload:
         task.start_date = _parse_date(payload.get("start_date"))
 
@@ -113,6 +152,9 @@ def update_task(task_id: str, payload: dict):
         if task.phase_id != phase.id:
             task.phase_id = phase.id
             task.phase_updated_at = utcnow()
+
+    if any(key in payload for key in ("mandays", "start_date", "end_date")) and task.start_date and task.mandays:
+        task.end_date = _calculate_end_date(task.start_date, task.mandays, task.project_id)
 
     db.session.commit()
     return task

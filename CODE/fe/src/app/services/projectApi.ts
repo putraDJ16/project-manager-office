@@ -31,6 +31,15 @@ export type ApiProjectMember = {
   joined_at: string;
 };
 
+export type ApiProjectHoliday = {
+  id: number;
+  project_id: string;
+  holiday_date: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type CreateProjectPayload = {
   name: string;
   description?: string;
@@ -81,4 +90,24 @@ export async function addProjectMember(projectId: string, employeeId: string): P
 
 export async function removeProjectMember(projectId: string, employeeId: string): Promise<void> {
   await apiRequest<null>(`/projects/${projectId}/members/${employeeId}`, { method: "DELETE" });
+}
+
+export async function fetchProjectHolidays(projectId: string): Promise<ApiProjectHoliday[]> {
+  const result = await apiRequest<ApiProjectHoliday[]>(`/projects/${projectId}/holidays`, { method: "GET" });
+  return result.data;
+}
+
+export async function createProjectHoliday(
+  projectId: string,
+  payload: { holiday_date: string; name: string }
+): Promise<MutationResult<ApiProjectHoliday>> {
+  const result = await apiRequest<ApiProjectHoliday>(`/projects/${projectId}/holidays`, {
+    method: "POST",
+    body: payload,
+  });
+  return { data: result.data, message: result.message };
+}
+
+export async function deleteProjectHoliday(projectId: string, holidayId: number): Promise<void> {
+  await apiRequest<null>(`/projects/${projectId}/holidays/${holidayId}`, { method: "DELETE" });
 }

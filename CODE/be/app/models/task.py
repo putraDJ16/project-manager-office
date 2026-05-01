@@ -25,6 +25,7 @@ class Task(BaseModel, TimestampMixin):
     progress_percentage: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
     )
+    mandays: Mapped[int | None] = mapped_column(Integer, nullable=True)
     start_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
 

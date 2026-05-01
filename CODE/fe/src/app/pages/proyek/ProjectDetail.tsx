@@ -28,10 +28,14 @@ import {
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import {
   addProjectMember,
+  createProjectHoliday,
+  deleteProjectHoliday,
+  fetchProjectHolidays,
   getProject,
   removeProjectMember,
   updateProject,
   type ApiProjectDetail,
+  type ApiProjectHoliday,
   type ApiProjectMember
 } from "../../services/projectApi";
 import { fetchEmployees } from "../../services/masterApi";
@@ -134,6 +138,7 @@ export function ProjectDetail() {
   const [project, setProject] = useState<ApiProjectDetail | null>(null);
   const [phases, setPhases] = useState<ApiPhase[]>([]);
   const [tasks, setTasks] = useState<ApiTask[]>([]);
+  const [projectHolidays, setProjectHolidays] = useState<ApiProjectHoliday[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,11 +173,15 @@ export function ProjectDetail() {
     assignee: "",
     priority: "Medium" as string,
     progress_percentage: 0,
+    mandays: "",
     start_date: "",
     end_date: ""
   });
   const [taskError, setTaskError] = useState<string | null>(null);
   const [taskSaving, setTaskSaving] = useState(false);
+  const [holidayForm, setHolidayForm] = useState({ holiday_date: "", name: "" });
+  const [holidaySaving, setHolidaySaving] = useState(false);
+  const [holidayError, setHolidayError] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
   const [isLoadingTaskComments, setIsLoadingTaskComments] = useState(false);
@@ -212,14 +221,16 @@ export function ProjectDetail() {
       canViewPhases ? fetchPhases(id) : Promise.resolve([]),
       canViewTasks ? fetchTasks(id, "") : Promise.resolve([]),
       fetchEmployees(),
-      canViewAttachments ? fetchAttachmentFolders(id) : Promise.resolve([])
+      canViewAttachments ? fetchAttachmentFolders(id) : Promise.resolve([]),
+      fetchProjectHolidays(id)
     ])
-      .then(([projectResult, phaseResult, taskResult, employeeResult, folderResult]) => {
+      .then(([projectResult, phaseResult, taskResult, employeeResult, folderResult, holidayResult]) => {
         setProject(projectResult);
         setPhases(phaseResult);
         setTasks(taskResult);
         setEmployees(employeeResult);
         setAttachmentFolders(folderResult);
+        setProjectHolidays(holidayResult);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -656,8 +667,8 @@ export function ProjectDetail() {
       setTaskError("Pilih fase untuk tugas ini.");
       return;
     }
-    if (taskForm.start_date && taskForm.end_date && taskForm.end_date < taskForm.start_date) {
-      setTaskError("Tanggal selesai tidak boleh lebih awal dari tanggal mulai.");
+    if (taskForm.mandays && (!Number.isInteger(Number(taskForm.mandays)) || Number(taskForm.mandays) < 1)) {
+      setTaskError("Mandays harus berupa angka minimal 1.");
       return;
     }
 
@@ -671,6 +682,7 @@ export function ProjectDetail() {
         project_id: id,
         phase_id: taskForm.phase_id,
         progress_percentage: taskForm.progress_percentage,
+        mandays: taskForm.mandays ? Number(taskForm.mandays) : null,
         start_date: taskForm.start_date || null,
         end_date: taskForm.end_date || null
       });
@@ -681,6 +693,7 @@ export function ProjectDetail() {
         assignee: "",
         priority: "Medium",
         progress_percentage: 0,
+        mandays: "",
         start_date: "",
         end_date: ""
       });
@@ -778,6 +791,46 @@ export function ProjectDetail() {
       throw err;
     } finally {
       setIsSavingTaskComment(false);
+    }
+  };
+
+  const refreshProjectHolidays = async () => {
+    if (!id) return;
+    const rows = await fetchProjectHolidays(id);
+    setProjectHolidays(rows);
+  };
+
+  const handleCreateHoliday = async () => {
+    if (!id || !holidayForm.holiday_date || !canEditProject) return;
+    setHolidaySaving(true);
+    setHolidayError(null);
+    try {
+      const result = await createProjectHoliday(id, {
+        holiday_date: holidayForm.holiday_date,
+        name: holidayForm.name.trim() || "Hari libur",
+      });
+      setProjectHolidays((current) => [...current, result.data].sort((left, right) => left.holiday_date.localeCompare(right.holiday_date)));
+      const freshTasks = await fetchTasks(id, "");
+      setTasks(freshTasks);
+      setHolidayForm({ holiday_date: "", name: "" });
+    } catch (err) {
+      setHolidayError(err instanceof Error ? err.message : "Gagal menambahkan hari libur.");
+    } finally {
+      setHolidaySaving(false);
+    }
+  };
+
+  const handleDeleteHoliday = async (holidayId: number) => {
+    if (!id || !canEditProject) return;
+    setHolidayError(null);
+    try {
+      await deleteProjectHoliday(id, holidayId);
+      setProjectHolidays((current) => current.filter((holiday) => holiday.id !== holidayId));
+      const freshTasks = await fetchTasks(id, "");
+      setTasks(freshTasks);
+      await refreshProjectHolidays();
+    } catch (err) {
+      setHolidayError(err instanceof Error ? err.message : "Gagal menghapus hari libur.");
     }
   };
 
@@ -1170,6 +1223,7 @@ export function ProjectDetail() {
                       assignee: "",
                       priority: "Medium",
                       progress_percentage: 0,
+                      mandays: "",
                       start_date: "",
                       end_date: ""
                     });
@@ -1272,13 +1326,16 @@ export function ProjectDetail() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Tanggal Selesai</label>
+                    <label className="block text-xs text-slate-500 mb-1">Mandays</label>
                     <input
-                      type="date"
-                      value={taskForm.end_date}
-                      onChange={(event) => setTaskForm((current) => ({ ...current, end_date: event.target.value }))}
+                      type="number"
+                      min={1}
+                      value={taskForm.mandays}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, mandays: event.target.value }))}
+                      placeholder="Contoh: 5"
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
+                    <p className="mt-1 text-[11px] text-slate-500">Tanggal selesai otomatis melewati weekend dan hari libur project.</p>
                   </div>
                 </div>
                 {taskError && (
@@ -1324,6 +1381,7 @@ export function ProjectDetail() {
                           <th className="px-4 py-3 font-medium text-left">Fase</th>
                           <th className="px-4 py-3 font-medium text-left">Prioritas</th>
                           <th className="px-4 py-3 font-medium text-left">Progress</th>
+                          <th className="px-4 py-3 font-medium text-left">Mandays</th>
                           <th className="px-4 py-3 font-medium text-left">Assignee</th>
                           <th className="px-4 py-3 font-medium text-left">Mulai</th>
                           <th className="px-4 py-3 font-medium text-left">Selesai</th>
@@ -1353,6 +1411,9 @@ export function ProjectDetail() {
                                   onChange={(next) => void handleTaskProgressChange(task.id, next)}
                                   disabled={!canEditTasks}
                                 />
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                {task.mandays ? `${task.mandays} hari` : <span className="text-slate-300">-</span>}
                               </td>
                               <td className="px-4 py-3 text-slate-600">
                                 {resolveAssigneeLabel(task.assignee) || <span className="text-slate-300">-</span>}
@@ -1438,6 +1499,9 @@ export function ProjectDetail() {
                                             Assignee: {resolveAssigneeLabel(task.assignee) || "-"}
                                           </p>
                                           <p className="text-xs text-slate-500 mt-1">
+                                            Mandays: {task.mandays ? `${task.mandays} hari` : "-"}
+                                          </p>
+                                          <p className="text-xs text-slate-500 mt-1">
                                             {formatDate(task.start_date)} - {formatDate(task.end_date)}
                                           </p>
                                         </div>
@@ -1464,6 +1528,14 @@ export function ProjectDetail() {
             project={project}
             tasks={tasks}
             phases={phasesSorted}
+            holidays={projectHolidays}
+            holidayForm={holidayForm}
+            holidaySaving={holidaySaving}
+            holidayError={holidayError}
+            canEditHolidays={canEditProject}
+            onHolidayFormChange={setHolidayForm}
+            onCreateHoliday={handleCreateHoliday}
+            onDeleteHoliday={handleDeleteHoliday}
             resolveAssigneeLabel={resolveAssigneeLabel}
           />
         )}
@@ -1998,6 +2070,10 @@ function ganttMonthLabel(date: Date) {
   return date.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
 }
 
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function buildGanttTicks(start: Date, end: Date, scale: GanttScale) {
   if (scale === "month") {
     const ticks: Date[] = [];
@@ -2054,11 +2130,27 @@ function ProjectGanttChart({
   project,
   tasks,
   phases,
+  holidays,
+  holidayForm,
+  holidaySaving,
+  holidayError,
+  canEditHolidays,
+  onHolidayFormChange,
+  onCreateHoliday,
+  onDeleteHoliday,
   resolveAssigneeLabel
 }: {
   project: ApiProjectDetail;
   tasks: ApiTask[];
   phases: ApiPhase[];
+  holidays: ApiProjectHoliday[];
+  holidayForm: { holiday_date: string; name: string };
+  holidaySaving: boolean;
+  holidayError: string | null;
+  canEditHolidays: boolean;
+  onHolidayFormChange: (value: { holiday_date: string; name: string }) => void;
+  onCreateHoliday: () => void;
+  onDeleteHoliday: (holidayId: number) => void;
   resolveAssigneeLabel: (assigneeValue: string) => string;
 }) {
   const [scale, setScale] = useState<GanttScale>("week");
@@ -2103,6 +2195,29 @@ function ProjectGanttChart({
   const todayOffset = today >= timelineStart && today <= timelineEnd
     ? (daysBetween(timelineStart, today) / totalDays) * 100
     : null;
+  const holidayByDate = new Map(holidays.map((holiday) => [holiday.holiday_date, holiday]));
+  const holidayDates = new Set(holidayByDate.keys());
+  const nonWorkingDays = Array.from({ length: totalDays }, (_, index) => addCalendarDays(timelineStart, index))
+    .filter((date) => date.getDay() === 0 || date.getDay() === 6 || holidayDates.has(dateKey(date)));
+  const renderNonWorkingColumns = (keyPrefix: string) =>
+    nonWorkingDays.map((date) => {
+      const key = dateKey(date);
+      const holiday = holidayByDate.get(key);
+      const label = holiday ? holiday.name : date.getDay() === 0 ? "Minggu" : "Sabtu";
+      return (
+        <div
+          key={`${keyPrefix}-${key}`}
+          className={`pointer-events-none absolute top-0 h-full ${
+            holiday ? "bg-rose-100/70" : "bg-slate-100/70"
+          }`}
+          style={{
+            left: `${(daysBetween(timelineStart, date) / totalDays) * 100}%`,
+            width: `${(1 / totalDays) * 100}%`
+          }}
+          title={`${label} - ${formatDate(key)}`}
+        />
+      );
+    });
 
   const scheduledByPhase = phases
     .map((phase) => ({
@@ -2144,6 +2259,85 @@ function ProjectGanttChart({
           <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-medium text-amber-700">
             {unscheduledTasks.length} perlu tanggal
           </span>
+          <span className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-2 py-1 font-medium text-rose-700">
+            {holidays.length} hari libur
+          </span>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <Calendar className="h-4 w-4 text-rose-500" /> Hari Libur Project
+            </h4>
+            <p className="mt-1 text-xs text-slate-500">
+              Task dengan mandays otomatis melewati weekend dan tanggal libur ini.
+            </p>
+          </div>
+          {canEditHolidays && (
+            <div className="flex flex-wrap items-end gap-2">
+              <div>
+                <label className="mb-1 block text-[11px] text-slate-500">Tanggal</label>
+                <input
+                  type="date"
+                  value={holidayForm.holiday_date}
+                  onChange={(event) => onHolidayFormChange({ ...holidayForm, holiday_date: event.target.value })}
+                  className="h-9 rounded-md border border-slate-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] text-slate-500">Nama</label>
+                <input
+                  type="text"
+                  value={holidayForm.name}
+                  onChange={(event) => onHolidayFormChange({ ...holidayForm, name: event.target.value })}
+                  placeholder="Contoh: Cuti bersama"
+                  className="h-9 w-48 rounded-md border border-slate-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={onCreateHoliday}
+                disabled={holidaySaving || !holidayForm.holiday_date}
+                className="inline-flex h-9 items-center rounded-md bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {holidaySaving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
+                Tambah
+              </button>
+            </div>
+          )}
+        </div>
+        {holidayError && (
+          <p className="mt-3 flex items-center gap-1 text-xs text-red-600">
+            <AlertCircle className="h-3.5 w-3.5" /> {holidayError}
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {holidays.length === 0 ? (
+            <span className="text-xs text-slate-400">Belum ada hari libur khusus project.</span>
+          ) : (
+            [...holidays]
+              .sort((left, right) => left.holiday_date.localeCompare(right.holiday_date))
+              .map((holiday) => (
+                <span
+                  key={holiday.id}
+                  className="inline-flex items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700"
+                >
+                  {holiday.name} - {formatDate(holiday.holiday_date)}
+                  {canEditHolidays && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteHoliday(holiday.id)}
+                      className="rounded p-0.5 text-rose-400 hover:bg-rose-100 hover:text-rose-700"
+                      title="Hapus hari libur"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </span>
+              ))
+          )}
         </div>
       </div>
 
@@ -2159,11 +2353,12 @@ function ProjectGanttChart({
                 Tugas
               </div>
               <div className="relative h-14 shrink-0" style={{ width: timelineWidth }}>
+                {renderNonWorkingColumns("header")}
                 {scale === "day" &&
                   monthBands.map((band) => (
                     <div
                       key={band.date.toISOString()}
-                      className="absolute top-0 h-6 border-l border-slate-200 bg-slate-100/70 px-2 pt-1 text-[11px] font-semibold text-slate-600"
+                      className="absolute top-0 h-6 border-l border-slate-200 bg-slate-100 px-2 pt-1 text-[11px] font-semibold text-slate-600"
                       style={{ left: `${band.left}%`, width: `${band.width}%` }}
                     >
                       {band.label}
@@ -2180,7 +2375,7 @@ function ProjectGanttChart({
                         isDailyTick ? "top-6 w-7 -translate-x-1/2 pt-1 text-center" : "top-0 pl-2 pt-2"
                       }`}
                       style={{ left: `${offset}%` }}
-                      title={formatDate(tick.toISOString().slice(0, 10))}
+                      title={formatDate(dateKey(tick))}
                     >
                       <span className={isMonthStart ? "font-bold text-slate-700" : ""}>
                         {ganttTickLabel(tick, scale)}
@@ -2220,6 +2415,7 @@ function ProjectGanttChart({
                             <p className="truncate text-sm font-medium text-slate-900">{task.title}</p>
                             <p className="mt-0.5 text-xs text-slate-500">
                               {task.id} | {resolveAssigneeLabel(task.assignee) || "-"}
+                              {task.mandays ? ` | ${task.mandays} mandays` : ""}
                             </p>
                           </div>
                           <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
@@ -2228,6 +2424,7 @@ function ProjectGanttChart({
                         </div>
                       </div>
                       <div className="relative h-16 shrink-0" style={{ width: timelineWidth }}>
+                        {renderNonWorkingColumns(task.id)}
                         {ticks.map((tick) => (
                           <div
                             key={`${task.id}-${tick.toISOString()}`}
@@ -2241,7 +2438,9 @@ function ProjectGanttChart({
                         <div
                           className={`absolute top-5 h-6 overflow-hidden rounded-md shadow-sm ${ganttPriorityClass(task.priority)}`}
                           style={{ left: `${left}%`, width: `${width}%` }}
-                          title={`${task.title} (${formatDate(task.start_date)} - ${formatDate(task.end_date)})`}
+                          title={`${task.title} (${formatDate(task.start_date)} - ${formatDate(task.end_date)}${
+                            task.mandays ? `, ${task.mandays} mandays` : ""
+                          })`}
                         >
                           <div className="h-full bg-white/35" style={{ width: `${progressWidth}%` }} />
                         </div>

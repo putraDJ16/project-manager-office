@@ -1,4 +1,4 @@
-from app.models import Phase, Project, ProjectMember
+from app.models import Phase, Project, ProjectHoliday, ProjectMember
 
 
 class ProjectRepository:
@@ -32,3 +32,16 @@ class ProjectRepository:
         return ProjectMember.query.filter_by(
             project_id=project_id, employee_id=employee_id
         ).first()
+
+    @staticmethod
+    def list_holidays(project_id: str):
+        return (
+            ProjectHoliday.query
+            .filter_by(project_id=project_id)
+            .order_by(ProjectHoliday.holiday_date.asc(), ProjectHoliday.id.asc())
+            .all()
+        )
+
+    @staticmethod
+    def get_holiday(project_id: str, holiday_id: int):
+        return ProjectHoliday.query.filter_by(project_id=project_id, id=holiday_id).first()

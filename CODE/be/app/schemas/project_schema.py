@@ -23,6 +23,15 @@ class ProjectMemberSchema(Schema):
         return obj.employee.organization if obj.employee else None
 
 
+class ProjectHolidaySchema(Schema):
+    id = fields.Integer()
+    project_id = fields.String()
+    holiday_date = fields.Date(required=True)
+    name = fields.String(required=True)
+    created_at = fields.DateTime()
+    updated_at = fields.DateTime()
+
+
 class ProjectSchema(Schema):
     id = fields.String()
     name = fields.String()

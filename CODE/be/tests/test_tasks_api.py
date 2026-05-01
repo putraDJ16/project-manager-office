@@ -78,6 +78,57 @@ def test_projects_phases_tasks_flow(client, auth_headers):
     assert listed_comment_rows[0]["content"] == "Komentar pertama untuk task ini."
 
 
+def test_task_mandays_skip_weekends_and_project_holidays(client, auth_headers):
+    created_project = client.post(
+        "/api/v1/projects", headers=auth_headers, json={"name": "Project Mandays API Test", "status": "Planning"}
+    )
+    assert created_project.status_code == 201
+    project_id = created_project.get_json()["data"]["id"]
+
+    phases = client.get(f"/api/v1/projects/{project_id}/phases", headers=auth_headers)
+    assert phases.status_code == 200
+    phase_id = phases.get_json()["data"][0]["id"]
+
+    created_task = client.post(
+        "/api/v1/tasks",
+        headers=auth_headers,
+        json={
+            "title": "Task mandays API",
+            "priority": "Medium",
+            "assignee": "u1",
+            "project_id": project_id,
+            "phase_id": phase_id,
+            "start_date": "2026-05-01",
+            "mandays": 2,
+        },
+    )
+    assert created_task.status_code == 201
+    task_data = created_task.get_json()["data"]
+    assert task_data["mandays"] == 2
+    assert task_data["end_date"] == "2026-05-04"
+
+    created_holiday = client.post(
+        f"/api/v1/projects/{project_id}/holidays",
+        headers=auth_headers,
+        json={"holiday_date": "2026-05-04", "name": "Libur test"},
+    )
+    assert created_holiday.status_code == 201
+    holiday_id = created_holiday.get_json()["data"]["id"]
+
+    listed_after_holiday = client.get(f"/api/v1/tasks?project_id={project_id}", headers=auth_headers)
+    assert listed_after_holiday.status_code == 200
+    recalculated_task = next(task for task in listed_after_holiday.get_json()["data"] if task["id"] == task_data["id"])
+    assert recalculated_task["end_date"] == "2026-05-05"
+
+    deleted_holiday = client.delete(f"/api/v1/projects/{project_id}/holidays/{holiday_id}", headers=auth_headers)
+    assert deleted_holiday.status_code == 200
+
+    listed_after_delete = client.get(f"/api/v1/tasks?project_id={project_id}", headers=auth_headers)
+    assert listed_after_delete.status_code == 200
+    restored_task = next(task for task in listed_after_delete.get_json()["data"] if task["id"] == task_data["id"])
+    assert restored_task["end_date"] == "2026-05-04"
+
+
 def test_project_task_comments_can_be_restricted_per_role(client, auth_headers):
     role_response = client.post(
         "/api/v1/roles",

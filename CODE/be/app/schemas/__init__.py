@@ -6,7 +6,7 @@ from app.schemas.organization_schema import OrganizationSchema
 from app.schemas.organization_unit_schema import OrganizationUnitSchema
 from app.schemas.position_schema import PositionSchema
 from app.schemas.project_attachment_schema import ProjectAttachmentFileSchema, ProjectAttachmentFolderSchema
-from app.schemas.project_schema import PhaseSchema, ProjectDetailSchema, ProjectMemberSchema, ProjectSchema
+from app.schemas.project_schema import PhaseSchema, ProjectDetailSchema, ProjectHolidaySchema, ProjectMemberSchema, ProjectSchema
 from app.schemas.role_schema import RoleSchema
 from app.schemas.task_schema import TaskSchema
 from app.schemas.task_comment_schema import TaskCommentSchema
@@ -22,6 +22,8 @@ projects_schema = ProjectSchema(many=True)
 project_detail_schema = ProjectDetailSchema()
 project_member_schema = ProjectMemberSchema()
 project_members_schema = ProjectMemberSchema(many=True)
+project_holiday_schema = ProjectHolidaySchema()
+project_holidays_schema = ProjectHolidaySchema(many=True)
 phase_schema = PhaseSchema()
 phases_schema = PhaseSchema(many=True)
 task_schema = TaskSchema()

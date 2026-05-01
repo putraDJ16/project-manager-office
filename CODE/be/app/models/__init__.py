@@ -7,6 +7,7 @@ from app.models.notification import Notification
 from app.models.phase import Phase
 from app.models.project_attachment_file import ProjectAttachmentFile
 from app.models.project_attachment_folder import ProjectAttachmentFolder
+from app.models.project_holiday import ProjectHoliday
 from app.models.position import Position
 from app.models.project import Project
 from app.models.project_member import ProjectMember
@@ -26,6 +27,7 @@ __all__ = [
     "ProjectMember",
     "ProjectAttachmentFolder",
     "ProjectAttachmentFile",
+    "ProjectHoliday",
     "Task",
     "TaskComment",
     "Issue",

@@ -25,6 +25,7 @@ export type ApiTask = {
   updated_at: string;
   phase_updated_at: string | null;
   progress_percentage: number;
+  mandays: number | null;
   start_date: string | null;
   end_date: string | null;
 };
@@ -99,6 +100,7 @@ export async function createTask(payload: {
   project_id: string;
   phase_id: string;
   progress_percentage?: number;
+  mandays?: number | null;
   start_date?: string | null;
   end_date?: string | null;
 }): Promise<ApiMutationResult<ApiTask>> {
@@ -114,6 +116,7 @@ export async function updateTask(
     assignee: string;
     phase_id: string;
     progress_percentage: number;
+    mandays: number | null;
     start_date: string | null;
     end_date: string | null;
   }>

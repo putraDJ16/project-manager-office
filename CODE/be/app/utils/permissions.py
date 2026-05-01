@@ -11,7 +11,6 @@ PERMISSION_FALLBACKS = {
     "projectMembers": ("masterProjects",),
     "projectIssues": ("issues", "masterProjects"),
     "projectTasks": ("tasks", "masterProjects"),
-    "projectTaskComments": ("tasks", "masterProjects"),
     "projectAttachments": ("masterProjects",),
 }
 

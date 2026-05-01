@@ -6,6 +6,8 @@ from app.schemas import (
     phase_schema,
     phases_schema,
     project_detail_schema,
+    project_holiday_schema,
+    project_holidays_schema,
     project_member_schema,
     project_members_schema,
     project_schema,
@@ -90,3 +92,28 @@ def add_member_handler(project_id: str):
 def remove_member_handler(project_id: str, employee_id: str):
     project_service.remove_member(project_id, employee_id)
     return success_response(None, message="Anggota berhasil dihapus dari project.")
+
+
+@api_v1.get("/projects/<string:project_id>/holidays")
+@jwt_required()
+@require_permission("masterProjects", "view")
+def list_project_holidays_handler(project_id: str):
+    holidays = project_service.list_holidays(project_id)
+    return success_response(project_holidays_schema.dump(holidays))
+
+
+@api_v1.post("/projects/<string:project_id>/holidays")
+@jwt_required()
+@require_permission("masterProjects", "edit")
+def create_project_holiday_handler(project_id: str):
+    payload = request.get_json(silent=True) or {}
+    holiday = project_service.create_holiday(project_id, payload)
+    return success_response(project_holiday_schema.dump(holiday), message="Hari libur project berhasil ditambahkan.", status_code=201)
+
+
+@api_v1.delete("/projects/<string:project_id>/holidays/<int:holiday_id>")
+@jwt_required()
+@require_permission("masterProjects", "edit")
+def delete_project_holiday_handler(project_id: str, holiday_id: int):
+    project_service.delete_holiday(project_id, holiday_id)
+    return success_response(None, message="Hari libur project berhasil dihapus.")
