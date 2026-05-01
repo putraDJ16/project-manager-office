@@ -5,8 +5,9 @@ from app.api.v1 import api_v1
 from app.schemas import task_schema, tasks_schema
 from app.schemas import task_comment_schema, task_comments_schema
 from app.services import task_service
+from app.utils.exceptions import ApiError
 from app.utils.http import success_response
-from app.utils.permissions import require_permission
+from app.utils.permissions import get_current_user, require_permission, user_has_permission
 
 
 @api_v1.get("/tasks")
@@ -31,9 +32,16 @@ def create_task_handler():
 
 @api_v1.patch("/tasks/<string:task_id>")
 @jwt_required()
-@require_permission("projectTasks", "edit")
 def update_task_handler(task_id: str):
     payload = request.get_json(silent=True) or {}
+    current_user = get_current_user()
+    if not user_has_permission(current_user, "projectTasks", "edit"):
+        task = task_service.get_task(task_id)
+        if not task:
+            raise ApiError("Tugas tidak ditemukan.", status_code=404)
+        if not task_service.is_assigned_progress_update(task, payload, current_user):
+            raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)
+
     task = task_service.update_task(task_id, payload)
     return success_response(task_schema.dump(task), message="Tugas berhasil diperbarui.")
 

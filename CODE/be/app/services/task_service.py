@@ -68,6 +68,44 @@ def list_tasks(project_id: str | None = None, search: str | None = None):
     return TaskRepository.list_tasks(project_id=project_id, search=search)
 
 
+def get_task(task_id: str):
+    return TaskRepository.get_task(task_id)
+
+
+def _normalize_assignee(value) -> str:
+    return str(value or "").strip().lower()
+
+
+def _abbreviated_name(name: str | None):
+    parts = [part for part in (name or "").strip().split(" ") if part]
+    if len(parts) < 2:
+        return parts[0] if parts else None
+    return f"{parts[0]} {parts[1][0]}."
+
+
+def _assignment_aliases(user) -> set[str]:
+    employee = user.employee if user.employee_id else None
+    raw_aliases = [
+        str(user.id),
+        user.display_name,
+        user.email,
+        user.employee_id,
+        employee.id if employee else None,
+        employee.name if employee else None,
+        employee.email if employee else None,
+        _abbreviated_name(user.display_name),
+        _abbreviated_name(employee.name if employee else None),
+    ]
+    return {_normalize_assignee(alias) for alias in raw_aliases if _normalize_assignee(alias)}
+
+
+def is_assigned_progress_update(task: Task, payload: dict, user) -> bool:
+    return (
+        set(payload.keys()) == {"progress_percentage"}
+        and _normalize_assignee(task.assignee) in _assignment_aliases(user)
+    )
+
+
 def create_task(payload: dict, created_by: str = "System"):
     required = ["title", "phase_id", "assignee", "project_id"]
     data = {field: (payload.get(field) or "").strip() for field in required}
