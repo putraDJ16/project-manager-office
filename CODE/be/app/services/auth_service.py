@@ -60,6 +60,7 @@ def login(email: str, password: str):
         "email": user.email,
         "name": user.display_name,
         "role_id": user.role_id,
+        "employee_id": user.employee_id,
     }
 
     return {
@@ -73,6 +74,8 @@ def login(email: str, password: str):
             "role_id": user.role_id,
             "role": user.role.name if user.role else None,
             "permissions": get_user_permissions(user),
+            "employee_id": user.employee_id,
+            "employee_name": user.employee.name if user.employee else None,
         },
     }
 

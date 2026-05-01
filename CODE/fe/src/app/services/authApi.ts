@@ -11,6 +11,8 @@ type LoginResponse = {
     initials: string;
     role_id?: string | null;
     role?: string | null;
+    employee_id?: string | null;
+    employee_name?: string | null;
     permissions?: Partial<Record<ModuleKey, PermissionSet>>;
   };
 };

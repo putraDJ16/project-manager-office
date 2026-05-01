@@ -30,6 +30,7 @@ type ProfileIdentity = {
 type NoticeState = { type: "success" | "error"; message: string } | null;
 type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
 type TaskChecklistItem = { id: number; title: string; isDone: boolean };
+type TaskCompletionFilter = "active" | "done" | "all";
 
 function toTaskComment(raw: ApiTaskComment): TaskComment {
   return {
@@ -54,6 +55,7 @@ export function MyTasksPage() {
   const [tasks, setTasks] = useState<ApiTask[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [activeTab, setActiveTab] = useState<"tasks" | "issues">("tasks");
+  const [taskFilter, setTaskFilter] = useState<TaskCompletionFilter>("active");
   const [progressDrafts, setProgressDrafts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +139,12 @@ export function MyTasksPage() {
     [issues, tasks]
   );
 
+  const filteredTasks = useMemo(() => {
+    if (taskFilter === "done") return tasks.filter((task) => task.progress_percentage >= 100);
+    if (taskFilter === "all") return tasks;
+    return tasks.filter((task) => task.progress_percentage < 100);
+  }, [taskFilter, tasks]);
+
   const handleSaveTaskProgress = async (task: ApiTask) => {
     const rawValue = progressDrafts[task.id] ?? String(task.progress_percentage);
     const progress = Number(rawValue);
@@ -150,7 +158,13 @@ export function MyTasksPage() {
       const updated = await updateTask(task.id, { progress_percentage: progress });
       setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
       setProgressDrafts((current) => ({ ...current, [task.id]: String(updated.progress_percentage) }));
-      setNotice({ type: "success", message: `Progress ${task.id} berhasil diperbarui.` });
+      setNotice({
+        type: "success",
+        message:
+          updated.progress_percentage >= 100
+            ? `Progress ${task.id} sudah 100%. Tugas dipindahkan ke filter Selesai.`
+            : `Progress ${task.id} berhasil diperbarui.`
+      });
     } catch (updateError) {
       setNotice({
         type: "error",
@@ -356,15 +370,19 @@ export function MyTasksPage() {
         ) : error ? (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
         ) : activeTab === "tasks" ? (
-          <TaskTable
-            tasks={tasks}
-            projectNameById={projectNameById}
-            progressDrafts={progressDrafts}
-            savingTaskId={savingTaskId}
-            onProgressChange={(taskId, value) => setProgressDrafts((current) => ({ ...current, [taskId]: value }))}
-            onSaveProgress={handleSaveTaskProgress}
-            onOpenDetail={handleOpenTaskDetail}
-          />
+          <div className="space-y-4">
+            <TaskFilterBar value={taskFilter} summary={summary} onChange={setTaskFilter} />
+            <TaskTable
+              tasks={filteredTasks}
+              emptyMessage={taskFilter === "active" ? "Tidak ada tugas aktif. Tugas dengan progress 100% ada di filter Selesai." : undefined}
+              projectNameById={projectNameById}
+              progressDrafts={progressDrafts}
+              savingTaskId={savingTaskId}
+              onProgressChange={(taskId, value) => setProgressDrafts((current) => ({ ...current, [taskId]: value }))}
+              onSaveProgress={handleSaveTaskProgress}
+              onOpenDetail={handleOpenTaskDetail}
+            />
+          </div>
         ) : (
           <IssueTable
             issues={issues}
@@ -411,8 +429,45 @@ export function MyTasksPage() {
   );
 }
 
+function TaskFilterBar({
+  value,
+  summary,
+  onChange
+}: {
+  value: TaskCompletionFilter;
+  summary: { openTasks: number; doneTasks: number };
+  onChange: (value: TaskCompletionFilter) => void;
+}) {
+  const options: Array<{ key: TaskCompletionFilter; label: string; count: number }> = [
+    { key: "active", label: "Aktif", count: summary.openTasks },
+    { key: "done", label: "Selesai", count: summary.doneTasks },
+    { key: "all", label: "Semua", count: summary.openTasks + summary.doneTasks }
+  ];
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="inline-grid grid-cols-3 rounded-lg border border-slate-200 bg-white p-1">
+        {options.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            onClick={() => onChange(option.key)}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              value === option.key ? "bg-slate-100 text-indigo-700" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            {option.label} ({option.count})
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-slate-500">Tugas progress 100% tidak tampil di daftar aktif.</p>
+    </div>
+  );
+}
+
 function TaskTable({
   tasks,
+  emptyMessage,
   projectNameById,
   progressDrafts,
   savingTaskId,
@@ -421,6 +476,7 @@ function TaskTable({
   onOpenDetail,
 }: {
   tasks: ApiTask[];
+  emptyMessage?: string;
   projectNameById: Record<string, string>;
   progressDrafts: Record<string, string>;
   savingTaskId: string | null;
@@ -431,7 +487,7 @@ function TaskTable({
   if (tasks.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
-        Belum ada tugas yang diassign ke akun Anda.
+        {emptyMessage ?? "Belum ada tugas yang diassign ke akun Anda."}
       </div>
     );
   }

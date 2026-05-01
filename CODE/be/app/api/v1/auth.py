@@ -46,6 +46,7 @@ def refresh_handler():
             "email": claims.get("email"),
             "name": claims.get("name"),
             "role_id": claims.get("role_id"),
+            "employee_id": claims.get("employee_id"),
         },
     )
     return success_response({"access_token": next_access})

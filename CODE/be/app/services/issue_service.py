@@ -20,6 +20,10 @@ def list_issues(project_id: str | None = None):
     return IssueRepository.list_issues(project_id=project_id)
 
 
+def get_issue(issue_id: str):
+    return IssueRepository.get_issue(issue_id)
+
+
 def create_issue(payload: dict, reporter_from_claim: str | None = None):
     title = (payload.get("title") or "").strip()
     project_id = (payload.get("project_id") or "").strip()

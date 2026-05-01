@@ -172,6 +172,66 @@ def test_assignee_can_update_own_task_progress_without_task_edit_permission(clie
     assert updated.get_json()["data"]["progress_percentage"] == 65
 
 
+def test_project_member_can_update_project_task_without_task_permission(client, auth_headers):
+    role_response = client.post(
+        "/api/v1/roles",
+        headers=auth_headers,
+        json={
+            "name": "Project Member Scoped Access",
+            "description": "Akses detail proyek hanya dari membership.",
+            "status": "Active",
+            "permissions": {"dashboard": {"view": True}},
+        },
+    )
+    assert role_response.status_code == 201
+    role_id = role_response.get_json()["data"]["id"]
+
+    employee_response = client.post(
+        "/api/v1/employees",
+        headers=auth_headers,
+        json={
+            "nip": "20000101-996",
+            "name": "Member Proyek Scoped",
+            "email": "member.proyek.scoped@company.co.id",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+            "role_id": role_id,
+            "status": "Active",
+        },
+    )
+    assert employee_response.status_code == 201
+    employee_id = employee_response.get_json()["data"]["id"]
+
+    member_response = client.post(
+        "/api/v1/projects/p1/members",
+        headers=auth_headers,
+        json={"employee_id": employee_id},
+    )
+    assert member_response.status_code == 201
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "member.proyek.scoped@company.co.id", "password": "Welcome123!"},
+    )
+    assert login_response.status_code == 200
+    member_headers = {"Authorization": f"Bearer {login_response.get_json()['data']['access_token']}"}
+
+    project_detail = client.get("/api/v1/projects/p1", headers=member_headers)
+    assert project_detail.status_code == 200
+
+    tasks = client.get("/api/v1/tasks?project_id=p1", headers=member_headers)
+    assert tasks.status_code == 200
+
+    updated = client.patch(
+        "/api/v1/tasks/T-101",
+        headers=member_headers,
+        json={"progress_percentage": 44},
+    )
+    assert updated.status_code == 200
+    assert updated.get_json()["data"]["progress_percentage"] == 44
+
+
 def test_assignee_can_manage_own_task_checklist_without_comment_permission(client, auth_headers):
     employee_id, employee_headers = _create_task_viewer_employee(
         client,
@@ -216,6 +276,41 @@ def test_assignee_can_manage_own_task_checklist_without_comment_permission(clien
 
     deleted = client.delete(f"/api/v1/tasks/{task_id}/checklist/{item_id}", headers=employee_headers)
     assert deleted.status_code == 200
+
+
+def test_assignee_can_comment_on_own_task_without_comment_permission(client, auth_headers):
+    employee_id, employee_headers = _create_task_viewer_employee(
+        client,
+        auth_headers,
+        name="Komentar Mandiri",
+        email="komentar.mandiri@company.co.id",
+    )
+
+    created_task = client.post(
+        "/api/v1/tasks",
+        headers=auth_headers,
+        json={
+            "title": "Task komentar mandiri",
+            "priority": "Medium",
+            "assignee": employee_id,
+            "project_id": "p1",
+            "phase_id": "ph-101",
+            "progress_percentage": 10,
+        },
+    )
+    assert created_task.status_code == 201
+    task_id = created_task.get_json()["data"]["id"]
+
+    listed = client.get(f"/api/v1/tasks/{task_id}/comments", headers=employee_headers)
+    assert listed.status_code == 200
+
+    created = client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        headers=employee_headers,
+        json={"content": "Komentar dari assignee."},
+    )
+    assert created.status_code == 201
+    assert created.get_json()["data"]["content"] == "Komentar dari assignee."
 
 
 def test_assignee_without_task_edit_permission_cannot_update_task_fields(client, auth_headers):

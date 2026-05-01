@@ -2,7 +2,7 @@ from functools import wraps
 
 from flask_jwt_extended import get_jwt_identity
 
-from app.models import User
+from app.models import Project, ProjectMember, User
 from app.utils.exceptions import ApiError
 
 PERMISSION_ACTIONS = ("view", "create", "edit", "delete", "restore")
@@ -163,6 +163,14 @@ def user_has_permission(user: User, module: str, action: str):
     return any(permissions.get(fallback_module, {}).get(action, False) for fallback_module in fallback_modules)
 
 
+def user_is_project_member(user: User, project_id: str | None):
+    if not user.employee_id or not project_id:
+        return False
+    if ProjectMember.query.filter_by(project_id=project_id, employee_id=user.employee_id).first() is not None:
+        return True
+    return Project.query.filter_by(id=project_id, manager_id=user.employee_id).first() is not None
+
+
 def require_permission(module: str, action: str):
     def decorator(handler):
         @wraps(handler)
@@ -171,6 +179,21 @@ def require_permission(module: str, action: str):
             if not user_has_permission(user, module, action):
                 raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)
             return handler(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def require_project_permission(module: str, action: str, project_id_arg: str = "project_id"):
+    def decorator(handler):
+        @wraps(handler)
+        def wrapper(*args, **kwargs):
+            user = get_current_user()
+            project_id = kwargs.get(project_id_arg)
+            if user_has_permission(user, module, action) or user_is_project_member(user, project_id):
+                return handler(*args, **kwargs)
+            raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)
 
         return wrapper
 

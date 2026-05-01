@@ -195,22 +195,22 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const session = loadAuthSession();
-  const canEditProject = hasPermission(session, "masterProjects", "edit");
-  const canViewPhases = hasPermission(session, "projectPhases", "view");
-  const canCreateMembers = hasPermission(session, "projectMembers", "create");
-  const canDeleteMembers = hasPermission(session, "projectMembers", "delete");
-  const canViewTasks = hasPermission(session, "projectTasks", "view");
-  const canCreateTasks = hasPermission(session, "projectTasks", "create");
-  const canEditTasks = hasPermission(session, "projectTasks", "edit");
-  const canViewTaskComments = hasPermission(session, "projectTaskComments", "view");
-  const canCreateTaskComments = hasPermission(session, "projectTaskComments", "create");
-  const canViewIssues = hasPermission(session, "projectIssues", "view");
-  const canCreateIssues = hasPermission(session, "projectIssues", "create");
-  const canEditIssues = hasPermission(session, "projectIssues", "edit");
-  const canViewAttachments = hasPermission(session, "projectAttachments", "view");
-  const canCreateAttachments = hasPermission(session, "projectAttachments", "create");
-  const canEditAttachments = hasPermission(session, "projectAttachments", "edit");
-  const canDeleteAttachments = hasPermission(session, "projectAttachments", "delete");
+  const baseCanEditProject = hasPermission(session, "masterProjects", "edit");
+  const baseCanViewPhases = hasPermission(session, "projectPhases", "view");
+  const baseCanCreateMembers = hasPermission(session, "projectMembers", "create");
+  const baseCanDeleteMembers = hasPermission(session, "projectMembers", "delete");
+  const baseCanViewTasks = hasPermission(session, "projectTasks", "view");
+  const baseCanCreateTasks = hasPermission(session, "projectTasks", "create");
+  const baseCanEditTasks = hasPermission(session, "projectTasks", "edit");
+  const baseCanViewTaskComments = hasPermission(session, "projectTaskComments", "view");
+  const baseCanCreateTaskComments = hasPermission(session, "projectTaskComments", "create");
+  const baseCanViewIssues = hasPermission(session, "projectIssues", "view");
+  const baseCanCreateIssues = hasPermission(session, "projectIssues", "create");
+  const baseCanEditIssues = hasPermission(session, "projectIssues", "edit");
+  const baseCanViewAttachments = hasPermission(session, "projectAttachments", "view");
+  const baseCanCreateAttachments = hasPermission(session, "projectAttachments", "create");
+  const baseCanEditAttachments = hasPermission(session, "projectAttachments", "edit");
+  const baseCanDeleteAttachments = hasPermission(session, "projectAttachments", "delete");
 
   const [project, setProject] = useState<ApiProjectDetail | null>(null);
   const [phases, setPhases] = useState<ApiPhase[]>([]);
@@ -293,6 +293,34 @@ export function ProjectDetail() {
     null
   );
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  const isCurrentProjectMember = useMemo(() => {
+    if (!project) return false;
+    const sessionEmployeeId = session?.employeeId ?? "";
+    const sessionEmployeeName = (session?.employeeName ?? session?.name ?? "").trim().toLowerCase();
+    if (sessionEmployeeId && project.manager_id === sessionEmployeeId) return true;
+    return project.members.some((member) => {
+      if (sessionEmployeeId && member.employee_id === sessionEmployeeId) return true;
+      return sessionEmployeeName.length > 0 && (member.employee_name ?? "").trim().toLowerCase() === sessionEmployeeName;
+    });
+  }, [project, session?.employeeId, session?.employeeName, session?.name]);
+
+  const canEditProject = baseCanEditProject || isCurrentProjectMember;
+  const canViewPhases = baseCanViewPhases || isCurrentProjectMember;
+  const canCreateMembers = baseCanCreateMembers || isCurrentProjectMember;
+  const canDeleteMembers = baseCanDeleteMembers || isCurrentProjectMember;
+  const canViewTasks = baseCanViewTasks || isCurrentProjectMember;
+  const canCreateTasks = baseCanCreateTasks || isCurrentProjectMember;
+  const canEditTasks = baseCanEditTasks || isCurrentProjectMember;
+  const canViewTaskComments = baseCanViewTaskComments || isCurrentProjectMember;
+  const canCreateTaskComments = baseCanCreateTaskComments || isCurrentProjectMember;
+  const canViewIssues = baseCanViewIssues || isCurrentProjectMember;
+  const canCreateIssues = baseCanCreateIssues || isCurrentProjectMember;
+  const canEditIssues = baseCanEditIssues || isCurrentProjectMember;
+  const canViewAttachments = baseCanViewAttachments || isCurrentProjectMember;
+  const canCreateAttachments = baseCanCreateAttachments || isCurrentProjectMember;
+  const canEditAttachments = baseCanEditAttachments || isCurrentProjectMember;
+  const canDeleteAttachments = baseCanDeleteAttachments || isCurrentProjectMember;
 
   useEffect(() => {
     if (!id) return;
