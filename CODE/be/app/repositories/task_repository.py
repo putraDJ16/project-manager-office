@@ -1,6 +1,6 @@
 from sqlalchemy import or_
 
-from app.models import Task, TaskComment
+from app.models import Task, TaskChecklistItem, TaskComment
 
 
 class TaskRepository:
@@ -32,3 +32,16 @@ class TaskRepository:
             .order_by(TaskComment.created_at.asc(), TaskComment.id.asc())
             .all()
         )
+
+    @staticmethod
+    def list_task_checklist_items(task_id: str):
+        return (
+            TaskChecklistItem.query
+            .filter(TaskChecklistItem.task_id == task_id)
+            .order_by(TaskChecklistItem.order_index.asc(), TaskChecklistItem.id.asc())
+            .all()
+        )
+
+    @staticmethod
+    def get_task_checklist_item(item_id: int):
+        return TaskChecklistItem.query.get(item_id)

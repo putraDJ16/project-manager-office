@@ -9,6 +9,7 @@ from app.schemas.project_attachment_schema import ProjectAttachmentFileSchema, P
 from app.schemas.project_schema import PhaseSchema, ProjectDetailSchema, ProjectHolidaySchema, ProjectMemberSchema, ProjectSchema
 from app.schemas.role_schema import RoleSchema
 from app.schemas.task_schema import TaskSchema
+from app.schemas.task_checklist_schema import TaskChecklistItemSchema
 from app.schemas.task_comment_schema import TaskCommentSchema
 
 role_schema = RoleSchema()
@@ -28,6 +29,8 @@ phase_schema = PhaseSchema()
 phases_schema = PhaseSchema(many=True)
 task_schema = TaskSchema()
 tasks_schema = TaskSchema(many=True)
+task_checklist_item_schema = TaskChecklistItemSchema()
+task_checklist_items_schema = TaskChecklistItemSchema(many=True)
 task_comment_schema = TaskCommentSchema()
 task_comments_schema = TaskCommentSchema(many=True)
 issue_schema = IssueSchema()

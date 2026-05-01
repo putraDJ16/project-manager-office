@@ -3,11 +3,24 @@ from flask_jwt_extended import get_jwt, jwt_required
 
 from app.api.v1 import api_v1
 from app.schemas import task_schema, tasks_schema
+from app.schemas import task_checklist_item_schema, task_checklist_items_schema
 from app.schemas import task_comment_schema, task_comments_schema
 from app.services import task_service
 from app.utils.exceptions import ApiError
 from app.utils.http import success_response
 from app.utils.permissions import get_current_user, require_permission, user_has_permission
+
+
+def _ensure_task_checklist_access(task_id: str, action: str):
+    current_user = get_current_user()
+    if user_has_permission(current_user, "projectTaskComments", action):
+        return
+
+    task = task_service.get_task(task_id)
+    if not task:
+        raise ApiError("Tugas tidak ditemukan.", status_code=404)
+    if not task_service.is_assigned_to_task(task, current_user):
+        raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)
 
 
 @api_v1.get("/tasks")
@@ -66,3 +79,42 @@ def create_task_comment_handler(task_id: str):
         message="Komentar berhasil ditambahkan.",
         status_code=201,
     )
+
+
+@api_v1.get("/tasks/<string:task_id>/checklist")
+@jwt_required()
+def list_task_checklist_handler(task_id: str):
+    _ensure_task_checklist_access(task_id, "view")
+    items = task_service.list_task_checklist_items(task_id)
+    return success_response(task_checklist_items_schema.dump(items))
+
+
+@api_v1.post("/tasks/<string:task_id>/checklist")
+@jwt_required()
+def create_task_checklist_handler(task_id: str):
+    _ensure_task_checklist_access(task_id, "create")
+    payload = request.get_json(silent=True) or {}
+    claims = get_jwt()
+    item = task_service.create_task_checklist_item(task_id, payload, created_by=claims.get("name", "System"))
+    return success_response(
+        task_checklist_item_schema.dump(item),
+        message="Checklist berhasil ditambahkan.",
+        status_code=201,
+    )
+
+
+@api_v1.patch("/tasks/<string:task_id>/checklist/<int:item_id>")
+@jwt_required()
+def update_task_checklist_handler(task_id: str, item_id: int):
+    _ensure_task_checklist_access(task_id, "create")
+    payload = request.get_json(silent=True) or {}
+    item = task_service.update_task_checklist_item(task_id, item_id, payload)
+    return success_response(task_checklist_item_schema.dump(item), message="Checklist berhasil diperbarui.")
+
+
+@api_v1.delete("/tasks/<string:task_id>/checklist/<int:item_id>")
+@jwt_required()
+def delete_task_checklist_handler(task_id: str, item_id: int):
+    _ensure_task_checklist_access(task_id, "create")
+    task_service.delete_task_checklist_item(task_id, item_id)
+    return success_response(None, message="Checklist berhasil dihapus.")

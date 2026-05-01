@@ -39,6 +39,17 @@ export type ApiTaskComment = {
   updated_at: string;
 };
 
+export type ApiTaskChecklistItem = {
+  id: number;
+  task_id: string;
+  title: string;
+  is_done: boolean;
+  order_index: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type ApiMutationResult<T> = {
   data: T;
   message?: string;
@@ -136,4 +147,33 @@ export async function createTaskComment(taskId: string, payload: { content: stri
     body: payload
   });
   return { data: result.data, message: result.message };
+}
+
+export async function fetchTaskChecklist(taskId: string) {
+  const result = await apiRequest<ApiTaskChecklistItem[]>(`/tasks/${taskId}/checklist`, { method: "GET" });
+  return result.data;
+}
+
+export async function createTaskChecklistItem(taskId: string, payload: { title: string }) {
+  const result = await apiRequest<ApiTaskChecklistItem>(`/tasks/${taskId}/checklist`, {
+    method: "POST",
+    body: payload
+  });
+  return { data: result.data, message: result.message };
+}
+
+export async function updateTaskChecklistItem(
+  taskId: string,
+  itemId: number,
+  payload: Partial<{ title: string; is_done: boolean }>
+) {
+  const result = await apiRequest<ApiTaskChecklistItem>(`/tasks/${taskId}/checklist/${itemId}`, {
+    method: "PATCH",
+    body: payload
+  });
+  return { data: result.data, message: result.message };
+}
+
+export async function deleteTaskChecklistItem(taskId: string, itemId: number) {
+  await apiRequest<null>(`/tasks/${taskId}/checklist/${itemId}`, { method: "DELETE" });
 }

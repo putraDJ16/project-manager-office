@@ -77,6 +77,28 @@ def test_projects_phases_tasks_flow(client, auth_headers):
     assert len(listed_comment_rows) == 1
     assert listed_comment_rows[0]["content"] == "Komentar pertama untuk task ini."
 
+    listed_checklist = client.get(f"/api/v1/tasks/{task_id}/checklist", headers=auth_headers)
+    assert listed_checklist.status_code == 200
+    assert listed_checklist.get_json()["data"] == []
+
+    created_checklist = client.post(
+        f"/api/v1/tasks/{task_id}/checklist",
+        headers=auth_headers,
+        json={"title": "Checklist pertama"},
+    )
+    assert created_checklist.status_code == 201
+    checklist_data = created_checklist.get_json()["data"]
+    assert checklist_data["title"] == "Checklist pertama"
+    assert checklist_data["is_done"] is False
+
+    updated_checklist = client.patch(
+        f"/api/v1/tasks/{task_id}/checklist/{checklist_data['id']}",
+        headers=auth_headers,
+        json={"is_done": True},
+    )
+    assert updated_checklist.status_code == 200
+    assert updated_checklist.get_json()["data"]["is_done"] is True
+
 
 def _create_task_viewer_employee(client, auth_headers, name: str, email: str):
     role_response = client.post(
@@ -148,6 +170,52 @@ def test_assignee_can_update_own_task_progress_without_task_edit_permission(clie
     )
     assert updated.status_code == 200
     assert updated.get_json()["data"]["progress_percentage"] == 65
+
+
+def test_assignee_can_manage_own_task_checklist_without_comment_permission(client, auth_headers):
+    employee_id, employee_headers = _create_task_viewer_employee(
+        client,
+        auth_headers,
+        name="Checklist Mandiri",
+        email="checklist.mandiri@company.co.id",
+    )
+
+    created_task = client.post(
+        "/api/v1/tasks",
+        headers=auth_headers,
+        json={
+            "title": "Task checklist mandiri",
+            "priority": "Medium",
+            "assignee": employee_id,
+            "project_id": "p1",
+            "phase_id": "ph-101",
+            "progress_percentage": 10,
+        },
+    )
+    assert created_task.status_code == 201
+    task_id = created_task.get_json()["data"]["id"]
+
+    listed = client.get(f"/api/v1/tasks/{task_id}/checklist", headers=employee_headers)
+    assert listed.status_code == 200
+
+    created = client.post(
+        f"/api/v1/tasks/{task_id}/checklist",
+        headers=employee_headers,
+        json={"title": "Cek dokumen"},
+    )
+    assert created.status_code == 201
+    item_id = created.get_json()["data"]["id"]
+
+    updated = client.patch(
+        f"/api/v1/tasks/{task_id}/checklist/{item_id}",
+        headers=employee_headers,
+        json={"is_done": True},
+    )
+    assert updated.status_code == 200
+    assert updated.get_json()["data"]["is_done"] is True
+
+    deleted = client.delete(f"/api/v1/tasks/{task_id}/checklist/{item_id}", headers=employee_headers)
+    assert deleted.status_code == 200
 
 
 def test_assignee_without_task_edit_permission_cannot_update_task_fields(client, auth_headers):

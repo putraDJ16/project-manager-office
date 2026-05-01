@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 from app.models.base import utcnow
 from app.extensions import db
-from app.models import ProjectHoliday, Task, TaskComment
+from app.models import ProjectHoliday, Task, TaskChecklistItem, TaskComment
 from app.repositories import ProjectRepository, TaskRepository
 from app.services.notification_service import notify_employee
 from app.utils.exceptions import ApiError
@@ -104,6 +104,10 @@ def is_assigned_progress_update(task: Task, payload: dict, user) -> bool:
         set(payload.keys()) == {"progress_percentage"}
         and _normalize_assignee(task.assignee) in _assignment_aliases(user)
     )
+
+
+def is_assigned_to_task(task: Task, user) -> bool:
+    return _normalize_assignee(task.assignee) in _assignment_aliases(user)
 
 
 def create_task(payload: dict, created_by: str = "System"):
@@ -224,3 +228,71 @@ def create_task_comment(task_id: str, payload: dict, author_name: str = "System"
     db.session.add(comment)
     db.session.commit()
     return comment
+
+
+def list_task_checklist_items(task_id: str):
+    task = TaskRepository.get_task(task_id)
+    if not task:
+        raise ApiError("Tugas tidak ditemukan.", status_code=404)
+    return TaskRepository.list_task_checklist_items(task_id)
+
+
+def create_task_checklist_item(task_id: str, payload: dict, created_by: str = "System"):
+    task = TaskRepository.get_task(task_id)
+    if not task:
+        raise ApiError("Tugas tidak ditemukan.", status_code=404)
+
+    title = (payload.get("title") or "").strip()
+    if not title:
+        raise ApiError("Judul checklist wajib diisi.", errors={"title": "required"})
+    if len(title) > 240:
+        raise ApiError("Judul checklist maksimal 240 karakter.", errors={"title": "max_length"})
+
+    existing_items = TaskRepository.list_task_checklist_items(task_id)
+    item = TaskChecklistItem(
+        task_id=task.id,
+        title=title,
+        is_done=bool(payload.get("is_done", False)),
+        order_index=len(existing_items) + 1,
+        created_by=(created_by or "System").strip() or "System",
+    )
+    db.session.add(item)
+    db.session.commit()
+    return item
+
+
+def update_task_checklist_item(task_id: str, item_id: int, payload: dict):
+    task = TaskRepository.get_task(task_id)
+    if not task:
+        raise ApiError("Tugas tidak ditemukan.", status_code=404)
+
+    item = TaskRepository.get_task_checklist_item(item_id)
+    if not item or item.task_id != task_id:
+        raise ApiError("Checklist tidak ditemukan.", status_code=404)
+
+    if "title" in payload:
+        title = (payload.get("title") or "").strip()
+        if not title:
+            raise ApiError("Judul checklist wajib diisi.", errors={"title": "required"})
+        if len(title) > 240:
+            raise ApiError("Judul checklist maksimal 240 karakter.", errors={"title": "max_length"})
+        item.title = title
+
+    if "is_done" in payload:
+        item.is_done = bool(payload.get("is_done"))
+
+    db.session.commit()
+    return item
+
+
+def delete_task_checklist_item(task_id: str, item_id: int):
+    task = TaskRepository.get_task(task_id)
+    if not task:
+        raise ApiError("Tugas tidak ditemukan.", status_code=404)
+
+    item = TaskRepository.get_task_checklist_item(item_id)
+    if not item or item.task_id != task_id:
+        raise ApiError("Checklist tidak ditemukan.", status_code=404)
+
+    db.session.delete(item)
+    db.session.commit()

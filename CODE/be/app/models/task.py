@@ -32,3 +32,6 @@ class Task(BaseModel, TimestampMixin):
     project = relationship("Project", back_populates="tasks")
     phase = relationship("Phase", back_populates="tasks")
     comments = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan")
+    checklist_items = relationship(
+        "TaskChecklistItem", back_populates="task", cascade="all, delete-orphan"
+    )

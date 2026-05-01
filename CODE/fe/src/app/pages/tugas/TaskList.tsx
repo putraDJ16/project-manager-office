@@ -3,11 +3,16 @@ import { Filter, GitCommit, Layers3, List, Search, Settings2, X } from "lucide-r
 import { useNavigate } from "react-router";
 import { teamMembers } from "../../data/mockData";
 import {
+  createTaskChecklistItem,
   createTaskComment,
+  deleteTaskChecklistItem,
   fetchPhases,
   fetchProjects,
+  fetchTaskChecklist,
   fetchTaskComments,
   fetchTasks,
+  updateTaskChecklistItem,
+  type ApiTaskChecklistItem,
   type ApiTaskComment
 } from "../../services/taskApi";
 import { TaskDetailModal } from "./TaskDetailModal";
@@ -29,6 +34,7 @@ type Task = {
   updatedAt: string;
 };
 type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
+type TaskChecklistItem = { id: number; title: string; isDone: boolean };
 type NoticeState = { type: "success" | "error"; message: string } | null;
 type DateStatus = "upcoming" | "on_progress" | "overdue";
 
@@ -75,6 +81,14 @@ function toTaskComment(raw: ApiTaskComment): TaskComment {
   };
 }
 
+function toTaskChecklistItem(raw: ApiTaskChecklistItem): TaskChecklistItem {
+  return {
+    id: raw.id,
+    title: raw.title,
+    isDone: raw.is_done
+  };
+}
+
 function taskDateStatus(startDate: string | null, endDate: string | null): DateStatus | null {
   if (!startDate && !endDate) return null;
   const today = new Date();
@@ -113,8 +127,11 @@ export function TaskList() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
+  const [taskChecklistItems, setTaskChecklistItems] = useState<Record<string, TaskChecklistItem[]>>({});
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
+  const [isLoadingChecklist, setIsLoadingChecklist] = useState(false);
+  const [isSavingChecklist, setIsSavingChecklist] = useState(false);
 
   const phasesForProject = useMemo(
     () =>
@@ -213,9 +230,22 @@ export function TaskList() {
     }
   };
 
+  const loadTaskChecklist = async (taskId: string) => {
+    setIsLoadingChecklist(true);
+    try {
+      const rows = await fetchTaskChecklist(taskId);
+      setTaskChecklistItems((current) => ({ ...current, [taskId]: rows.map(toTaskChecklistItem) }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Gagal memuat checklist tugas.";
+      setNotice({ type: "error", message });
+    } finally {
+      setIsLoadingChecklist(false);
+    }
+  };
+
   const handleOpenTaskDetail = async (taskId: string) => {
     setSelectedTaskId(taskId);
-    await loadTaskComments(taskId);
+    await Promise.all([loadTaskComments(taskId), loadTaskChecklist(taskId)]);
   };
 
   const handleSubmitTaskComment = async (content: string) => {
@@ -231,6 +261,51 @@ export function TaskList() {
       throw error;
     } finally {
       setIsSavingComment(false);
+    }
+  };
+
+  const handleAddChecklistItem = async (title: string) => {
+    if (!selectedTaskId) return;
+    setIsSavingChecklist(true);
+    try {
+      await createTaskChecklistItem(selectedTaskId, { title });
+      await loadTaskChecklist(selectedTaskId);
+      setNotice({ type: "success", message: "Checklist berhasil ditambahkan." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Gagal menambahkan checklist.";
+      setNotice({ type: "error", message });
+      throw error;
+    } finally {
+      setIsSavingChecklist(false);
+    }
+  };
+
+  const handleToggleChecklistItem = async (itemId: number, isDone: boolean) => {
+    if (!selectedTaskId) return;
+    setIsSavingChecklist(true);
+    try {
+      await updateTaskChecklistItem(selectedTaskId, itemId, { is_done: isDone });
+      await loadTaskChecklist(selectedTaskId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Gagal memperbarui checklist.";
+      setNotice({ type: "error", message });
+    } finally {
+      setIsSavingChecklist(false);
+    }
+  };
+
+  const handleDeleteChecklistItem = async (itemId: number) => {
+    if (!selectedTaskId) return;
+    setIsSavingChecklist(true);
+    try {
+      await deleteTaskChecklistItem(selectedTaskId, itemId);
+      await loadTaskChecklist(selectedTaskId);
+      setNotice({ type: "success", message: "Checklist berhasil dihapus." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Gagal menghapus checklist.";
+      setNotice({ type: "error", message });
+    } finally {
+      setIsSavingChecklist(false);
     }
   };
 
@@ -472,10 +547,17 @@ export function TaskList() {
           phaseName={phaseById[selectedTask.phaseId]?.name ?? "Tanpa Fase"}
           assigneeName={teamMembers.find((member) => member.id === selectedTask.assignee)?.name ?? selectedTask.assignee}
           comments={taskComments[selectedTask.id] ?? []}
+          checklistItems={taskChecklistItems[selectedTask.id] ?? []}
           isLoadingComments={isLoadingComments}
           isSavingComment={isSavingComment}
+          isLoadingChecklist={isLoadingChecklist}
+          isSavingChecklist={isSavingChecklist}
+          canEditChecklist
           onClose={() => setSelectedTaskId(null)}
           onSubmitComment={handleSubmitTaskComment}
+          onAddChecklistItem={handleAddChecklistItem}
+          onToggleChecklistItem={handleToggleChecklistItem}
+          onDeleteChecklistItem={handleDeleteChecklistItem}
         />
       )}
     </div>

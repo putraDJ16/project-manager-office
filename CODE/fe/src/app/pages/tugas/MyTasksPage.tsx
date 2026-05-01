@@ -4,7 +4,20 @@ import { teamMembers } from "../../data/mockData";
 import { ISSUE_STATUS_ORDER, type Issue, type IssueStatus } from "../../domain/issues";
 import { fetchMyProjects, getMe, type MyProjectResponse } from "../../services/authApi";
 import { getIssues, updateIssueStatus } from "../../services/issueService";
-import { fetchAllTasks, updateTask, type ApiTask } from "../../services/taskApi";
+import {
+  createTaskChecklistItem,
+  createTaskComment,
+  deleteTaskChecklistItem,
+  fetchAllTasks,
+  fetchTaskChecklist,
+  fetchTaskComments,
+  updateTask,
+  updateTaskChecklistItem,
+  type ApiTask,
+  type ApiTaskChecklistItem,
+  type ApiTaskComment
+} from "../../services/taskApi";
+import { TaskDetailModal } from "./TaskDetailModal";
 
 type ProfileIdentity = {
   id: number;
@@ -15,6 +28,25 @@ type ProfileIdentity = {
 };
 
 type NoticeState = { type: "success" | "error"; message: string } | null;
+type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
+type TaskChecklistItem = { id: number; title: string; isDone: boolean };
+
+function toTaskComment(raw: ApiTaskComment): TaskComment {
+  return {
+    id: raw.id,
+    authorName: raw.author_name,
+    content: raw.content,
+    createdAt: raw.created_at
+  };
+}
+
+function toTaskChecklistItem(raw: ApiTaskChecklistItem): TaskChecklistItem {
+  return {
+    id: raw.id,
+    title: raw.title,
+    isDone: raw.is_done
+  };
+}
 
 export function MyTasksPage() {
   const [profile, setProfile] = useState<ProfileIdentity | null>(null);
@@ -28,6 +60,13 @@ export function MyTasksPage() {
   const [notice, setNotice] = useState<NoticeState>(null);
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [savingIssueId, setSavingIssueId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
+  const [taskChecklistItems, setTaskChecklistItems] = useState<Record<string, TaskChecklistItem[]>>({});
+  const [isLoadingTaskComments, setIsLoadingTaskComments] = useState(false);
+  const [isSavingTaskComment, setIsSavingTaskComment] = useState(false);
+  const [isLoadingTaskChecklist, setIsLoadingTaskChecklist] = useState(false);
+  const [isSavingTaskChecklist, setIsSavingTaskChecklist] = useState(false);
 
   useEffect(() => {
     let isCancelled = false;
@@ -83,6 +122,11 @@ export function MyTasksPage() {
     [projects]
   );
 
+  const selectedTask = useMemo(
+    () => tasks.find((task) => task.id === selectedTaskId) ?? null,
+    [selectedTaskId, tasks]
+  );
+
   const summary = useMemo(
     () => ({
       openTasks: tasks.filter((task) => task.progress_percentage < 100).length,
@@ -131,6 +175,115 @@ export function MyTasksPage() {
       });
     } finally {
       setSavingIssueId(null);
+    }
+  };
+
+  const loadTaskComments = async (taskId: string) => {
+    setIsLoadingTaskComments(true);
+    try {
+      const rows = await fetchTaskComments(taskId);
+      setTaskComments((current) => ({ ...current, [taskId]: rows.map(toTaskComment) }));
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : "Gagal memuat komentar tugas.";
+      if (message.toLowerCase().includes("izin")) {
+        setTaskComments((current) => ({ ...current, [taskId]: [] }));
+        return;
+      }
+      setNotice({
+        type: "error",
+        message
+      });
+    } finally {
+      setIsLoadingTaskComments(false);
+    }
+  };
+
+  const loadTaskChecklist = async (taskId: string) => {
+    setIsLoadingTaskChecklist(true);
+    try {
+      const rows = await fetchTaskChecklist(taskId);
+      setTaskChecklistItems((current) => ({ ...current, [taskId]: rows.map(toTaskChecklistItem) }));
+    } catch (loadError) {
+      setNotice({
+        type: "error",
+        message: loadError instanceof Error ? loadError.message : "Gagal memuat checklist tugas."
+      });
+    } finally {
+      setIsLoadingTaskChecklist(false);
+    }
+  };
+
+  const handleOpenTaskDetail = async (taskId: string) => {
+    setSelectedTaskId(taskId);
+    await Promise.all([loadTaskComments(taskId), loadTaskChecklist(taskId)]);
+  };
+
+  const handleSubmitTaskComment = async (content: string) => {
+    if (!selectedTaskId) return;
+    setIsSavingTaskComment(true);
+    try {
+      await createTaskComment(selectedTaskId, { content });
+      await loadTaskComments(selectedTaskId);
+      setNotice({ type: "success", message: "Komentar berhasil ditambahkan." });
+    } catch (saveError) {
+      setNotice({
+        type: "error",
+        message: saveError instanceof Error ? saveError.message : "Gagal menambahkan komentar tugas."
+      });
+      throw saveError;
+    } finally {
+      setIsSavingTaskComment(false);
+    }
+  };
+
+  const handleAddTaskChecklistItem = async (title: string) => {
+    if (!selectedTaskId) return;
+    setIsSavingTaskChecklist(true);
+    try {
+      await createTaskChecklistItem(selectedTaskId, { title });
+      await loadTaskChecklist(selectedTaskId);
+      setNotice({ type: "success", message: "Checklist berhasil ditambahkan." });
+    } catch (saveError) {
+      setNotice({
+        type: "error",
+        message: saveError instanceof Error ? saveError.message : "Gagal menambahkan checklist tugas."
+      });
+      throw saveError;
+    } finally {
+      setIsSavingTaskChecklist(false);
+    }
+  };
+
+  const handleToggleTaskChecklistItem = async (itemId: number, isDone: boolean) => {
+    if (!selectedTaskId) return;
+    setIsSavingTaskChecklist(true);
+    try {
+      await updateTaskChecklistItem(selectedTaskId, itemId, { is_done: isDone });
+      await loadTaskChecklist(selectedTaskId);
+    } catch (saveError) {
+      setNotice({
+        type: "error",
+        message: saveError instanceof Error ? saveError.message : "Gagal memperbarui checklist tugas."
+      });
+    } finally {
+      setIsSavingTaskChecklist(false);
+    }
+  };
+
+  const handleDeleteTaskChecklistItem = async (itemId: number) => {
+    if (!selectedTaskId) return;
+    setIsSavingTaskChecklist(true);
+    try {
+      await deleteTaskChecklistItem(selectedTaskId, itemId);
+      await loadTaskChecklist(selectedTaskId);
+      setNotice({ type: "success", message: "Checklist berhasil dihapus." });
+    } catch (saveError) {
+      setNotice({
+        type: "error",
+        message: saveError instanceof Error ? saveError.message : "Gagal menghapus checklist tugas."
+      });
+    } finally {
+      setIsSavingTaskChecklist(false);
     }
   };
 
@@ -210,6 +363,7 @@ export function MyTasksPage() {
             savingTaskId={savingTaskId}
             onProgressChange={(taskId, value) => setProgressDrafts((current) => ({ ...current, [taskId]: value }))}
             onSaveProgress={handleSaveTaskProgress}
+            onOpenDetail={handleOpenTaskDetail}
           />
         ) : (
           <IssueTable
@@ -220,6 +374,39 @@ export function MyTasksPage() {
           />
         )}
       </div>
+
+      {selectedTask && (
+        <TaskDetailModal
+          task={{
+            id: selectedTask.id,
+            title: selectedTask.title,
+            priority: selectedTask.priority,
+            assignee: selectedTask.assignee,
+            createdBy: selectedTask.created_by,
+            project: selectedTask.project_id,
+            phaseId: selectedTask.phase_id,
+            startDate: selectedTask.start_date,
+            endDate: selectedTask.end_date,
+            progressPercentage: selectedTask.progress_percentage,
+            createdAt: selectedTask.created_at,
+            updatedAt: selectedTask.updated_at
+          }}
+          projectName={projectNameById[selectedTask.project_id] ?? selectedTask.project_id}
+          phaseName={selectedTask.phase_id || "Tanpa Fase"}
+          assigneeName={resolveAssigneeDisplay(selectedTask.assignee)}
+          comments={taskComments[selectedTask.id] ?? []}
+          checklistItems={taskChecklistItems[selectedTask.id] ?? []}
+          isLoadingComments={isLoadingTaskComments}
+          isSavingComment={isSavingTaskComment}
+          isLoadingChecklist={isLoadingTaskChecklist}
+          isSavingChecklist={isSavingTaskChecklist}
+          onClose={() => setSelectedTaskId(null)}
+          onSubmitComment={handleSubmitTaskComment}
+          onAddChecklistItem={handleAddTaskChecklistItem}
+          onToggleChecklistItem={handleToggleTaskChecklistItem}
+          onDeleteChecklistItem={handleDeleteTaskChecklistItem}
+        />
+      )}
     </div>
   );
 }
@@ -231,6 +418,7 @@ function TaskTable({
   savingTaskId,
   onProgressChange,
   onSaveProgress,
+  onOpenDetail,
 }: {
   tasks: ApiTask[];
   projectNameById: Record<string, string>;
@@ -238,6 +426,7 @@ function TaskTable({
   savingTaskId: string | null;
   onProgressChange: (taskId: string, value: string) => void;
   onSaveProgress: (task: ApiTask) => void;
+  onOpenDetail: (taskId: string) => void;
 }) {
   if (tasks.length === 0) {
     return (
@@ -302,15 +491,24 @@ function TaskTable({
                 </div>
               </td>
               <td className="px-4 py-3 text-right">
-                <button
-                  type="button"
-                  onClick={() => onSaveProgress(task)}
-                  disabled={savingTaskId === task.id}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  {savingTaskId === task.id ? "Menyimpan..." : "Simpan"}
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenDetail(task.id)}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Detail
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSaveProgress(task)}
+                    disabled={savingTaskId === task.id}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {savingTaskId === task.id ? "Menyimpan..." : "Simpan"}
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

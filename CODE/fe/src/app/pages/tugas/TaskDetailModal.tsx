@@ -1,11 +1,17 @@
 import { type FormEvent, useMemo, useState } from "react";
-import { MessageSquare, Send, X } from "lucide-react";
+import { CheckSquare, MessageSquare, Plus, Send, Trash2, X } from "lucide-react";
 
 type TaskComment = {
   id: number;
   authorName: string;
   content: string;
   createdAt: string;
+};
+
+type TaskChecklistItem = {
+  id: number;
+  title: string;
+  isDone: boolean;
 };
 
 type TaskDetail = {
@@ -29,11 +35,18 @@ type TaskDetailModalProps = {
   phaseName: string;
   assigneeName: string;
   comments: TaskComment[];
+  checklistItems: TaskChecklistItem[];
   isLoadingComments: boolean;
   isSavingComment: boolean;
+  isLoadingChecklist?: boolean;
+  isSavingChecklist?: boolean;
   canCreateComment?: boolean;
+  canEditChecklist?: boolean;
   onClose: () => void;
   onSubmitComment: (content: string) => Promise<void>;
+  onAddChecklistItem: (title: string) => Promise<void>;
+  onToggleChecklistItem: (itemId: number, isDone: boolean) => Promise<void>;
+  onDeleteChecklistItem: (itemId: number) => Promise<void>;
 };
 
 function formatDate(value: string | null) {
@@ -61,13 +74,21 @@ export function TaskDetailModal({
   phaseName,
   assigneeName,
   comments,
+  checklistItems,
   isLoadingComments,
   isSavingComment,
+  isLoadingChecklist = false,
+  isSavingChecklist = false,
   canCreateComment = true,
+  canEditChecklist = true,
   onClose,
-  onSubmitComment
+  onSubmitComment,
+  onAddChecklistItem,
+  onToggleChecklistItem,
+  onDeleteChecklistItem
 }: TaskDetailModalProps) {
   const [draftComment, setDraftComment] = useState("");
+  const [draftChecklistItem, setDraftChecklistItem] = useState("");
 
   const priorityClass = useMemo(() => {
     const map: Record<TaskDetail["priority"], string> = {
@@ -88,6 +109,21 @@ export function TaskDetailModal({
       setDraftComment("");
     } catch {
       // Error toast/notice is handled by parent component.
+    }
+  };
+
+  const checklistDoneCount = checklistItems.filter((item) => item.isDone).length;
+  const checklistProgress = checklistItems.length > 0 ? Math.round((checklistDoneCount / checklistItems.length) * 100) : 0;
+
+  const handleChecklistSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const title = draftChecklistItem.trim();
+    if (!title) return;
+    try {
+      await onAddChecklistItem(title);
+      setDraftChecklistItem("");
+    } catch {
+      // Error notice is handled by parent component.
     }
   };
 
@@ -128,6 +164,82 @@ export function TaskDetailModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
+          <section className="mb-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-900 flex items-center">
+                <CheckSquare className="w-4 h-4 mr-2" /> Checklist
+              </h3>
+              <span className="text-xs font-medium text-slate-500">
+                {checklistDoneCount}/{checklistItems.length} selesai
+              </span>
+            </div>
+
+            <div className="mb-3 flex items-center gap-3">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${checklistProgress}%` }} />
+              </div>
+              <span className="w-10 text-right text-xs font-semibold text-slate-500">{checklistProgress}%</span>
+            </div>
+
+            {isLoadingChecklist ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                Memuat checklist...
+              </div>
+            ) : checklistItems.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                Belum ada checklist pada tugas ini.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {checklistItems.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={item.isDone}
+                      disabled={!canEditChecklist || isSavingChecklist}
+                      onChange={(event) => void onToggleChecklistItem(item.id, event.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                    <span className={`flex-1 text-sm ${item.isDone ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                      {item.title}
+                    </span>
+                    {canEditChecklist && (
+                      <button
+                        type="button"
+                        disabled={isSavingChecklist}
+                        onClick={() => void onDeleteChecklistItem(item.id)}
+                        className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {canEditChecklist && (
+              <form onSubmit={(event) => void handleChecklistSubmit(event)} className="mt-3 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={draftChecklistItem}
+                  onChange={(event) => setDraftChecklistItem(event.target.value)}
+                  placeholder="Tambah item checklist..."
+                  maxLength={240}
+                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  type="submit"
+                  disabled={isSavingChecklist || draftChecklistItem.trim().length === 0}
+                  className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Tambah
+                </button>
+              </form>
+            )}
+          </section>
+
           <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center">
             <MessageSquare className="w-4 h-4 mr-2" /> Komentar
           </h3>

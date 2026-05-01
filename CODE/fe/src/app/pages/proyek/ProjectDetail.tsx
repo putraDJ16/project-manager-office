@@ -43,11 +43,16 @@ import {
 import { fetchEmployees } from "../../services/masterApi";
 import {
   createTask,
+  createTaskChecklistItem,
   createTaskComment,
+  deleteTaskChecklistItem,
   fetchPhases,
+  fetchTaskChecklist,
   fetchTaskComments,
   fetchTasks,
   updateTask,
+  updateTaskChecklistItem,
+  type ApiTaskChecklistItem,
   type ApiPhase,
   type ApiTask,
   type ApiTaskComment
@@ -94,6 +99,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 type Tab = "ringkasan" | "anggota" | "tugas" | "gantt" | "isu" | "lampiran";
 type TaskView = "list" | "kanban";
 type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
+type TaskChecklistItem = { id: number; title: string; isDone: boolean };
 type GanttScale = "day" | "week" | "month";
 
 const GANTT_SCALE_OPTIONS: Array<{ key: GanttScale; label: string; dayWidth: number }> = [
@@ -129,6 +135,14 @@ function toTaskComment(raw: ApiTaskComment): TaskComment {
     authorName: raw.author_name,
     content: raw.content,
     createdAt: raw.created_at
+  };
+}
+
+function toTaskChecklistItem(raw: ApiTaskChecklistItem): TaskChecklistItem {
+  return {
+    id: raw.id,
+    title: raw.title,
+    isDone: raw.is_done
   };
 }
 
@@ -248,8 +262,11 @@ export function ProjectDetail() {
   const [holidayError, setHolidayError] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
+  const [taskChecklistItems, setTaskChecklistItems] = useState<Record<string, TaskChecklistItem[]>>({});
   const [isLoadingTaskComments, setIsLoadingTaskComments] = useState(false);
   const [isSavingTaskComment, setIsSavingTaskComment] = useState(false);
+  const [isLoadingTaskChecklist, setIsLoadingTaskChecklist] = useState(false);
+  const [isSavingTaskChecklist, setIsSavingTaskChecklist] = useState(false);
 
   const [attachmentFolders, setAttachmentFolders] = useState<ApiAttachmentFolder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -852,10 +869,26 @@ export function ProjectDetail() {
     }
   };
 
+  const loadTaskChecklist = async (taskId: string) => {
+    if (!canViewTaskComments) return;
+    setIsLoadingTaskChecklist(true);
+    try {
+      const rows = await fetchTaskChecklist(taskId);
+      setTaskChecklistItems((current) => ({ ...current, [taskId]: rows.map(toTaskChecklistItem) }));
+    } catch (err: unknown) {
+      setSaveNotice({
+        type: "error",
+        msg: err instanceof Error ? err.message : "Gagal memuat checklist tugas."
+      });
+    } finally {
+      setIsLoadingTaskChecklist(false);
+    }
+  };
+
   const handleOpenTaskDetail = async (taskId: string) => {
     setSelectedTaskId(taskId);
     if (canViewTaskComments) {
-      await loadTaskComments(taskId);
+      await Promise.all([loadTaskComments(taskId), loadTaskChecklist(taskId)]);
     }
   };
 
@@ -874,6 +907,57 @@ export function ProjectDetail() {
       throw err;
     } finally {
       setIsSavingTaskComment(false);
+    }
+  };
+
+  const handleAddTaskChecklistItem = async (title: string) => {
+    if (!selectedTaskId || !canCreateTaskComments) return;
+    setIsSavingTaskChecklist(true);
+    try {
+      await createTaskChecklistItem(selectedTaskId, { title });
+      await loadTaskChecklist(selectedTaskId);
+      setSaveNotice({ type: "success", msg: "Checklist berhasil ditambahkan." });
+    } catch (err: unknown) {
+      setSaveNotice({
+        type: "error",
+        msg: err instanceof Error ? err.message : "Gagal menambahkan checklist tugas."
+      });
+      throw err;
+    } finally {
+      setIsSavingTaskChecklist(false);
+    }
+  };
+
+  const handleToggleTaskChecklistItem = async (itemId: number, isDone: boolean) => {
+    if (!selectedTaskId || !canCreateTaskComments) return;
+    setIsSavingTaskChecklist(true);
+    try {
+      await updateTaskChecklistItem(selectedTaskId, itemId, { is_done: isDone });
+      await loadTaskChecklist(selectedTaskId);
+    } catch (err: unknown) {
+      setSaveNotice({
+        type: "error",
+        msg: err instanceof Error ? err.message : "Gagal memperbarui checklist tugas."
+      });
+    } finally {
+      setIsSavingTaskChecklist(false);
+    }
+  };
+
+  const handleDeleteTaskChecklistItem = async (itemId: number) => {
+    if (!selectedTaskId || !canCreateTaskComments) return;
+    setIsSavingTaskChecklist(true);
+    try {
+      await deleteTaskChecklistItem(selectedTaskId, itemId);
+      await loadTaskChecklist(selectedTaskId);
+      setSaveNotice({ type: "success", msg: "Checklist berhasil dihapus." });
+    } catch (err: unknown) {
+      setSaveNotice({
+        type: "error",
+        msg: err instanceof Error ? err.message : "Gagal menghapus checklist tugas."
+      });
+    } finally {
+      setIsSavingTaskChecklist(false);
     }
   };
 
@@ -1972,11 +2056,18 @@ export function ProjectDetail() {
           phaseName={phasesSorted.find((phase) => phase.id === selectedTask.phase_id)?.name ?? "Tanpa Fase"}
           assigneeName={resolveAssigneeLabel(selectedTask.assignee) || selectedTask.assignee}
           comments={taskComments[selectedTask.id] ?? []}
+          checklistItems={taskChecklistItems[selectedTask.id] ?? []}
           isLoadingComments={isLoadingTaskComments}
           isSavingComment={isSavingTaskComment}
+          isLoadingChecklist={isLoadingTaskChecklist}
+          isSavingChecklist={isSavingTaskChecklist}
           canCreateComment={canCreateTaskComments}
+          canEditChecklist={canCreateTaskComments}
           onClose={() => setSelectedTaskId(null)}
           onSubmitComment={handleSubmitTaskComment}
+          onAddChecklistItem={handleAddTaskChecklistItem}
+          onToggleChecklistItem={handleToggleTaskChecklistItem}
+          onDeleteChecklistItem={handleDeleteTaskChecklistItem}
         />
       )}
 
