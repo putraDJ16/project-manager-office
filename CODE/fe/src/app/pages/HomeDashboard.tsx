@@ -24,11 +24,20 @@ import {
 import { fetchProjects, type ApiProject } from "../services/projectApi";
 import { fetchAllTasks, type ApiTask } from "../services/taskApi";
 import { getIssues } from "../services/issueService";
+import { Badge, Card, CardBody, CardHeader } from "../components/ui";
 import type { Issue } from "../domain/issues";
 
 type StatTone = "blue" | "emerald" | "amber" | "rose";
 
 const RISK_SEVERITIES = new Set<Issue["severity"]>(["Blocker", "Critical"]);
+
+const CHART_TOOLTIP_STYLE = {
+  borderRadius: "8px",
+  border: "1px solid var(--border)",
+  boxShadow: "var(--shadow-lg)",
+  backgroundColor: "var(--popover)",
+  color: "var(--popover-foreground)"
+} as const;
 
 function startOfToday() {
   const today = new Date();
@@ -211,17 +220,17 @@ export function HomeDashboard() {
     <div className="max-w-7xl mx-auto space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Beranda Operasional</h1>
-          <p className="text-slate-500 mt-1">
+          <h1 className="text-2xl font-bold text-color-foreground">Beranda Operasional</h1>
+          <p className="text-color-muted-foreground mt-1">
             Ringkasan project, task, timeline, dan risiko dari data terbaru aplikasi.
           </p>
         </div>
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-color-muted-foreground">
           {isLoading ? "Memuat data..." : `${projects.length} project | ${tasks.length} task | ${issues.length} issue`}
         </div>
       </div>
 
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && <div className="rounded-lg border border-color-destructive/40 bg-color-destructive/15 p-3 text-sm text-color-destructive">{error}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
         <StatCard label="Proyek Aktif" value={activeProjects.length} icon={FolderKanban} tone="blue" detail={`${projects.length} total project`} />
@@ -232,71 +241,75 @@ export function HomeDashboard() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <section className="xl:col-span-2 rounded-lg border border-slate-200 bg-white p-5">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="xl:col-span-2">
+          <CardBody className="p-5">
+            <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">Project Per Bulan</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Jumlah project dibuat dalam 6 bulan terakhir.</p>
+              <h2 className="text-sm font-semibold text-color-foreground">Project Per Bulan</h2>
+              <p className="text-xs text-color-muted-foreground mt-0.5">Jumlah project dibuat dalam 6 bulan terakhir.</p>
             </div>
-            <TrendingUp className="w-5 h-5 text-slate-400" />
+            <TrendingUp className="w-5 h-5 text-color-muted-foreground" />
           </div>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
               <BarChart data={projectMonthlyData} margin={{ top: 8, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#64748b" }} />
-                <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#64748b" }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
+                <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
                 <Tooltip
-                  contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 10px 20px rgb(15 23 42 / 0.08)" }}
+                  contentStyle={CHART_TOOLTIP_STYLE}
                   itemStyle={{ fontSize: "13px", fontWeight: 500 }}
-                  labelStyle={{ fontSize: "13px", color: "#475569", marginBottom: "4px" }}
+                  labelStyle={{ fontSize: "13px", color: "var(--muted-foreground)", marginBottom: "4px" }}
                 />
-                <Bar dataKey="active" stackId="project" name="Aktif" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="completed" stackId="project" name="Completed" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="active" stackId="project" name="Aktif" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="completed" stackId="project" name="Completed" fill="var(--status-success)" radius={[4, 4, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+              </ResponsiveContainer>
+            </div>
+          </CardBody>
+        </Card>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-slate-800">Proyek Aktif</h2>
-            <Link to="/proyek/list" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+        <Card>
+          <CardBody className="p-5">
+            <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-color-foreground">Proyek Aktif</h2>
+            <Link to="/proyek/list" className="text-xs font-semibold text-color-primary hover:text-color-primary">
               Lihat semua
             </Link>
           </div>
-          <div className="space-y-4">
+            <div className="space-y-4">
             {activeProjectRows.map(({ project, progress, openTasks: taskCount, openIssues }) => (
               <div key={project.id} className="space-y-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Link to={`/proyek/${project.id}`} className="text-sm font-semibold text-slate-900 hover:text-indigo-700 truncate block">
+                    <Link to={`/proyek/${project.id}`} className="text-sm font-semibold text-color-foreground hover:text-color-primary truncate block">
                       {project.name}
                     </Link>
-                    <p className="text-xs text-slate-500">{taskCount} task open | {openIssues} issue aktif</p>
+                    <p className="text-xs text-color-muted-foreground">{taskCount} task open | {openIssues} issue aktif</p>
                   </div>
-                  <span className="text-xs font-semibold text-slate-600">{progress}%</span>
+                  <span className="text-xs font-semibold text-color-muted-foreground">{progress}%</span>
                 </div>
-                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full rounded-full bg-blue-600" style={{ width: `${progress}%` }} />
+                <div className="h-2 rounded-full bg-color-accent overflow-hidden">
+                  <div className="h-full rounded-full bg-color-primary" style={{ width: `${progress}%` }} />
                 </div>
               </div>
             ))}
             {activeProjectRows.length === 0 && (
-              <p className="text-sm text-slate-500">Belum ada project aktif.</p>
+              <p className="text-sm text-color-muted-foreground">Belum ada project aktif.</p>
             )}
-          </div>
-        </section>
+            </div>
+          </CardBody>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-800">Task Mendekati Timeline</h2>
-            <Clock className="w-4 h-4 text-amber-500" />
-          </div>
+        <Card className="overflow-hidden">
+          <CardHeader className="px-5 py-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-color-foreground">Task Mendekati Timeline</h2>
+            <Clock className="w-4 h-4 text-color-status-warning" />
+          </CardHeader>
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
+            <thead className="bg-color-secondary text-xs uppercase text-color-muted-foreground border-b border-color-border">
               <tr>
                 <th className="px-4 py-3 text-left font-medium">Task</th>
                 <th className="px-4 py-3 text-left font-medium">Project</th>
@@ -305,70 +318,69 @@ export function HomeDashboard() {
                 <th className="px-4 py-3 text-right font-medium">Deadline</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-color-border">
               {nearTimelineTasks.map((task) => (
-                <tr key={task.id} className="hover:bg-slate-50">
+                <tr key={task.id} className="hover:bg-color-secondary">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900">{task.title}</p>
-                    <p className="text-xs text-slate-500">{task.id} | {task.priority}</p>
+                    <p className="font-medium text-color-foreground">{task.title}</p>
+                    <p className="text-xs text-color-muted-foreground">{task.id} | {task.priority}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{projectById[task.project_id]?.name ?? task.project_id}</td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-color-muted-foreground">{projectById[task.project_id]?.name ?? task.project_id}</td>
+                  <td className="px-4 py-3 text-color-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
-                      <UserRound className="h-3.5 w-3.5 text-slate-400" />
+                      <UserRound className="h-3.5 w-3.5 text-color-muted-foreground" />
                       {resolveAssigneeDisplay(task.assignee)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700">
+                    <Badge color="primary" className="rounded-md px-2 py-0.5">
                       {task.progress_percentage}%
-                    </span>
+                    </Badge>
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-600">{formatDate(task.end_date)}</td>
+                  <td className="px-4 py-3 text-right text-color-muted-foreground">{formatDate(task.end_date)}</td>
                 </tr>
               ))}
               {nearTimelineTasks.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-color-muted-foreground">
                     Tidak ada task yang mendekati deadline minggu ini.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </section>
+        </Card>
 
-        <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-800">Risk Item</h2>
-            <AlertTriangle className="w-4 h-4 text-red-500" />
-          </div>
-          <div className="divide-y divide-slate-100">
+        <Card className="overflow-hidden">
+          <CardHeader className="px-5 py-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-color-foreground">Risk Item</h2>
+            <AlertTriangle className="w-4 h-4 text-color-destructive" />
+          </CardHeader>
+          <div className="divide-y divide-color-border">
             {topRiskRows.map((item) => (
-              <div key={`${item.id}-${item.title}`} className="px-5 py-3 flex items-center justify-between gap-4 hover:bg-slate-50">
+              <div key={`${item.id}-${item.title}`} className="px-5 py-3 flex items-center justify-between gap-4 hover:bg-color-secondary">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{item.title}</p>
-                  <p className="text-xs text-slate-500 truncate">{item.id} | {item.context}</p>
+                  <p className="text-sm font-medium text-color-foreground truncate">{item.title}</p>
+                  <p className="text-xs text-color-muted-foreground truncate">{item.id} | {item.context}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <span
-                    className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
-                      item.tone === "rose" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                    }`}
+                  <Badge
+                    color={item.tone === "rose" ? "destructive" : "warning"}
+                    className="rounded-md px-2 py-0.5"
                   >
                     {item.label}
-                  </span>
-                  <p className="text-xs text-slate-500 mt-1">{item.due}</p>
+                  </Badge>
+                  <p className="text-xs text-color-muted-foreground mt-1">{item.due}</p>
                 </div>
               </div>
             ))}
             {topRiskRows.length === 0 && (
-              <div className="px-5 py-8 text-center text-sm text-slate-500">
+              <div className="px-5 py-8 text-center text-sm text-color-muted-foreground">
                 Tidak ada risk item aktif.
               </div>
             )}
           </div>
-        </section>
+        </Card>
       </div>
     </div>
   );
@@ -388,24 +400,24 @@ function StatCard({
   detail: string;
 }) {
   const styles: Record<StatTone, string> = {
-    blue: "bg-blue-50 text-blue-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    amber: "bg-amber-50 text-amber-700",
-    rose: "bg-red-50 text-red-700"
+    blue: "bg-color-status-info-surface text-color-status-info",
+    emerald: "bg-color-status-success-surface text-color-status-success",
+    amber: "bg-color-status-warning-surface text-color-status-warning",
+    rose: "bg-color-destructive/15 text-color-destructive"
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium text-slate-500">{label}</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
-          <p className="text-xs text-slate-500 mt-1">{detail}</p>
+          <p className="text-xs font-medium text-color-muted-foreground">{label}</p>
+          <p className="text-2xl font-bold text-color-foreground mt-1">{value}</p>
+          <p className="text-xs text-color-muted-foreground mt-1">{detail}</p>
         </div>
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${styles[tone]}`}>
           <Icon className="w-5 h-5" />
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

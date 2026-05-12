@@ -15,6 +15,7 @@ import {
   type ApiTaskChecklistItem,
   type ApiTaskComment
 } from "../../services/taskApi";
+import { Badge, Button, Card, Input, Select, SelectItem } from "../../components/ui";
 import { TaskDetailModal } from "./TaskDetailModal";
 
 type Project = { id: string; name: string; status: string };
@@ -104,10 +105,10 @@ function taskDateStatus(startDate: string | null, endDate: string | null): DateS
   return "on_progress";
 }
 
-const DATE_STATUS_CONFIG: Record<DateStatus, { label: string; className: string }> = {
-  overdue: { label: "Lewat Deadline", className: "bg-red-100 text-red-700" },
-  on_progress: { label: "On Progress", className: "bg-emerald-100 text-emerald-700" },
-  upcoming: { label: "Belum Mulai", className: "bg-blue-100 text-blue-700" }
+const DATE_STATUS_CONFIG: Record<DateStatus, { label: string; color: "primary" | "success" | "warning" | "destructive" | "secondary" }> = {
+  overdue: { label: "Lewat Deadline", color: "destructive" },
+  on_progress: { label: "On Progress", color: "success" },
+  upcoming: { label: "Belum Mulai", color: "primary" }
 };
 
 function taskStatus(task: Task, phaseById: Record<string, Phase>) {
@@ -323,27 +324,26 @@ export function TaskList() {
             Halaman ini read-only. Pengelolaan tugas dilakukan dari detail proyek.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           disabled={!selectedProjectId}
           onClick={() => selectedProjectId && navigate(`/proyek/${selectedProjectId}`)}
-          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Settings2 className="w-4 h-4 mr-2" />
+          <Settings2 className="w-4 h-4" />
           Kelola di Proyek
-        </button>
+        </Button>
       </div>
 
       <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 flex items-center gap-4">
         <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
+            <Input
               type="text"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Cari tugas..."
-              className="pl-9 pr-10 py-1.5 w-72 border border-slate-300 rounded-md text-sm"
+              leadingIcon={<Search className="w-4 h-4" />}
+              className="h-8 w-72 pr-10 py-1.5"
             />
             {hasSearchInput && (
               <button
@@ -356,32 +356,27 @@ export function TaskList() {
               </button>
             )}
           </div>
-          <button
-            type="submit"
-            className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 border border-indigo-600 rounded-md hover:bg-indigo-700"
-          >
+          <Button type="submit" size="sm">
             Cari
-          </button>
+          </Button>
         </form>
-        <button className="flex items-center px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md">
-          <Filter className="w-4 h-4 mr-2" />
+        <Button type="button" variant="outline" color="secondary" size="sm">
+          <Filter className="w-4 h-4" />
           Filter
-        </button>
+        </Button>
         <div className="ml-2 flex items-center gap-2 text-sm text-slate-600">
           <Layers3 className="w-4 h-4 text-slate-500" />
           <span>Project Aktif</span>
         </div>
-        <select
-          value={selectedProjectId}
-          onChange={(event) => setSelectedProjectId(event.target.value)}
-          className="border border-slate-300 rounded-md py-1.5 px-3 text-sm font-medium bg-white shadow-sm"
-        >
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
+        <div className="w-64">
+          <Select value={selectedProjectId} onValueChange={setSelectedProjectId} placeholder="Pilih project">
+            {projects.map((project) => (
+              <SelectItem key={project.id} value={project.id}>
+                {project.name}
+              </SelectItem>
+            ))}
+          </Select>
+        </div>
         <div className="ml-auto text-xs font-medium text-slate-500">
           {phasesForProject.length} fase | {filteredTasks.length} tugas
         </div>
@@ -389,24 +384,28 @@ export function TaskList() {
 
       <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50">
         <div className="grid grid-cols-2 bg-white p-1 rounded-lg border border-slate-200 w-full">
-          <button
+          <Button
+            type="button"
+            variant={view === "list" ? "solid" : "ghost"}
+            color={view === "list" ? "secondary" : "secondary"}
+            size="sm"
             onClick={() => setView("list")}
-            className={`px-3 py-1.5 text-sm rounded-md flex items-center justify-center ${
-              view === "list" ? "bg-slate-100 text-indigo-700" : "text-slate-600"
-            }`}
+            className={view === "list" ? "text-indigo-700" : "text-slate-600"}
           >
-            <List className="w-4 h-4 mr-2" />
+            <List className="w-4 h-4" />
             List
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant={view === "wbs" ? "solid" : "ghost"}
+            color={view === "wbs" ? "secondary" : "secondary"}
+            size="sm"
             onClick={() => setView("wbs")}
-            className={`px-3 py-1.5 text-sm rounded-md flex items-center justify-center ${
-              view === "wbs" ? "bg-slate-100 text-indigo-700" : "text-slate-600"
-            }`}
+            className={view === "wbs" ? "text-indigo-700" : "text-slate-600"}
           >
-            <GitCommit className="w-4 h-4 mr-2" />
+            <GitCommit className="w-4 h-4" />
             WBS
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -426,13 +425,13 @@ export function TaskList() {
 
       <div className="flex-1 overflow-auto bg-slate-50/50 p-6 relative">
         {isLoading && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          <Card variant="outlined" className="border-dashed p-8 text-center text-sm text-slate-500 bg-white">
             Memuat data monitoring tugas...
-          </div>
+          </Card>
         )}
 
         {!isLoading && view === "list" && (
-          <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm bg-white">
+          <Card className="overflow-hidden">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -480,39 +479,39 @@ export function TaskList() {
                       {(() => {
                         const status = taskDateStatus(task.startDate, task.endDate);
                         return status ? (
-                          <span
-                            className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-md ${DATE_STATUS_CONFIG[status].className}`}
-                          >
+                          <Badge color={DATE_STATUS_CONFIG[status].color} className="rounded-md px-2 py-0.5">
                             {DATE_STATUS_CONFIG[status].label}
-                          </span>
+                          </Badge>
                         ) : (
                           <span className="text-slate-400 text-xs">-</span>
                         );
                       })()}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-md bg-slate-100 text-slate-700">
+                      <Badge color="secondary" className="rounded-md px-2 py-0.5">
                         {task.priority}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        color="secondary"
+                        size="sm"
                         onClick={() => void handleOpenTaskDetail(task.id)}
-                        className="inline-flex px-3 py-1.5 rounded-md border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-100"
                       >
                         Detail
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </Card>
         )}
 
         {!isLoading && view === "wbs" && (
-          <div className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-sm">
+          <Card className="overflow-hidden">
             {phasesForProject.map((phase, index) => (
               <div key={phase.id} className="border-b border-slate-100">
                 <div className="px-6 py-3.5 bg-slate-50/50 flex items-center">
@@ -536,7 +535,7 @@ export function TaskList() {
                   ))}
               </div>
             ))}
-          </div>
+          </Card>
         )}
       </div>
 

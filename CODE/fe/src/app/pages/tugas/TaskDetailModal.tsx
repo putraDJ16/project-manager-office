@@ -152,13 +152,13 @@ export function TaskDetailModal({
           <InfoItem label="Selesai" value={formatDate(task.endDate)} />
           <InfoItem label="Terakhir Diubah" value={formatDateTime(task.updatedAt)} />
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">Prioritas</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">Prioritas</p>
             <span className={`inline-flex mt-1 px-2 py-0.5 text-xs font-semibold rounded-md ${priorityClass}`}>
               {task.priority}
             </span>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">Progress</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">Progress</p>
             <p className="text-sm text-slate-800 font-semibold mt-1">{task.progressPercentage}%</p>
           </div>
         </div>
@@ -302,7 +302,7 @@ export function TaskDetailModal({
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
       <p className="text-sm text-slate-800 font-medium mt-1">{value || "-"}</p>
     </div>
   );

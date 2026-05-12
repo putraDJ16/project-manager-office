@@ -3,35 +3,52 @@
 @source "../src";
 @import "./theme.css";
 
-@theme {
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+@theme inline {
+  --color-color-border: var(--border);
+  --color-color-input: var(--input);
+  --color-color-ring: var(--ring);
+  --color-color-background: var(--background);
+  --color-color-foreground: var(--foreground);
 
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
+  --color-color-primary: var(--primary);
+  --color-color-primary-foreground: var(--primary-foreground);
 
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
+  --color-color-secondary: var(--secondary);
+  --color-color-secondary-foreground: var(--secondary-foreground);
 
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+  --color-color-destructive: var(--destructive);
+  --color-color-destructive-foreground: var(--destructive-foreground);
 
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
+  --color-color-status-success: var(--status-success);
+  --color-color-status-success-surface: var(--status-success-surface);
+  --color-color-status-success-border: var(--status-success-border);
 
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-color-status-warning: var(--status-warning);
+  --color-color-status-warning-surface: var(--status-warning-surface);
+  --color-color-status-warning-border: var(--status-warning-border);
 
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
+  --color-color-status-info: var(--status-info);
+  --color-color-status-info-surface: var(--status-info-surface);
+  --color-color-status-info-border: var(--status-info-border);
 
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
+  --color-color-muted: var(--muted);
+  --color-color-muted-foreground: var(--muted-foreground);
+
+  --color-color-accent: var(--accent);
+  --color-color-accent-foreground: var(--accent-foreground);
+
+  --color-color-popover: var(--popover);
+  --color-color-popover-foreground: var(--popover-foreground);
+
+  --color-color-card: var(--card);
+  --color-color-card-foreground: var(--card-foreground);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 24px rgba(15, 23, 42, 0.12);
+  --shadow-xl: 0 18px 60px rgba(15, 23, 42, 0.14);
 }

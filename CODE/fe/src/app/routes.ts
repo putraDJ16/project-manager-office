@@ -1,4 +1,5 @@
 import { HomeDashboard } from "./pages/HomeDashboard";
+import { DesignSystemTest } from "./pages/DesignSystemTest";
 import { IssueList } from "./pages/isu/IssueList";
 import { MyTasksPage } from "./pages/tugas/MyTasksPage";
 import { WorkloadHeatmap } from "./pages/sdm/WorkloadHeatmap";
@@ -25,6 +26,7 @@ export type AppRoute = {
 
 export const routes: AppRoute[] = [
   { index: true, path: "/", component: HomeDashboard, module: "dashboard" },
+  { path: "/design-system-test", component: DesignSystemTest },
   { path: "/tugas-saya", component: MyTasksPage },
   { path: "/isu/list", component: IssueList, module: "projectIssues" },
   { path: "/sdm/workload", component: WorkloadHeatmap, module: "workload" },

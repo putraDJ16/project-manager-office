@@ -393,7 +393,7 @@ export function WorkloadHeatmap() {
                               <div className="space-y-1.5">
                                 {openIssues.slice(0, 2).map((issue) => (
                                   <div key={issue.id} className="flex items-center gap-2 min-w-0">
-                                    <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold ${severityBadgeClass(issue.severity)}`}>
+                                    <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${severityBadgeClass(issue.severity)}`}>
                                       {issue.severity}
                                     </span>
                                     <span className="text-xs text-slate-600 truncate">{issue.title}</span>

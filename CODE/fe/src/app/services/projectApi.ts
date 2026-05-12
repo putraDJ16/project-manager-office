@@ -3,6 +3,8 @@ import { apiRequest } from "./apiClient";
 export type ApiProject = {
   id: string;
   name: string;
+  color?: string | null;
+  project_color?: string | null;
   status: string;
   description: string | null;
   priority: string | null;

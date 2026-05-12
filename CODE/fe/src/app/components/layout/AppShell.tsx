@@ -32,7 +32,7 @@ import {
   type ApiNotification
 } from "../../services/notificationApi";
 
-type AppShellProps = {
+export type AppShellProps = {
   session: AuthSession;
   onLogout: () => void;
   themeMode: ThemeMode;

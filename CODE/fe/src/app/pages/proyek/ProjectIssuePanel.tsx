@@ -473,7 +473,7 @@ export function ProjectIssuePanel({
                                     type="button"
                                     onMouseDown={(event) => event.stopPropagation()}
                                     onClick={() => setSelectedIssueId(issue.id)}
-                                    className="mt-2 inline-flex px-2.5 py-1 text-[11px] rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100"
+                                    className="mt-2 inline-flex px-2.5 py-1 text-xs rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100"
                                   >
                                     Buka Detail
                                   </button>

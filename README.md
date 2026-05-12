@@ -9,6 +9,12 @@ This project is a PMO SaaS prototype inspired by ZOHO, featuring a modern fronte
 - `project_docs`: Documentation and implementation plans
 - `stitch_task_md_pack`: Design system and task guides
 
+## Frontend Design System
+
+- Component library: `CODE/fe/src/COMPONENT_LIBRARY.md`
+- Design tokens: `CODE/fe/src/DESIGN_TOKENS.md`
+- Implementation plan: `CODE/fe/DESIGN_SYSTEM_IMPROVEMENT_PLAN.md`
+
 ## Deployment to Vercel (Frontend)
 
 To deploy the frontend to Vercel:
