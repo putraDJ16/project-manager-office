@@ -4,6 +4,7 @@ import { MyTasksPage } from "./pages/tugas/MyTasksPage";
 import { WorkloadHeatmap } from "./pages/sdm/WorkloadHeatmap";
 import { ProjectList } from "./pages/proyek/ProjectList";
 import { ProjectDetail } from "./pages/proyek/ProjectDetail";
+import { ProjectMonitoring } from "./pages/proyek/ProjectMonitoring";
 import { EmployeeMaster } from "./pages/master/EmployeeMaster";
 import { RoleMaster } from "./pages/master/RoleMaster";
 import { OrganizationMaster } from "./pages/master/OrganizationMaster";
@@ -28,6 +29,7 @@ export const routes: AppRoute[] = [
   { path: "/isu/list", component: IssueList, module: "projectIssues" },
   { path: "/sdm/workload", component: WorkloadHeatmap, module: "workload" },
   { path: "/proyek/list", component: ProjectList, module: "masterProjects" },
+  { path: "/proyek/monitoring", component: ProjectMonitoring, module: "masterProjects" },
   { path: "/proyek/:id", component: ProjectDetail, module: "masterProjects" },
   { path: "/master/pegawai", component: EmployeeMaster, module: "masterEmployees" },
   { path: "/master/role", component: RoleMaster, module: "masterRoles" },

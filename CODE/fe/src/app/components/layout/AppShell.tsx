@@ -18,7 +18,8 @@ import {
   ListTodo,
   LogOut,
   Moon,
-  Sun
+  Sun,
+  CalendarRange
 } from "lucide-react";
 import type { AuthSession } from "../../data/auth";
 import type { ThemeMode } from "../../utils/theme";
@@ -123,9 +124,9 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
         <div className={`h-16 flex items-center font-bold text-lg tracking-tight border-b border-indigo-900 ${isSidebarMinimized ? "justify-between px-1.5" : "justify-between px-4"}`}>
           <div className="flex items-center min-w-0">
             <div className={`${isSidebarMinimized ? "w-7 h-7 text-sm" : "w-8 h-8 mr-3 text-base"} rounded bg-indigo-600 flex items-center justify-center text-white`}>
-              Z
+              P
             </div>
-            {!isSidebarMinimized && <span className="truncate">ZOHO PM SaaS</span>}
+            {!isSidebarMinimized && <span className="truncate">PM Dashboard</span>}
           </div>
           <button
             type="button"
@@ -184,10 +185,20 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
             </Link>
 
             {canViewProjects && (
-              <Link to="/proyek/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Proyek">
-                <FolderKanban className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
-                {!isSidebarMinimized && "Proyek"}
-              </Link>
+              <>
+                <Link to="/proyek/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Proyek">
+                  <FolderKanban className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                  {!isSidebarMinimized && "Proyek"}
+                </Link>
+                <Link
+                  to="/proyek/monitoring"
+                  className={`${navItemClass} hover:bg-indigo-900 hover:text-white`}
+                  title="Monitoring Proyek"
+                >
+                  <CalendarRange className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                  {!isSidebarMinimized && "Monitoring Proyek"}
+                </Link>
+              </>
             )}
 
             {canViewIssues && (

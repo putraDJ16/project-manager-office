@@ -66,6 +66,49 @@ def sync_default_role_permissions():
     db.session.commit()
 
 
+def ensure_demo_users():
+    demo_accounts = [
+        {
+            "email": "admin@zoho.local",
+            "password": "Admin123!",
+            "display_name": "Administrator",
+            "role_name": "Administrator",
+            "employee_id": "emp-001",
+        },
+        {
+            "email": "pm@zoho.local",
+            "password": "Pm123456!",
+            "display_name": "Project Manager",
+            "role_name": "Project Manager",
+            "employee_id": "emp-002",
+        },
+    ]
+
+    for account in demo_accounts:
+        role = Role.query.filter_by(name=account["role_name"]).first()
+        user = User.query.filter(User.email.ilike(account["email"])).first()
+        if user:
+            user.password_hash = generate_password_hash(account["password"])
+            user.display_name = account["display_name"]
+            user.role_id = role.id if role else user.role_id
+            user.employee_id = account["employee_id"]
+            user.is_active = True
+            continue
+
+        db.session.add(
+            User(
+                email=account["email"],
+                password_hash=generate_password_hash(account["password"]),
+                display_name=account["display_name"],
+                role_id=role.id if role else None,
+                employee_id=account["employee_id"],
+                is_active=True,
+            )
+        )
+
+    db.session.commit()
+
+
 def seed_database(force_reset: bool = False):
     if force_reset:
         db.drop_all()
@@ -73,6 +116,7 @@ def seed_database(force_reset: bool = False):
 
     if Role.query.first():
         sync_default_role_permissions()
+        ensure_demo_users()
         return
 
     roles = [
@@ -155,25 +199,7 @@ def seed_database(force_reset: bool = False):
     ]
     db.session.add_all(employees)
 
-    users = [
-        User(
-            email="admin@zoho.local",
-            password_hash=generate_password_hash("Admin123!"),
-            display_name="Administrator",
-            role_id="role-001",
-            employee_id="emp-001",
-            is_active=True,
-        ),
-        User(
-            email="pm@zoho.local",
-            password_hash=generate_password_hash("Pm123456!"),
-            display_name="Project Manager",
-            role_id="role-002",
-            employee_id="emp-002",
-            is_active=True,
-        ),
-    ]
-    db.session.add_all(users)
+    ensure_demo_users()
 
     projects = [
         Project(id="p1", name="Transformasi Digital Kamsiber", status="Active", manager_id="emp-001"),

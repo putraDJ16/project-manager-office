@@ -50,7 +50,7 @@ export type Employee = {
 const EMPLOYEES_STORAGE_KEY = "zoho-master-employees";
 const ROLES_STORAGE_KEY = "zoho-master-roles";
 
-export const DEFAULT_ORGANIZATION_NAME = "ZOHO PM SaaS";
+export const DEFAULT_ORGANIZATION_NAME = "PM Dashboard";
 
 export const modulePermissionLabels: Record<ModuleKey, string> = {
   dashboard: "Beranda",

@@ -185,8 +185,8 @@ export function LoginPage({ onLogin, themeMode, onToggleTheme }: LoginPageProps)
       <div className="w-full max-w-5xl grid md:grid-cols-2 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
         <div className="hidden md:flex flex-col justify-between bg-indigo-950 text-indigo-100 p-8">
           <div>
-            <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center">Z</div>
-            <h1 className="mt-6 text-2xl font-bold leading-tight">ZOHO PM SaaS</h1>
+            <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center">P</div>
+            <h1 className="mt-6 text-2xl font-bold leading-tight">PM Dashboard</h1>
             <p className="mt-3 text-sm text-indigo-200">
               Platform manajemen proyek terpadu untuk tugas, isu, SDM, dan tata kelola master data.
             </p>
