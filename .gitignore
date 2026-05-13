@@ -6,6 +6,7 @@ venv/
 ENV/
 bin/
 lib/
+!CODE/fe/src/lib/
 share/
 
 # Build outputs
