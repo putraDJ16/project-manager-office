@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ElementType } from "react";
-import { AlertTriangle, Bug, Calendar, CheckCircle2, ListTodo } from "lucide-react";
+import { AlertTriangle, Bug, Calendar, CalendarDays, CheckCircle2, ListTodo } from "lucide-react";
 import { teamMembers } from "../../data/mockData";
 import { ISSUE_STATUS_ORDER, type Issue, type IssueStatus } from "../../domain/issues";
 import { fetchMyProjects, getMe, type MyProjectResponse } from "../../services/authApi";
@@ -17,6 +17,7 @@ import {
   type ApiTaskChecklistItem,
   type ApiTaskComment
 } from "../../services/taskApi";
+import { MyCalendarPage } from "../kalender/MyCalendarPage";
 import { TaskDetailModal } from "./TaskDetailModal";
 
 type ProfileIdentity = {
@@ -54,7 +55,7 @@ export function MyTasksPage() {
   const [projects, setProjects] = useState<MyProjectResponse[]>([]);
   const [tasks, setTasks] = useState<ApiTask[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [activeTab, setActiveTab] = useState<"tasks" | "issues">("tasks");
+  const [activeTab, setActiveTab] = useState<"tasks" | "issues" | "calendar">("tasks");
   const [taskFilter, setTaskFilter] = useState<TaskCompletionFilter>("active");
   const [progressDrafts, setProgressDrafts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -313,7 +314,7 @@ export function MyTasksPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Tugas Saya</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Tugas dan isu/bug yang diassign ke {profile?.employee_name ?? profile?.name ?? "akun Anda"}.
+              Tugas, isu/bug, dan jadwal meeting yang terkait dengan {profile?.employee_name ?? profile?.name ?? "akun Anda"}.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
@@ -326,7 +327,7 @@ export function MyTasksPage() {
       </div>
 
       <div className="border-b border-slate-200 bg-slate-50 px-6 py-3">
-        <div className="grid w-full grid-cols-2 rounded-lg border border-slate-200 bg-white p-1 sm:w-96">
+        <div className="grid w-full grid-cols-3 rounded-lg border border-slate-200 bg-white p-1 sm:w-[34rem]">
           <button
             type="button"
             onClick={() => setActiveTab("tasks")}
@@ -346,6 +347,16 @@ export function MyTasksPage() {
           >
             <Bug className="h-4 w-4" />
             Isu & Bug
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("calendar")}
+            className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium ${
+              activeTab === "calendar" ? "bg-slate-100 text-indigo-700" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <CalendarDays className="h-4 w-4" />
+            Kalender
           </button>
         </div>
       </div>
@@ -369,6 +380,8 @@ export function MyTasksPage() {
           </div>
         ) : error ? (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        ) : activeTab === "calendar" ? (
+          <MyCalendarPage />
         ) : activeTab === "tasks" ? (
           <div className="space-y-4">
             <TaskFilterBar value={taskFilter} summary={summary} onChange={setTaskFilter} />

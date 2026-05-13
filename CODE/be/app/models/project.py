@@ -33,5 +33,6 @@ class Project(BaseModel, TimestampMixin):
     attachment_files = relationship(
         "ProjectAttachmentFile", back_populates="project", cascade="all, delete-orphan"
     )
+    meetings = relationship("ProjectMeeting", back_populates="project", cascade="all, delete-orphan")
     holidays = relationship("ProjectHoliday", back_populates="project", cascade="all, delete-orphan")
     manager = relationship("Employee", foreign_keys=[manager_id])

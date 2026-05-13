@@ -14,6 +14,7 @@ export type ModuleKey =
   | "projectTaskComments"
   | "projectIssues"
   | "projectAttachments"
+  | "projectMeetings"
   | "masterRoles"
   | "masterOrganizations"
   | "masterOrganizationUnits"
@@ -65,6 +66,7 @@ export const modulePermissionLabels: Record<ModuleKey, string> = {
   projectTaskComments: "Proyek - Komentar Tugas",
   projectIssues: "Proyek - Isu & Bug",
   projectAttachments: "Proyek - Lampiran",
+  projectMeetings: "Proyek - Meeting",
   masterRoles: "Master - Role",
   masterOrganizations: "Master - Organisasi",
   masterOrganizationUnits: "Master - Unit Organisasi",
@@ -98,6 +100,7 @@ function createRolePermissions(
     projectTaskComments: createPermissionSet(overrides?.projectTaskComments),
     projectIssues: createPermissionSet(overrides?.projectIssues),
     projectAttachments: createPermissionSet(overrides?.projectAttachments),
+    projectMeetings: createPermissionSet(overrides?.projectMeetings),
     masterRoles: createPermissionSet(overrides?.masterRoles),
     masterOrganizations: createPermissionSet(overrides?.masterOrganizations),
     masterOrganizationUnits: createPermissionSet(overrides?.masterOrganizationUnits),
@@ -124,6 +127,7 @@ export const initialRoles: Role[] = [
       projectTaskComments: { view: true, create: true, edit: true, delete: true, restore: true },
       projectIssues: { view: true, create: true, edit: true, delete: true, restore: true },
       projectAttachments: { view: true, create: true, edit: true, delete: true, restore: true },
+      projectMeetings: { view: true, create: true, edit: true, delete: true, restore: true },
       masterRoles: { view: true, create: true, edit: true, delete: true, restore: true },
       masterOrganizations: { view: true, create: true, edit: true, delete: true, restore: true },
       masterOrganizationUnits: { view: true, create: true, edit: true, delete: true, restore: true },
@@ -147,6 +151,7 @@ export const initialRoles: Role[] = [
       projectTaskComments: { view: true, create: true },
       projectIssues: { view: true, create: true, edit: true },
       projectAttachments: { view: true, create: true, edit: true, delete: true },
+      projectMeetings: { view: true, create: true, edit: true, delete: true },
       masterOrganizations: { view: true },
       masterOrganizationUnits: { view: true },
       masterPositions: { view: true }
@@ -185,6 +190,7 @@ export const initialRoles: Role[] = [
       projectTaskComments: { view: true },
       projectIssues: { view: true },
       projectAttachments: { view: true },
+      projectMeetings: { view: true },
       masterRoles: { view: true },
       masterOrganizations: { view: true },
       masterOrganizationUnits: { view: true },

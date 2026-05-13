@@ -8,7 +8,8 @@ const permissionFallbacks: Partial<Record<ModuleKey, ModuleKey[]>> = {
   projectIssues: ["issues", "masterProjects"],
   projectTasks: ["tasks", "masterProjects"],
   projectTaskComments: ["tasks", "masterProjects"],
-  projectAttachments: ["masterProjects"]
+  projectAttachments: ["masterProjects"],
+  projectMeetings: ["masterProjects"]
 };
 
 export function hasPermission(

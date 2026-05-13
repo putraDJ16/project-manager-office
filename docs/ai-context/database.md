@@ -21,6 +21,11 @@ Primary ORM models are in `CODE/be/app/models/`. Alembic migrations are in `CODE
 | `sla_rules` / `SlaRule` | SLA target and escalation config per issue severity. | `id`, `severity`, `target_hours`, `auto_escalate`, `escalation_delay_minutes` | Issue and SLA | `CODE/be/app/models/sla_rule.py`, `CODE/be/app/services/issue_service.py` |
 | `project_attachment_folders` / `ProjectAttachmentFolder` | Folder tree for project attachments. | `id`, `project_id`, `name`, `parent_id` | Project Attachments | `CODE/be/app/models/project_attachment_folder.py`, `CODE/be/app/services/project_attachment_service.py` |
 | `project_attachment_files` / `ProjectAttachmentFile` | Uploaded project file metadata. | `id`, `project_id`, `folder_id`, `original_name`, `stored_name`, `mime_type`, `size_bytes`, `description`, `uploaded_by` | Project Attachments | `CODE/be/app/models/project_attachment_file.py`, `CODE/be/app/services/project_attachment_service.py` |
+| `project_meetings` / `ProjectMeeting` | Meeting schedule inside a project. | `id`, `project_id`, `title`, `description`, `location`, `meeting_type`, `meeting_url`, `start_datetime`, `end_datetime`, `status`, `created_by` | Meeting Agenda, Personal Calendar | `CODE/be/app/models/project_meeting.py`, `CODE/be/app/services/meeting_service.py` |
+| `project_meeting_attendees` / `ProjectMeetingAttendee` | Meeting attendee RSVP relation. | `meeting_id`, `employee_id`, `rsvp_status`, `attended`; composite PK `meeting_id + employee_id` | Meeting Agenda, Personal Calendar | `CODE/be/app/models/project_meeting.py`, `CODE/be/app/services/meeting_service.py` |
+| `project_meeting_notes` / `ProjectMeetingNote` | One meeting note/MoM record per meeting. | `id`, `meeting_id`, `summary`, `notes`, `decisions`, `created_by`, `last_edited_by`; unique `meeting_id` | Meeting Notes (MoM) | `CODE/be/app/models/project_meeting_note.py`, `CODE/be/app/services/meeting_note_service.py` |
+| `project_meeting_action_items` / `ProjectMeetingActionItem` | Queryable action items attached to meeting notes. | `id`, `meeting_note_id`, `description`, `assignee_employee_id`, `due_date`, `is_done`, `order_index` | Meeting Notes (MoM) | `CODE/be/app/models/project_meeting_note.py`, `CODE/be/app/services/meeting_note_service.py` |
+| `project_meeting_files` / `ProjectMeetingFile` | Supporting documents uploaded to a meeting. | `id`, `meeting_id`, `original_name`, `stored_name`, `mime_type`, `size_bytes`, `description`, `uploaded_by` | Meeting Notes (MoM) | `CODE/be/app/models/project_meeting_file.py`, `CODE/be/app/services/meeting_file_service.py` |
 | `notifications` / `Notification` | In-app notifications. | `id`, `user_id`, `title`, `message`, `entity_type`, `entity_id`, `target_url`, `is_read` | Notifications | `CODE/be/app/models/notification.py`, `CODE/be/app/services/notification_service.py` |
 | `audit_trails` / `AuditTrail` | Request audit records. | `id`, `user_id`, `user_email`, `action`, `method`, `path`, `status_code`, `ip_address`, `user_agent`, `request_query`, `request_body`, `note` | Audit Trail | `CODE/be/app/models/audit_trail.py`, `CODE/be/app/services/audit_trail_service.py` |
 
@@ -45,6 +50,7 @@ Defined in `CODE/be/app/models/constants.py`:
 - `project_members` uses composite primary key `project_id + employee_id`.
 - Attachment folders cascade on project deletion and support self-parenting relationships; service prevents invalid parent/self-descendant moves.
 - File storage path depends on `ATTACHMENT_STORAGE_DIR`; runtime storage behavior needs environment verification outside code review.
+- Meeting files reuse `ATTACHMENT_STORAGE_DIR` with the project storage directory pattern from project attachments.
 
 ## Migration Files
 
@@ -65,3 +71,4 @@ Current migration files include:
 - `CODE/be/migrations/versions/f1a2b3c4d5e6_add_audit_trails_table.py`
 - `CODE/be/migrations/versions/f2a3b4c5d6e7_add_project_rasci.py`
 - `CODE/be/migrations/versions/f3a4b5c6d7e8_add_task_checklist_items.py`
+- `CODE/be/migrations/versions/f4a5b6c7d8e9_add_project_meetings_tables.py`

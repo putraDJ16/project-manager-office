@@ -8,6 +8,9 @@ from app.models.phase import Phase
 from app.models.project_attachment_file import ProjectAttachmentFile
 from app.models.project_attachment_folder import ProjectAttachmentFolder
 from app.models.project_holiday import ProjectHoliday
+from app.models.project_meeting import ProjectMeeting, ProjectMeetingAttendee
+from app.models.project_meeting_file import ProjectMeetingFile
+from app.models.project_meeting_note import ProjectMeetingActionItem, ProjectMeetingNote
 from app.models.position import Position
 from app.models.project import Project
 from app.models.project_member import ProjectMember
@@ -29,6 +32,11 @@ __all__ = [
     "ProjectAttachmentFolder",
     "ProjectAttachmentFile",
     "ProjectHoliday",
+    "ProjectMeeting",
+    "ProjectMeetingAttendee",
+    "ProjectMeetingNote",
+    "ProjectMeetingActionItem",
+    "ProjectMeetingFile",
     "Task",
     "TaskChecklistItem",
     "TaskComment",

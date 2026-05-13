@@ -33,6 +33,7 @@ function createEmptyPermissions(): Record<ModuleKey, PermissionSet> {
     projectTaskComments: createEmptyPermissionSet(),
     projectIssues: createEmptyPermissionSet(),
     projectAttachments: createEmptyPermissionSet(),
+    projectMeetings: createEmptyPermissionSet(),
     masterRoles: createEmptyPermissionSet(),
     masterOrganizations: createEmptyPermissionSet(),
     masterOrganizationUnits: createEmptyPermissionSet(),

@@ -6,11 +6,13 @@ import {
   ArrowLeft,
   Bug,
   Calendar,
+  CalendarDays,
   CheckSquare,
   Download,
   Eye,
   Edit2,
   FilePlus2,
+  FileText,
   FolderClosed,
   FolderPlus,
   GanttChartSquare,
@@ -76,6 +78,8 @@ import { loadAuthSession } from "../../data/auth";
 import { hasPermission } from "../../utils/permissions";
 import { TaskDetailModal } from "../tugas/TaskDetailModal";
 import { ProjectIssuePanel } from "./ProjectIssuePanel";
+import { ProjectMeetingNotesPanel } from "./ProjectMeetingNotesPanel";
+import { ProjectMeetingPanel } from "./ProjectMeetingPanel";
 
 const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 const PROJECT_PRIORITIES = ["Low", "Medium", "High", "Critical"];
@@ -96,7 +100,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   Low: "bg-color-status-success-surface text-color-status-success"
 };
 
-type Tab = "ringkasan" | "anggota" | "tugas" | "gantt" | "isu" | "lampiran";
+type Tab = "ringkasan" | "anggota" | "tugas" | "gantt" | "isu" | "meetings" | "meetingNotes" | "lampiran";
 type TaskView = "list" | "kanban";
 type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
 type TaskChecklistItem = { id: number; title: string; isDone: boolean };
@@ -211,6 +215,10 @@ export function ProjectDetail() {
   const baseCanCreateAttachments = hasPermission(session, "projectAttachments", "create");
   const baseCanEditAttachments = hasPermission(session, "projectAttachments", "edit");
   const baseCanDeleteAttachments = hasPermission(session, "projectAttachments", "delete");
+  const baseCanViewMeetings = hasPermission(session, "projectMeetings", "view");
+  const baseCanCreateMeetings = hasPermission(session, "projectMeetings", "create");
+  const baseCanEditMeetings = hasPermission(session, "projectMeetings", "edit");
+  const baseCanDeleteMeetings = hasPermission(session, "projectMeetings", "delete");
 
   const [project, setProject] = useState<ApiProjectDetail | null>(null);
   const [phases, setPhases] = useState<ApiPhase[]>([]);
@@ -321,6 +329,10 @@ export function ProjectDetail() {
   const canCreateAttachments = baseCanCreateAttachments || isCurrentProjectMember;
   const canEditAttachments = baseCanEditAttachments || isCurrentProjectMember;
   const canDeleteAttachments = baseCanDeleteAttachments || isCurrentProjectMember;
+  const canViewMeetings = baseCanViewMeetings || isCurrentProjectMember;
+  const canCreateMeetings = baseCanCreateMeetings || isCurrentProjectMember;
+  const canEditMeetings = baseCanEditMeetings || isCurrentProjectMember;
+  const canDeleteMeetings = baseCanDeleteMeetings || isCurrentProjectMember;
 
   useEffect(() => {
     if (!id) return;
@@ -1231,6 +1243,8 @@ export function ProjectDetail() {
           { key: "tugas", label: `Tugas (${tasks.length})`, icon: CheckSquare, visible: canViewTasks },
           { key: "gantt", label: "Gantt", icon: GanttChartSquare, visible: canViewTasks },
           { key: "isu", label: "Isu & Bug", icon: Bug, visible: canViewIssues },
+          { key: "meetings", label: "Meetings", icon: CalendarDays, visible: canViewMeetings },
+          { key: "meetingNotes", label: "Meeting Notes", icon: FileText, visible: canViewMeetings },
           { key: "lampiran", label: `Lampiran (${attachmentFiles.length})`, icon: FolderClosed, visible: canViewAttachments }
         ] as { key: Tab; label: string; icon: React.ElementType; visible?: boolean }[])
           .filter((tab) => tab.visible !== false)
@@ -1787,6 +1801,28 @@ export function ProjectDetail() {
             canCreate={canCreateIssues}
             canEdit={canEditIssues}
             canUploadAttachment={canCreateAttachments}
+            onNotice={setSaveNotice}
+          />
+        )}
+
+        {activeTab === "meetings" && (
+          <ProjectMeetingPanel
+            projectId={project.id}
+            members={project.members}
+            employees={employees}
+            canCreate={canCreateMeetings}
+            canEdit={canEditMeetings}
+            canDelete={canDeleteMeetings}
+            onNotice={setSaveNotice}
+          />
+        )}
+
+        {activeTab === "meetingNotes" && (
+          <ProjectMeetingNotesPanel
+            projectId={project.id}
+            employees={employees}
+            canEdit={canEditMeetings}
+            canDelete={canDeleteMeetings}
             onNotice={setSaveNotice}
           />
         )}

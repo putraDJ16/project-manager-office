@@ -1,6 +1,15 @@
 from app.schemas.audit_trail_schema import AuditTrailSchema
 from app.schemas.employee_schema import EmployeeSchema
 from app.schemas.issue_schema import IssueSchema, SlaRuleSchema
+from app.schemas.meeting_schema import (
+    CalendarMeetingSchema,
+    MeetingActionItemSchema,
+    MeetingAttendeeSchema,
+    MeetingFileSchema,
+    MeetingNoteSchema,
+    MeetingNoteSummarySchema,
+    MeetingSchema,
+)
 from app.schemas.notification_schema import NotificationSchema
 from app.schemas.organization_schema import OrganizationSchema
 from app.schemas.organization_unit_schema import OrganizationUnitSchema
@@ -49,3 +58,17 @@ project_attachment_folder_schema = ProjectAttachmentFolderSchema()
 project_attachment_folders_schema = ProjectAttachmentFolderSchema(many=True)
 project_attachment_file_schema = ProjectAttachmentFileSchema()
 project_attachment_files_schema = ProjectAttachmentFileSchema(many=True)
+meeting_schema = MeetingSchema()
+meetings_schema = MeetingSchema(many=True)
+meeting_attendee_schema = MeetingAttendeeSchema()
+meeting_attendees_schema = MeetingAttendeeSchema(many=True)
+meeting_note_schema = MeetingNoteSchema()
+meeting_notes_schema = MeetingNoteSchema(many=True)
+meeting_action_item_schema = MeetingActionItemSchema()
+meeting_action_items_schema = MeetingActionItemSchema(many=True)
+meeting_file_schema = MeetingFileSchema()
+meeting_files_schema = MeetingFileSchema(many=True)
+meeting_note_summary_schema = MeetingNoteSummarySchema()
+meeting_note_summaries_schema = MeetingNoteSummarySchema(many=True)
+calendar_meeting_schema = CalendarMeetingSchema()
+calendar_meetings_schema = CalendarMeetingSchema(many=True)

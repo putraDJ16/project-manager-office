@@ -12,6 +12,7 @@ PERMISSION_FALLBACKS = {
     "projectIssues": ("issues", "masterProjects"),
     "projectTasks": ("tasks", "masterProjects"),
     "projectAttachments": ("masterProjects",),
+    "projectMeetings": ("masterProjects",),
 }
 
 MODULE_KEYS = (
@@ -27,6 +28,7 @@ MODULE_KEYS = (
     "projectTaskComments",
     "projectIssues",
     "projectAttachments",
+    "projectMeetings",
     "masterRoles",
     "masterOrganizations",
     "masterOrganizationUnits",
@@ -65,6 +67,7 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
             "projectTaskComments": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "projectIssues": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "projectAttachments": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
+            "projectMeetings": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "masterRoles": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "masterOrganizations": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "masterOrganizationUnits": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
@@ -84,6 +87,7 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
             "projectTaskComments": {"view": True, "create": True},
             "projectIssues": {"view": True, "create": True, "edit": True},
             "projectAttachments": {"view": True, "create": True, "edit": True, "delete": True},
+            "projectMeetings": {"view": True, "create": True, "edit": True, "delete": True},
             "masterOrganizations": {"view": True},
             "masterOrganizationUnits": {"view": True},
             "masterPositions": {"view": True},
@@ -114,6 +118,7 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
             "projectTaskComments": {"view": True},
             "projectIssues": {"view": True},
             "projectAttachments": {"view": True},
+            "projectMeetings": {"view": True},
             "masterRoles": {"view": True},
             "masterOrganizations": {"view": True},
             "masterOrganizationUnits": {"view": True},
