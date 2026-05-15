@@ -4,6 +4,7 @@ import { Badge, Button, Card, Input, Select, SelectItem } from "@/components/ui"
 import { type AuthSession } from "@/app/data/auth";
 import { fetchRegisterOptions, loginWithApi, registerWithApi, type RegisterOptionsResponse } from "@/services/authApi";
 import type { ThemeMode } from "@/utils/theme";
+import appLogo from "../../../styles/LOGO-IGLO-v.3-with-indocyber-square.png";
 
 type LoginPageProps = {
   onLogin: (session: AuthSession) => void;
@@ -188,7 +189,7 @@ export function LoginPage({ onLogin, themeMode, onToggleTheme }: LoginPageProps)
       <Card className="grid w-full max-w-5xl overflow-hidden rounded-2xl md:grid-cols-2 ds-elevated-shadow">
         <div className="hidden md:flex flex-col justify-between bg-indigo-950 text-indigo-100 p-8">
           <div>
-            <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center">P</div>
+            <img src={appLogo} alt="IGLO Indocyber" className="h-12 w-12 rounded-lg bg-white object-contain p-1" />
             <h1 className="mt-6 text-2xl font-bold leading-tight">PM Dashboard</h1>
             <p className="mt-3 text-sm text-indigo-200">
               Platform manajemen proyek terpadu untuk tugas, isu, SDM, dan tata kelola master data.

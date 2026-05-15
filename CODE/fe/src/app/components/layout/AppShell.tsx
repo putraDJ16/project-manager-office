@@ -31,6 +31,7 @@ import {
   markNotificationRead,
   type ApiNotification
 } from "../../services/notificationApi";
+import appLogo from "../../../styles/LOGO-IGLO-v.3-with-indocyber-square.png";
 
 export type AppShellProps = {
   session: AuthSession;
@@ -123,9 +124,11 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
       <aside className={`bg-indigo-950 text-indigo-100 flex flex-col shrink-0 transition-all duration-300 ${isSidebarMinimized ? "w-20" : "w-64"}`}>
         <div className={`h-16 flex items-center font-bold text-lg tracking-tight border-b border-indigo-900 ${isSidebarMinimized ? "justify-between px-1.5" : "justify-between px-4"}`}>
           <div className="flex items-center min-w-0">
-            <div className={`${isSidebarMinimized ? "w-7 h-7 text-sm" : "w-8 h-8 mr-3 text-base"} rounded bg-indigo-600 flex items-center justify-center text-white`}>
-              P
-            </div>
+            <img
+              src={appLogo}
+              alt="IGLO Indocyber"
+              className={`${isSidebarMinimized ? "h-7 w-7" : "mr-3 h-8 w-8"} rounded-md bg-white object-contain p-0.5`}
+            />
             {!isSidebarMinimized && <span className="truncate">PM Dashboard</span>}
           </div>
           <button
