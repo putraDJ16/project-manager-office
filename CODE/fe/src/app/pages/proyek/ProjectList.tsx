@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import {
   Search, Plus, Filter, LayoutGrid, List, MoreVertical, FolderKanban,
   Activity, Calendar, Users, X, ChevronRight, ChevronLeft, Loader2,
@@ -10,6 +10,7 @@ import { fetchEmployees } from "../../services/masterApi";
 import type { Employee } from "../../data/masterData";
 import { loadAuthSession } from "../../data/auth";
 import { hasPermission } from "../../utils/permissions";
+import { PaginationControls } from "../../components/ui";
 
 const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 const PROJECT_PRIORITIES = ["Low", "Medium", "High", "Critical"];
@@ -63,6 +64,7 @@ const RASCI_FIELDS: RasciField[] = [
   { key: "consulted_ids", code: "C", label: "Consulted", multiple: true },
   { key: "informed_ids", code: "I", label: "Informed", multiple: true },
 ];
+const PAGE_SIZE = 9;
 
 const createEmptyForm = (): CreateForm => ({
   name: "",
@@ -91,6 +93,7 @@ const buildRasciPayload = (rasci: RasciForm): RasciAssignment => ({
 
 export function ProjectList() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const session = loadAuthSession();
   const canCreateProject = hasPermission(session, "masterProjects", "create");
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -109,6 +112,7 @@ export function ProjectList() {
   const [rasciSearch, setRasciSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     setLoading(true);
@@ -128,6 +132,14 @@ export function ProjectList() {
       `${p.id} ${p.name} ${p.status} ${p.priority ?? ""} ${p.manager_name ?? ""}`.toLowerCase().includes(q)
     );
   }, [projects, searchQuery]);
+  const paginatedProjects = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredProjects.slice(start, start + PAGE_SIZE);
+  }, [filteredProjects, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, view]);
 
   const activeEmployees = useMemo(() => employees.filter((employee) => employee.status === "Active"), [employees]);
 
@@ -205,6 +217,11 @@ export function ProjectList() {
     setShowModal(false);
     setSaveError(null);
   };
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "project" || !canCreateProject) return;
+    openModal();
+  }, [canCreateProject, searchParams]);
 
   const handleStep1Next = (e: FormEvent) => {
     e.preventDefault();
@@ -347,10 +364,17 @@ export function ProjectList() {
               )}
             </p>
           </div>
-        ) : view === "grid" ? (
-          <GridView projects={filteredProjects} onOpen={(id) => navigate(`/proyek/${id}`)} />
         ) : (
-          <ListView projects={filteredProjects} onOpen={(id) => navigate(`/proyek/${id}`)} />
+          <>
+            {view === "grid" ? (
+              <GridView projects={paginatedProjects} onOpen={(id) => navigate(`/proyek/${id}`)} />
+            ) : (
+              <ListView projects={paginatedProjects} onOpen={(id) => navigate(`/proyek/${id}`)} />
+            )}
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white">
+              <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={filteredProjects.length} onPageChange={setPage} />
+            </div>
+          </>
         )}
       </div>
 

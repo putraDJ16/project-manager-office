@@ -167,6 +167,14 @@ export function HomeDashboard() {
         .slice(0, 6),
     [tasks, today]
   );
+  const overdueTimelineTasks = useMemo(
+    () =>
+      overdueTasks
+        .slice()
+        .sort((left, right) => new Date(left.end_date ?? "").getTime() - new Date(right.end_date ?? "").getTime())
+        .slice(0, 6),
+    [overdueTasks]
+  );
   const riskIssues = useMemo(
     () => issues.filter((issue) => issue.status !== "Resolved" && RISK_SEVERITIES.has(issue.severity)),
     [issues]
@@ -302,7 +310,7 @@ export function HomeDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <Card className="overflow-hidden">
           <CardHeader className="px-5 py-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-color-foreground">Task Mendekati Timeline</h2>
@@ -344,6 +352,47 @@ export function HomeDashboard() {
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-sm text-color-muted-foreground">
                     Tidak ada task yang mendekati deadline minggu ini.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <CardHeader className="px-5 py-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-color-foreground">Task Melewati Tanggal Akhir</h2>
+            <AlertTriangle className="w-4 h-4 text-color-destructive" />
+          </CardHeader>
+          <table className="w-full text-sm">
+            <thead className="bg-color-secondary text-xs uppercase text-color-muted-foreground border-b border-color-border">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">Task</th>
+                <th className="px-4 py-3 text-left font-medium">Project</th>
+                <th className="px-4 py-3 text-left font-medium">Progress</th>
+                <th className="px-4 py-3 text-right font-medium">Deadline</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-color-border">
+              {overdueTimelineTasks.map((task) => (
+                <tr key={task.id} className="hover:bg-color-secondary">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-color-foreground">{task.title}</p>
+                    <p className="text-xs text-color-muted-foreground">{task.id} | {task.priority}</p>
+                  </td>
+                  <td className="px-4 py-3 text-color-muted-foreground">{projectById[task.project_id]?.name ?? task.project_id}</td>
+                  <td className="px-4 py-3">
+                    <Badge color="warning" className="rounded-md px-2 py-0.5">
+                      {task.progress_percentage}%
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-right text-color-muted-foreground">{formatDate(task.end_date)}</td>
+                </tr>
+              ))}
+              {overdueTimelineTasks.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-color-muted-foreground">
+                    Tidak ada task overdue.
                   </td>
                 </tr>
               )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, Link, useNavigate } from "react-router";
 import {
   Bell,
@@ -16,10 +16,14 @@ import {
   ChevronRight,
   ChevronDown,
   ListTodo,
+  ClipboardList,
   LogOut,
   Moon,
   Sun,
-  CalendarRange
+  CalendarRange,
+  Mail,
+  FileClock,
+  CircleHelp
 } from "lucide-react";
 import type { AuthSession } from "../../data/auth";
 import type { ThemeMode } from "../../utils/theme";
@@ -38,13 +42,18 @@ export type AppShellProps = {
   onLogout: () => void;
   themeMode: ThemeMode;
   onToggleTheme: () => void;
+  onOpenOnboarding: () => void;
 };
 
-export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShellProps) {
+export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOnboarding }: AppShellProps) {
   const navigate = useNavigate();
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
+  const [quickCreatePosition, setQuickCreatePosition] = useState({ top: 0, left: 0 });
+  const quickCreateRef = useRef<HTMLDivElement | null>(null);
+  const quickCreateButtonRef = useRef<HTMLButtonElement | null>(null);
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [assignmentCounter, setAssignmentCounter] = useState<MyAssignmentCounterResponse>({
@@ -56,20 +65,36 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
   const navItemClass = `flex items-center py-2 text-sm font-medium rounded-md transition-colors ${
     isSidebarMinimized ? "justify-center px-2" : "px-3"
   }`;
-  const canViewProjects = hasPermission(session, "masterProjects", "view");
-  const canViewIssues = hasPermission(session, "projectIssues", "view");
+  const canViewDashboard = hasPermission(session, "dashboard", "view");
+  const canViewCalendar = hasPermission(session, "calendar", "view");
+  const canViewTasks = hasPermission(session, "tasks", "view");
+  const canCreateTasks = hasPermission(session, "tasks", "create");
+  const canViewProjects =
+    hasPermission(session, "masterProjects", "view") ||
+    hasPermission(session, "projectMembers", "view") ||
+    hasPermission(session, "projectTasks", "view") ||
+    hasPermission(session, "projectGantt", "view") ||
+    hasPermission(session, "projectTimesheets", "view") ||
+    hasPermission(session, "projectAttachments", "view") ||
+    hasPermission(session, "projectMeetings", "view");
+  const canCreateProjects = hasPermission(session, "masterProjects", "create");
+  const canViewIssues = hasPermission(session, "issues", "view");
+  const canCreateIssues = hasPermission(session, "issues", "create");
   const canViewWorkload = hasPermission(session, "workload", "view");
   const canViewMasterEmployees = hasPermission(session, "masterEmployees", "view");
   const canViewMasterRoles = hasPermission(session, "masterRoles", "view");
   const canViewMasterOrganizations = hasPermission(session, "masterOrganizations", "view");
   const canViewMasterUnits = hasPermission(session, "masterOrganizationUnits", "view");
   const canViewMasterPositions = hasPermission(session, "masterPositions", "view");
+  const canViewEmailPreferences = hasPermission(session, "emailPreferences", "view");
+  const canViewEmailLogs = hasPermission(session, "adminEmailLogs", "view");
   const canViewAnyMaster =
     canViewMasterEmployees ||
     canViewMasterRoles ||
     canViewMasterOrganizations ||
     canViewMasterUnits ||
     canViewMasterPositions;
+  const canUseQuickCreate = canCreateProjects || canCreateTasks || canCreateIssues;
 
   const loadNotifications = async () => {
     try {
@@ -100,6 +125,48 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
     }, 30000);
     return () => window.clearInterval(interval);
   }, [session.userId, session.accessToken]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!quickCreateRef.current) return;
+      if (quickCreateRef.current.contains(event.target as Node)) return;
+      setIsQuickCreateOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    if (!isQuickCreateOpen) return;
+
+    const updateQuickCreatePosition = () => {
+      if (!quickCreateButtonRef.current) return;
+      const rect = quickCreateButtonRef.current.getBoundingClientRect();
+      const popupWidth = 224;
+      const popupHeight = 184;
+      const gap = 8;
+
+      let left = rect.right + gap;
+      let top = rect.top;
+
+      if (left + popupWidth > window.innerWidth - 8) {
+        left = Math.max(8, rect.left - popupWidth - gap);
+      }
+      if (top + popupHeight > window.innerHeight - 8) {
+        top = Math.max(8, window.innerHeight - popupHeight - 8);
+      }
+
+      setQuickCreatePosition({ top, left });
+    };
+
+    updateQuickCreatePosition();
+    window.addEventListener("resize", updateQuickCreatePosition);
+    window.addEventListener("scroll", updateQuickCreatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updateQuickCreatePosition);
+      window.removeEventListener("scroll", updateQuickCreatePosition, true);
+    };
+  }, [isQuickCreateOpen, isSidebarMinimized]);
 
   const handleNotificationClick = async (notification: ApiNotification) => {
     if (!notification.is_read) {
@@ -142,12 +209,93 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
           </button>
         </div>
 
-        <div className="sidebar-scroll flex-1 overflow-y-auto py-4 pr-1">
+        <div className="sidebar-scroll flex-1 overflow-y-auto overflow-x-visible py-4 pr-1">
           <nav className="space-y-1 px-3">
-            <Link to="/" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`}>
-              <Home className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
-              {!isSidebarMinimized && "Beranda"}
-            </Link>
+            {canUseQuickCreate && (
+              <div className="relative mb-2" ref={quickCreateRef}>
+                <button
+                  type="button"
+                  ref={quickCreateButtonRef}
+                  onClick={() => setIsQuickCreateOpen((current) => !current)}
+                  className={`w-full rounded-md border border-indigo-600/60 bg-indigo-700/35 text-indigo-100 hover:bg-indigo-600/50 transition-colors ${
+                    isSidebarMinimized ? "h-10 flex items-center justify-center" : "px-3 py-2.5"
+                  }`}
+                  title="Buat Baru"
+                >
+                  <span className={`inline-flex items-center ${isSidebarMinimized ? "" : "gap-2"}`}>
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-indigo-300/80 text-indigo-100 text-sm font-bold leading-none">
+                      +
+                    </span>
+                    {!isSidebarMinimized && <span className="text-xs font-bold tracking-wide">BUAT BARU</span>}
+                  </span>
+                </button>
+                {isQuickCreateOpen && (
+                <div
+                  className="fixed z-50 w-56 overflow-hidden rounded-md border border-indigo-800 bg-indigo-950 shadow-xl"
+                  style={{ top: quickCreatePosition.top, left: quickCreatePosition.left }}
+                >
+                  {canCreateProjects && (
+                    <Link
+                      to="/proyek/list?create=project"
+                      onClick={() => setIsQuickCreateOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-indigo-100 hover:bg-indigo-900"
+                    >
+                      <FolderKanban className="h-4 w-4 text-indigo-300" />
+                      Proyek Baru
+                    </Link>
+                  )}
+                  {canCreateTasks && (
+                    <Link
+                      to="/tugas-saya?create=task"
+                      onClick={() => setIsQuickCreateOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-indigo-100 hover:bg-indigo-900"
+                    >
+                      <ClipboardList className="h-4 w-4 text-indigo-300" />
+                      Tugas Baru
+                    </Link>
+                  )}
+                  {canCreateIssues && (
+                    <Link
+                      to="/isu/list?create=issue"
+                      onClick={() => setIsQuickCreateOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-indigo-100 hover:bg-indigo-900"
+                    >
+                      <Bug className="h-4 w-4 text-indigo-300" />
+                      Issue Baru
+                    </Link>
+                  )}
+                  {canCreateTasks && (
+                    <Link
+                      to="/tugas-saya?tab=timesheets&create=timesheet"
+                      onClick={() => setIsQuickCreateOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-indigo-100 hover:bg-indigo-900"
+                    >
+                      <FileClock className="h-4 w-4 text-indigo-300" />
+                      Timesheet Baru
+                    </Link>
+                  )}
+                </div>
+              )}
+              </div>
+            )}
+
+            {canViewDashboard && (
+              <Link to="/" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`}>
+                <Home className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                {!isSidebarMinimized && "Beranda"}
+              </Link>
+            )}
+
+            {canViewCalendar && (
+              <Link
+                to="/proyek/monitoring"
+                className={`${navItemClass} hover:bg-indigo-900 hover:text-white`}
+                title="Kalender"
+              >
+                <CalendarRange className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                {!isSidebarMinimized && "Kalender"}
+              </Link>
+            )}
 
             {!isSidebarMinimized && (
               <div className="pt-4 pb-1">
@@ -157,49 +305,43 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
 
             {isSidebarMinimized && <div className="pt-2" />}
 
-            <Link
-              to="/tugas-saya"
-              className={`${navItemClass} relative hover:bg-indigo-900 hover:text-white`}
-              title={
-                assignmentCounter.total_active > 0
-                  ? `Tugas aktif: ${assignmentCounter.active_tasks}, Isu aktif: ${assignmentCounter.active_issues}`
-                  : "Tugas Saya"
-              }
-            >
-              <span className="relative inline-flex">
-                <ListTodo className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
-                {assignmentCounter.total_active > 0 && isSidebarMinimized && (
-                  <span className="absolute -right-2 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
-                    {assignmentCounter.total_active > 9 ? "9+" : assignmentCounter.total_active}
-                  </span>
-                )}
-              </span>
-              {!isSidebarMinimized && (
-                <>
-                  <span className="min-w-0 flex-1">Tugas Saya</span>
-                  {assignmentCounter.total_active > 0 && (
-                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold leading-none text-white">
-                      <Bell className="h-3 w-3" />
-                      {assignmentCounter.total_active}
+            {canViewTasks && (
+              <Link
+                to="/tugas-saya"
+                className={`${navItemClass} relative hover:bg-indigo-900 hover:text-white`}
+                title={
+                  assignmentCounter.total_active > 0
+                    ? `Tugas aktif: ${assignmentCounter.active_tasks}, Isu aktif: ${assignmentCounter.active_issues}`
+                    : "Tugas Saya"
+                }
+              >
+                <span className="relative inline-flex">
+                  <ListTodo className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                  {assignmentCounter.total_active > 0 && isSidebarMinimized && (
+                    <span className="absolute -right-2 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                      {assignmentCounter.total_active > 9 ? "9+" : assignmentCounter.total_active}
                     </span>
                   )}
-                </>
-              )}
-            </Link>
+                </span>
+                {!isSidebarMinimized && (
+                  <>
+                    <span className="min-w-0 flex-1">Tugas Saya</span>
+                    {assignmentCounter.total_active > 0 && (
+                      <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold leading-none text-white">
+                        <Bell className="h-3 w-3" />
+                        {assignmentCounter.total_active}
+                      </span>
+                    )}
+                  </>
+                )}
+              </Link>
+            )}
 
             {canViewProjects && (
               <>
                 <Link to="/proyek/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Proyek">
                   <FolderKanban className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
                   {!isSidebarMinimized && "Proyek"}
-                </Link>
-                <Link
-                  to="/proyek/monitoring"
-                  className={`${navItemClass} hover:bg-indigo-900 hover:text-white`}
-                  title="Monitoring Proyek"
-                >
-                  <CalendarRange className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
-                  {!isSidebarMinimized && "Monitoring Proyek"}
                 </Link>
               </>
             )}
@@ -318,6 +460,24 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
                 )}
               </div>
             ) : null}
+
+            {(canViewEmailPreferences || canViewEmailLogs) && (
+              <div className="pt-3 pb-1">
+                {!isSidebarMinimized && <p className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-wider">Pengaturan</p>}
+              </div>
+            )}
+            {canViewEmailPreferences && (
+              <Link to="/pengaturan/email" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Notifikasi Email">
+                <Mail className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                {!isSidebarMinimized && "Notifikasi Email"}
+              </Link>
+            )}
+            {canViewEmailLogs && (
+              <Link to="/admin/email-log" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Email Log">
+                <Shield className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                {!isSidebarMinimized && "Email Log"}
+              </Link>
+            )}
           </nav>
         </div>
 
@@ -354,6 +514,16 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme }: AppShe
               title={themeMode === "dark" ? "Light mode" : "Dark mode"}
             >
               {themeMode === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenOnboarding}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              aria-label="Buka materi onboarding"
+              title="Materi onboarding"
+            >
+              <CircleHelp className="h-4 w-4" />
             </button>
 
             <div className="relative">

@@ -1,0 +1,7 @@
+Action Item Baru
+
+Anda mendapat action item dari rapat: {{ title }}
+{{ description }}
+
+Buka di PMO: {{ frontend_url }}
+Anda menerima email ini karena terdaftar di PMO.

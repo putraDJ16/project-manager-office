@@ -15,12 +15,34 @@ from app.schemas import (
 )
 from app.services import project_service
 from app.utils.http import success_response
-from app.utils.permissions import require_permission, require_project_permission
+from app.utils.permissions import require_any_permission, require_permission, require_project_any_permission, require_project_permission
+
+
+PROJECT_REFERENCE_READ_PERMISSIONS = (
+    ("masterProjects", "view"),
+    ("calendar", "view"),
+    ("dashboard", "view"),
+    ("workload", "view"),
+    ("projectTasks", "view"),
+    ("projectGantt", "view"),
+    ("projectTimesheets", "view"),
+    ("tasks", "view"),
+    ("projectIssues", "view"),
+    ("issues", "view"),
+)
+
+PROJECT_PHASE_READ_PERMISSIONS = (
+    ("masterProjects", "view"),
+    ("projectPhases", "view"),
+    ("projectTasks", "view"),
+    ("projectGantt", "view"),
+    ("tasks", "view"),
+)
 
 
 @api_v1.get("/projects")
 @jwt_required()
-@require_permission("masterProjects", "view")
+@require_any_permission(PROJECT_REFERENCE_READ_PERMISSIONS)
 def list_projects_handler():
     projects = project_service.list_projects()
     return success_response(projects_schema.dump(projects))
@@ -37,7 +59,7 @@ def create_project_handler():
 
 @api_v1.get("/projects/<string:project_id>")
 @jwt_required()
-@require_project_permission("masterProjects", "view")
+@require_project_any_permission(PROJECT_REFERENCE_READ_PERMISSIONS)
 def get_project_handler(project_id: str):
     project = project_service.get_project(project_id)
     return success_response(project_detail_schema.dump(project))
@@ -54,7 +76,7 @@ def update_project_handler(project_id: str):
 
 @api_v1.get("/projects/<string:project_id>/phases")
 @jwt_required()
-@require_project_permission("projectPhases", "view")
+@require_project_any_permission(PROJECT_PHASE_READ_PERMISSIONS)
 def list_phases_handler(project_id: str):
     phases = project_service.list_phases(project_id)
     return success_response(phases_schema.dump(phases))
@@ -96,7 +118,7 @@ def remove_member_handler(project_id: str, employee_id: str):
 
 @api_v1.get("/projects/<string:project_id>/holidays")
 @jwt_required()
-@require_project_permission("masterProjects", "view")
+@require_project_any_permission(PROJECT_REFERENCE_READ_PERMISSIONS)
 def list_project_holidays_handler(project_id: str):
     holidays = project_service.list_holidays(project_id)
     return success_response(project_holidays_schema.dump(holidays))

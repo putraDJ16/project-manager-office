@@ -73,3 +73,25 @@ Session timeout defaults to 480 minutes (8 hours). Set the same value for fronte
 - Frontend: `VITE_SESSION_TIMEOUT_MINUTES=480`
 
 Access tokens are short-lived by default. You can tune them separately with `JWT_ACCESS_TOKEN_EXPIRES_MINUTES=15`.
+
+
+## Email Notifications
+
+The backend uses a DB-backed email outbox. API requests only enqueue rows; SMTP delivery is handled by the dispatcher/worker so user-facing requests do not wait for email sending.
+
+Environment variables:
+
+- `MAIL_ENABLED=false` toggles real SMTP delivery. Keep `false` for tests/dev when you only want outbox rows.
+- `MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`, `MAIL_USE_TLS=true` configure SMTP.
+- `MAIL_USERNAME` and `MAIL_PASSWORD` must come from `.env` or deployment secrets. Do not commit Gmail App Passwords.
+- `MAIL_FROM_NAME=PMO Indocyber`, `MAIL_FROM_ADDRESS=agenda@indocyber.id` control sender identity.
+- `FRONTEND_BASE_URL=http://localhost:5173` is used for CTA links in email templates.
+- `MAIL_TEST_RECIPIENT` redirects all queued email to one recipient for staging tests.
+
+Run the worker manually from `CODE/be`:
+
+```bash
+flask email-worker
+```
+
+For one-shot/local validation, keep `MAIL_ENABLED=false`, trigger an assignment or meeting invite, then inspect `/api/v1/admin/email-outbox` with an admin user.

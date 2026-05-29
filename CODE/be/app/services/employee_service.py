@@ -9,6 +9,7 @@ from app.repositories import (
     OrganizationUnitRepository,
     PositionRepository,
 )
+from app.services.email_service import enqueue_event_email
 from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
 
@@ -25,6 +26,10 @@ def _validate_unique(nip: str, email: str, employee_id: str | None = None):
     duplicate_email = EmployeeRepository.get_by_email(email)
     if duplicate_email and duplicate_email.id != employee_id:
         raise ApiError("Email sudah digunakan oleh pegawai lain.", errors={"email": "duplicate"})
+
+    duplicate_user = User.query.filter(db.func.lower(User.email) == email.lower()).first()
+    if duplicate_user and duplicate_user.employee_id != employee_id:
+        raise ApiError("Email sudah digunakan oleh akun user lain.", errors={"email": "duplicate_user"})
 
 
 def _validate_role(role_id: str, current_role_id: str | None = None):
@@ -65,6 +70,17 @@ def _validate_position(name: str, current_name: str | None = None):
     is_current_value = bool(current_name and name.lower() == current_name.lower())
     if position.status != "Active" and not is_current_value:
         raise ApiError("Jabatan inactive tidak bisa dipilih untuk data baru.", errors={"position": "inactive"})
+
+
+def _sync_employee_user(employee: Employee):
+    user = User.query.filter_by(employee_id=employee.id).first()
+    if not user:
+        return
+
+    user.email = employee.email
+    user.display_name = employee.name
+    user.role_id = employee.role_id
+    user.is_active = employee.status == "Active"
 
 
 def create_employee(payload: dict):
@@ -117,6 +133,16 @@ def create_employee(payload: dict):
 
     db.session.add(employee)
     db.session.add(user)
+    db.session.flush()
+    enqueue_event_email(
+        user=user,
+        event_key="auth.welcome",
+        template_key="welcome_employee",
+        subject="Akun PMO Anda sudah aktif",
+        context={"employee": employee, "default_password": default_password, "target_url": "/login"},
+        entity_type="auth",
+        entity_id=employee.id,
+    )
     db.session.commit()
     return employee, default_password
 
@@ -149,6 +175,7 @@ def update_employee(employee_id: str, payload: dict):
     employee.position = position
     employee.role_id = role_id
     employee.status = status if status in {"Active", "Inactive"} else employee.status
+    _sync_employee_user(employee)
     db.session.commit()
     return employee
 
@@ -160,6 +187,7 @@ def update_employee_status(employee_id: str, status: str):
     if status not in {"Active", "Inactive"}:
         raise ApiError("Status pegawai tidak valid.")
     employee.status = status
+    _sync_employee_user(employee)
     db.session.commit()
     return employee
 
@@ -189,5 +217,15 @@ def reset_employee_password(employee_id: str):
         user.role_id = employee.role_id
         user.is_active = employee.status == "Active"
 
+    db.session.flush()
+    enqueue_event_email(
+        user=user,
+        event_key="auth.password_reset",
+        template_key="password_reset",
+        subject="Password Anda telah direset",
+        context={"employee": employee, "default_password": default_password, "target_url": "/login"},
+        entity_type="auth",
+        entity_id=employee.id,
+    )
     db.session.commit()
     return default_password

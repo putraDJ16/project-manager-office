@@ -1,0 +1,7 @@
+Rapat Dibatalkan
+
+Rapat dibatalkan: {{ title }}
+Silakan cek PMO untuk detail.
+
+Buka di PMO: {{ frontend_url }}
+Anda menerima email ini karena terdaftar di PMO.

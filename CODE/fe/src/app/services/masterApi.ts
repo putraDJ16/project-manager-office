@@ -15,6 +15,7 @@ type ApiEmployee = {
 
 const roleModuleKeys: ModuleKey[] = [
   "dashboard",
+  "calendar",
   "tasks",
   "issues",
   "workload",
@@ -24,8 +25,13 @@ const roleModuleKeys: ModuleKey[] = [
   "projectMembers",
   "projectTasks",
   "projectTaskComments",
+  "projectGantt",
+  "projectTimesheets",
   "projectIssues",
   "projectAttachments",
+  "projectMeetings",
+  "emailPreferences",
+  "adminEmailLogs",
   "masterRoles",
   "masterOrganizations",
   "masterOrganizationUnits",
@@ -33,6 +39,7 @@ const roleModuleKeys: ModuleKey[] = [
 ];
 
 const MASTER_API_CACHE_TTL_MS = 2 * 60 * 1000;
+const AUTH_SESSION_REFRESH_EVENT = "auth-session-refresh";
 
 type CacheEntry<T> = {
   data: T;
@@ -105,6 +112,11 @@ function setEmployeesCache(data: Employee[]) {
   };
 }
 
+function requestAuthSessionRefresh() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AUTH_SESSION_REFRESH_EVENT));
+}
+
 export async function fetchRoles() {
   if (isCacheFresh(rolesCache) && rolesCache) return rolesCache.data;
   if (rolesInFlight) return rolesInFlight;
@@ -137,6 +149,7 @@ export async function updateRole(id: string, payload: Partial<Omit<Role, "id">>)
   if (rolesCache) {
     setRolesCache(rolesCache.data.map((role) => (role.id === id ? updated : role)));
   }
+  requestAuthSessionRefresh();
   return updated;
 }
 
@@ -149,6 +162,7 @@ export async function updateRoleStatus(id: string, status: Role["status"]) {
   if (rolesCache) {
     setRolesCache(rolesCache.data.map((role) => (role.id === id ? updated : role)));
   }
+  requestAuthSessionRefresh();
   return updated;
 }
 

@@ -21,6 +21,19 @@ python run.py
 ```
 *(Server akan berjalan pada http://localhost:5000)*
 
+### Swagger / OpenAPI
+
+Backend menyediakan dokumentasi API otomatis:
+
+- Swagger UI: `http://localhost:5000/api/docs`
+- OpenAPI JSON: `http://localhost:5000/api/v1/openapi.json`
+
+Konfigurasi terkait:
+
+- `API_VERSION` default `1.0.0`
+- `API_PUBLIC_URL` default mengikuti `FRONTEND_BASE_URL`
+- `API_DOCS_VISIBILITY`: `public`, `jwt`, atau `disabled`
+
 ### Menjalankan Server (Melalui Docker)
 Alternatif yang lebih mudah, jika Anda menggunakan Docker, kembali ke folder paling luar (root `Project ZOHO`) dan jalankan:
 ```bash

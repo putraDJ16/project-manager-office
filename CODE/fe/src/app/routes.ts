@@ -14,6 +14,8 @@ import { PositionMaster } from "./pages/master/PositionMaster";
 import { NotificationsPage } from "./pages/kustomisasi/NotificationsPage";
 import { ProfilePage } from "./pages/kustomisasi/ProfilePage";
 import { SettingsPlaceholder } from "./pages/kustomisasi/SettingsPlaceholder";
+import { EmailPreferencesPage } from "./pages/profile/EmailPreferencesPage";
+import { EmailOutboxPage } from "./pages/admin/EmailOutboxPage";
 import type { ModuleKey } from "./data/masterData";
 import type { ComponentType } from "react";
 
@@ -21,18 +23,18 @@ export type AppRoute = {
   index?: boolean;
   path: string;
   component: ComponentType;
-  module?: ModuleKey;
+  module?: ModuleKey | ModuleKey[];
 };
 
 export const routes: AppRoute[] = [
   { index: true, path: "/", component: HomeDashboard, module: "dashboard" },
   { path: "/design-system-test", component: DesignSystemTest },
-  { path: "/tugas-saya", component: MyTasksPage },
-  { path: "/isu/list", component: IssueList, module: "projectIssues" },
+  { path: "/tugas-saya", component: MyTasksPage, module: "tasks" },
+  { path: "/isu/list", component: IssueList, module: "issues" },
   { path: "/sdm/workload", component: WorkloadHeatmap, module: "workload" },
-  { path: "/proyek/list", component: ProjectList, module: "masterProjects" },
-  { path: "/proyek/monitoring", component: ProjectMonitoring, module: "masterProjects" },
-  { path: "/proyek/:id", component: ProjectDetail, module: "masterProjects" },
+  { path: "/proyek/list", component: ProjectList, module: ["masterProjects", "projectMembers", "projectTasks", "projectGantt", "projectTimesheets", "projectAttachments", "projectMeetings"] },
+  { path: "/proyek/monitoring", component: ProjectMonitoring, module: "calendar" },
+  { path: "/proyek/:id", component: ProjectDetail, module: ["masterProjects", "projectMembers", "projectTasks", "projectGantt", "projectTimesheets", "projectAttachments", "projectMeetings"] },
   { path: "/master/pegawai", component: EmployeeMaster, module: "masterEmployees" },
   { path: "/master/role", component: RoleMaster, module: "masterRoles" },
   { path: "/master/organisasi", component: OrganizationMaster, module: "masterOrganizations" },
@@ -40,5 +42,7 @@ export const routes: AppRoute[] = [
   { path: "/master/jabatan", component: PositionMaster, module: "masterPositions" },
   { path: "/notifications", component: NotificationsPage },
   { path: "/profile", component: ProfilePage },
+  { path: "/pengaturan/email", component: EmailPreferencesPage, module: "emailPreferences" },
+  { path: "/admin/email-log", component: EmailOutboxPage, module: "adminEmailLogs" },
   { path: "/settings", component: SettingsPlaceholder }
 ];

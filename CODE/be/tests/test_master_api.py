@@ -64,6 +64,67 @@ def test_project_manager_cannot_mutate_master_data(client):
     assert edit_role.status_code == 403
 
 
+def test_operational_role_can_read_references_without_master_menu(client, auth_headers):
+    role_response = client.post(
+        "/api/v1/roles",
+        headers=auth_headers,
+        json={
+            "name": "Operational Reference Reader",
+            "description": "Bisa membuka menu operasional tanpa akses Data Master.",
+            "status": "Active",
+            "permissions": {
+                "tasks": {"view": True},
+                "calendar": {"view": True},
+            },
+        },
+    )
+    assert role_response.status_code == 201
+    role_id = role_response.get_json()["data"]["id"]
+
+    employee_response = client.post(
+        "/api/v1/employees",
+        headers=auth_headers,
+        json={
+            "nip": "20000101-997",
+            "name": "Operational User",
+            "email": "operational.user@company.co.id",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+            "role_id": role_id,
+            "status": "Active",
+        },
+    )
+    assert employee_response.status_code == 201
+
+    headers = _login(client, "operational.user@company.co.id", "Welcome123!")
+
+    employees = client.get("/api/v1/employees", headers=headers)
+    assert employees.status_code == 200
+
+    projects = client.get("/api/v1/projects", headers=headers)
+    assert projects.status_code == 200
+
+    project_detail = client.get("/api/v1/projects/p1", headers=headers)
+    assert project_detail.status_code == 200
+
+    create_employee = client.post(
+        "/api/v1/employees",
+        headers=headers,
+        json={
+            "nip": "20000101-988",
+            "name": "Still Forbidden",
+            "email": "still.forbidden@company.co.id",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+            "role_id": "role-001",
+            "status": "Active",
+        },
+    )
+    assert create_employee.status_code == 403
+
+
 def test_employee_crud(client, auth_headers):
     created = client.post(
         "/api/v1/employees",
@@ -92,16 +153,34 @@ def test_employee_crud(client, auth_headers):
     updated = client.patch(
         f"/api/v1/employees/{employee_id}",
         headers=auth_headers,
-        json={"position": "QA Engineer"},
+        json={"position": "QA Engineer", "role_id": "role-004"},
     )
     assert updated.status_code == 200
     assert updated.get_json()["data"]["position"] == "QA Engineer"
+    assert updated.get_json()["data"]["role_id"] == "role-004"
+
+    relogin_updated_employee = client.post(
+        "/api/v1/auth/login",
+        json={"email": "tes.pegawai@company.co.id", "password": "Welcome123!"},
+    )
+    assert relogin_updated_employee.status_code == 200
+    employee_token = relogin_updated_employee.get_json()["data"]["access_token"]
+    profile = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {employee_token}"})
+    assert profile.status_code == 200
+    assert profile.get_json()["data"]["role_id"] == "role-004"
+    assert profile.get_json()["data"]["role"] == "Viewer"
 
     status = client.patch(
         f"/api/v1/employees/{employee_id}/status", headers=auth_headers, json={"status": "Inactive"}
     )
     assert status.status_code == 200
     assert status.get_json()["data"]["status"] == "Inactive"
+
+    login_inactive_employee = client.post(
+        "/api/v1/auth/login",
+        json={"email": "tes.pegawai@company.co.id", "password": "Welcome123!"},
+    )
+    assert login_inactive_employee.status_code == 401
 
 
 def test_employee_reset_password(client, auth_headers):
@@ -164,6 +243,29 @@ def test_employee_reset_password(client, auth_headers):
         json={"email": "reset.password@company.co.id", "password": "Welcome123!"},
     )
     assert login_reset.status_code == 200
+
+
+def test_email_settings_permissions(client, auth_headers):
+    admin_preferences = client.get("/api/v1/me/email-preferences", headers=auth_headers)
+    assert admin_preferences.status_code == 200
+
+    updated_preferences = client.put(
+        "/api/v1/me/email-preferences",
+        headers=auth_headers,
+        json={"task_assignment": False},
+    )
+    assert updated_preferences.status_code == 200
+    assert updated_preferences.get_json()["data"]["task_assignment"] is False
+
+    admin_outbox = client.get("/api/v1/admin/email-outbox", headers=auth_headers)
+    assert admin_outbox.status_code == 200
+
+    pm_headers = _login(client)
+    pm_preferences = client.get("/api/v1/me/email-preferences", headers=pm_headers)
+    assert pm_preferences.status_code == 403
+
+    pm_outbox = client.get("/api/v1/admin/email-outbox", headers=pm_headers)
+    assert pm_outbox.status_code == 403
 
 
 def test_organization_crud(client, auth_headers):

@@ -4,6 +4,7 @@ from werkzeug.exceptions import HTTPException
 
 from app.api.v1 import register_api_routes
 from app.config import Config
+from app.docs.routes import register_docs_routes
 from app.extensions import cors, db, jwt, migrate
 from app.models import *  # noqa: F401,F403
 from app.services import audit_trail_service
@@ -25,6 +26,7 @@ def create_app(config_object: dict | None = None):
 
     api_v1 = register_api_routes()
     app.register_blueprint(api_v1)
+    register_docs_routes(app)
 
     _register_error_handlers(app)
     _register_hooks(app)
@@ -56,6 +58,18 @@ def _register_error_handlers(app: Flask):
 
 
 def _register_cli(app: Flask):
+    @app.cli.command("email-worker")
+    def email_worker_command():
+        """Run the email outbox dispatcher loop."""
+        from app.services.email_dispatcher import run_forever
+
+        run_forever()
+
+    @app.cli.command("meeting-reminders")
+    def meeting_reminders_command():
+        """Placeholder for scheduled meeting reminder enqueueing."""
+        print("Meeting reminder scheduler belum diaktifkan untuk v1 MVP.")
+
     @app.cli.command("seed")
     def seed_command():
         """Seed initial data."""

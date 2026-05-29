@@ -13,6 +13,7 @@ export type AuthSession = {
   role?: string | null;
   employeeId?: string | null;
   employeeName?: string | null;
+  onboardingCompleted?: boolean;
   permissions?: Partial<Record<ModuleKey, PermissionSet>>;
   loggedInAt: string;
   accessToken: string;
@@ -65,6 +66,7 @@ export function loadAuthSession(): AuthSession | null {
       role: parsed.role,
       employeeId: parsed.employeeId,
       employeeName: parsed.employeeName,
+      onboardingCompleted: parsed.onboardingCompleted,
       permissions: parsed.permissions,
       loggedInAt: parsed.loggedInAt,
       accessToken: parsed.accessToken,

@@ -14,7 +14,7 @@ Mengelola role, employee, organization, organization unit, dan position.
 
 ## User Roles / Permissions
 
-Setiap resource punya module permission sendiri: `masterRoles`, `masterEmployees`, `masterOrganizations`, `masterOrganizationUnits`, `masterPositions`.
+Backend tetap memakai module permission granular seperti `masterRoles`, `masterEmployees`, `masterOrganizations`, `masterOrganizationUnits`, dan `masterPositions`. UI Role Master menampilkan permission sebagai menu level 1 sidebar, lalu memetakan pilihan tersebut ke module granular di belakang layar. `GET /employees` juga dapat dipakai sebagai data referensi oleh menu operasional berizin, tetapi mutasi pegawai tetap wajib permission `masterEmployees`.
 
 ## Main Backend Files
 

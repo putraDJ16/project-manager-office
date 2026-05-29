@@ -1,5 +1,6 @@
 from app.models.audit_trail import AuditTrail
 from app.models.employee import Employee
+from app.models.email_outbox import EmailOutbox
 from app.models.issue import Issue
 from app.models.organization import Organization
 from app.models.organization_unit import OrganizationUnit
@@ -19,13 +20,17 @@ from app.models.sla_rule import SlaRule
 from app.models.task import Task
 from app.models.task_checklist_item import TaskChecklistItem
 from app.models.task_comment import TaskComment
+from app.models.task_timesheet import TaskTimesheet
 from app.models.user import User
+from app.models.user_email_preference import UserEmailPreference
 
 __all__ = [
     "AuditTrail",
     "Role",
     "Employee",
+    "EmailOutbox",
     "User",
+    "UserEmailPreference",
     "Project",
     "Phase",
     "ProjectMember",
@@ -40,6 +45,7 @@ __all__ = [
     "Task",
     "TaskChecklistItem",
     "TaskComment",
+    "TaskTimesheet",
     "Issue",
     "SlaRule",
     "Notification",

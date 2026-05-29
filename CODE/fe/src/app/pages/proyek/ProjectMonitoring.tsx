@@ -3,7 +3,7 @@ import { Activity, AlertCircle, CalendarDays, Clock, Flag, FolderKanban, Loader2
 import { fetchProjects, type ApiProject } from "../../services/projectApi";
 
 type CalendarView = "day" | "week" | "month";
-type ProjectMarkerType = "start" | "end";
+type ProjectMarkerType = "start" | "end" | "range";
 
 type ProjectMarker = {
   project: ApiProject;
@@ -14,6 +14,12 @@ type ProjectDetailPopup = {
   project: ApiProject;
   type: ProjectMarkerType;
   date: Date;
+  sourceAgendaDate?: Date;
+};
+
+type DateAgendaPopup = {
+  date: Date;
+  markers: ProjectMarker[];
 };
 
 const VIEW_LABELS: Record<CalendarView, string> = {
@@ -49,12 +55,14 @@ const PROJECT_COLOR_PALETTE = [
 
 const MARKER_STYLES: Record<ProjectMarkerType, string> = {
   start: "bg-color-status-success",
-  end: "bg-color-destructive"
+  end: "bg-color-destructive",
+  range: "bg-color-status-info"
 };
 
 const MARKER_BADGES: Record<ProjectMarkerType, string> = {
   start: "bg-color-status-success-surface text-color-status-success border-color-status-success-border",
-  end: "bg-color-destructive/15 text-color-destructive border-color-destructive/40"
+  end: "bg-color-destructive/15 text-color-destructive border-color-destructive/40",
+  range: "bg-color-status-info-surface text-color-status-info border-color-status-info-border"
 };
 
 const COMPLETED_DEADLINE_BADGE = "bg-color-secondary text-color-muted-foreground border-color-border";
@@ -144,6 +152,9 @@ function getProjectMarkers(project: ApiProject, date: Date, _view: CalendarView)
   const end = parseDate(project.end_date);
   const markers: ProjectMarker[] = [];
 
+  if (start && end && date.getTime() > start.getTime() && date.getTime() < end.getTime()) {
+    markers.push({ project, type: "range" });
+  }
   if (start && isSameDay(start, date)) markers.push({ project, type: "start" });
   if (end && isSameDay(end, date)) markers.push({ project, type: "end" });
 
@@ -182,6 +193,7 @@ function shiftDate(date: Date, view: CalendarView, direction: number) {
 
 function getMarkerLabel(type: ProjectMarkerType, project?: ApiProject) {
   if (type === "start") return "Mulai";
+  if (type === "range") return "Agenda Berjalan";
   if (project?.status === "Completed") return "Deadline Selesai";
   return "Deadline Aktif";
 }
@@ -196,10 +208,22 @@ function getMarkerDotClass(marker: ProjectMarker) {
   return MARKER_STYLES[marker.type];
 }
 
+function isAttentionMarker(marker: ProjectMarker) {
+  const { project, type } = marker;
+  if (type === "end" && project.status !== "Completed") return true;
+  if (project.status === "On Hold") return true;
+  return project.priority === "Critical" || project.priority === "High";
+}
+
 function getDateSummary(projects: ApiProject[], date: Date) {
   const starts = projects.filter((project) => {
     const start = parseDate(project.start_date);
     return start ? isSameDay(start, date) : false;
+  });
+  const ranges = projects.filter((project) => {
+    const start = parseDate(project.start_date);
+    const end = parseDate(project.end_date);
+    return start && end ? date.getTime() > start.getTime() && date.getTime() < end.getTime() : false;
   });
   const deadlines = projects.filter((project) => {
     const end = parseDate(project.end_date);
@@ -208,7 +232,7 @@ function getDateSummary(projects: ApiProject[], date: Date) {
   const activeDeadlines = deadlines.filter((project) => project.status !== "Completed");
   const completedDeadlines = deadlines.filter((project) => project.status === "Completed");
 
-  return { starts, deadlines, activeDeadlines, completedDeadlines };
+  return { starts, ranges, deadlines, activeDeadlines, completedDeadlines };
 }
 
 function getPeriodLabel(date: Date, view: CalendarView) {
@@ -240,6 +264,10 @@ function MarkerLegend() {
         Mulai
       </span>
       <span className="inline-flex items-center gap-1.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-color-status-info" />
+        Agenda Berjalan
+      </span>
+      <span className="inline-flex items-center gap-1.5">
         <span className="h-2.5 w-2.5 rounded-full bg-color-destructive" />
         Deadline Aktif
       </span>
@@ -251,14 +279,44 @@ function MarkerLegend() {
   );
 }
 
-function ProjectAgendaItem({ marker }: { marker: ProjectMarker }) {
+function ProjectAgendaItem({ marker, highlightAttention = false }: { marker: ProjectMarker; highlightAttention?: boolean }) {
   const { project, type } = marker;
-  const icon = type === "start" ? <CalendarDays className="h-4 w-4 text-color-status-success" /> : <Flag className="h-4 w-4 text-color-destructive" />;
+  const needsAttention = isAttentionMarker(marker);
+  const isCompletedOnDeadline = type === "end" && project.status === "Completed";
+  const emphasizeAttention = highlightAttention && needsAttention;
+  const emphasizeCompletedOnDeadline = highlightAttention && isCompletedOnDeadline;
+  const icon =
+    type === "start" ? (
+      <CalendarDays className="h-4 w-4 text-color-status-success" />
+    ) : type === "range" ? (
+      <Activity className="h-4 w-4 text-color-status-info" />
+    ) : (
+      <Flag className="h-4 w-4 text-color-destructive" />
+    );
   const label = getMarkerLabel(type, project);
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-l-4 border-color-border bg-color-card p-3 shadow-sm" style={{ borderLeftColor: getProjectColor(project) }}>
-      <div className="mt-0.5 rounded-lg bg-color-secondary p-2">{icon}</div>
+    <div
+      className={`flex items-start gap-3 rounded-xl border border-l-4 p-3 shadow-sm ${
+        emphasizeAttention
+          ? "border-color-destructive/40 bg-color-destructive/10 ring-1 ring-color-destructive/25"
+          : emphasizeCompletedOnDeadline
+            ? "border-color-status-success-border bg-color-status-success-surface ring-1 ring-color-status-success-border/50"
+            : "border-color-border bg-color-card"
+      }`}
+      style={{ borderLeftColor: getProjectColor(project) }}
+    >
+      <div
+        className={`mt-0.5 rounded-lg p-2 ${
+          emphasizeAttention
+            ? "bg-color-destructive/20"
+            : emphasizeCompletedOnDeadline
+              ? "bg-color-status-success-surface"
+              : "bg-color-secondary"
+        }`}
+      >
+        {icon}
+      </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -272,6 +330,16 @@ function ProjectAgendaItem({ marker }: { marker: ProjectMarker }) {
           </span>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
+          {emphasizeAttention && (
+            <span className="rounded-full border border-color-destructive/40 bg-color-destructive/15 px-2 py-0.5 text-xs font-semibold text-color-destructive">
+              Perlu Perhatian
+            </span>
+          )}
+          {emphasizeCompletedOnDeadline && (
+            <span className="rounded-full border border-color-status-success-border bg-color-status-success-surface px-2 py-0.5 text-xs font-semibold text-color-status-success">
+              Completed Tepat Deadline
+            </span>
+          )}
           <span className="rounded-full border border-color-border bg-color-secondary px-2 py-0.5 text-xs font-semibold text-color-muted-foreground">
             {label}
           </span>
@@ -296,6 +364,7 @@ export function ProjectMonitoring() {
   const [calendarView, setCalendarView] = useState<CalendarView>("month");
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [selectedProjectDetail, setSelectedProjectDetail] = useState<ProjectDetailPopup | null>(null);
+  const [selectedDateAgenda, setSelectedDateAgenda] = useState<DateAgendaPopup | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -339,6 +408,7 @@ export function ProjectMonitoring() {
         .sort((a, b) => a.date.getTime() - b.date.getTime()),
     [anchorDate, calendarView, markersByDate]
   );
+  const getDateAgendaMarkers = (date: Date) => projects.flatMap((project) => getProjectMarkers(project, date, calendarView));
 
   const healthStats = useMemo(
     () => ({
@@ -367,7 +437,7 @@ export function ProjectMonitoring() {
             <p className="text-sm font-semibold uppercase tracking-wide text-color-primary">Monitoring Proyek</p>
             <h1 className="mt-2 text-2xl font-bold text-color-foreground">Kalender & informasi proyek</h1>
             <p className="mt-2 max-w-2xl text-sm text-color-muted-foreground">
-              Kalender fokus ke tanggal mulai dan deadline/end task saja, dengan pembeda deadline aktif dan deadline proyek yang sudah selesai.
+              Kalender menampilkan rentang agenda proyek penuh dari tanggal mulai sampai deadline, termasuk pembeda proyek aktif dan yang sudah selesai.
             </p>
           </div>
 
@@ -469,27 +539,29 @@ export function ProjectMonitoring() {
             {markersByDate.map(({ date, markers }) => {
               const isCurrentMonth = date.getMonth() === anchorDate.getMonth();
               const isToday = isSameDay(date, new Date());
-              const { starts, deadlines, activeDeadlines, completedDeadlines } = getDateSummary(projects, date);
+              const { starts, ranges, deadlines, activeDeadlines, completedDeadlines } = getDateSummary(projects, date);
               const visibleMarkers = markers.slice(0, calendarView === "month" ? 2 : 4);
               const hiddenCount = markers.length - visibleMarkers.length;
-              const isActiveDate = starts.length > 0 || deadlines.length > 0;
+              const isActiveDate = starts.length > 0 || ranges.length > 0 || deadlines.length > 0;
 
               return (
                 <div
                   key={toDateKey(date)}
+                  onClick={() => setSelectedDateAgenda({ date, markers })}
                   className={`min-h-32 border-b border-r border-color-border p-3 transition-colors ${
                     calendarView === "month" && !isCurrentMonth
                       ? "bg-color-secondary/70 text-color-muted-foreground"
                       : isActiveDate
                         ? "bg-color-primary/10"
                         : "bg-color-card"
-                  }`}
+                  } cursor-pointer hover:bg-color-primary/15`}
                 >
                   <div className="mb-3 flex items-center justify-between">
                     <span
                       className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
                         isToday ? "bg-color-primary text-color-primary-foreground" : "text-color-foreground"
                       }`}
+                      title={`Lihat event ${formatReadableDate(date)}`}
                     >
                       {date.getDate()}
                     </span>
@@ -499,11 +571,16 @@ export function ProjectMonitoring() {
                   </div>
 
                   <div className="space-y-2">
-                    {(starts.length > 0 || deadlines.length > 0) && (
+                    {(starts.length > 0 || ranges.length > 0 || deadlines.length > 0) && (
                       <div className="flex flex-wrap gap-1">
                         {starts.length > 0 && (
                           <span className="rounded-full bg-color-status-success-surface px-1.5 py-0.5 text-xs font-bold text-color-status-success">
                             {starts.length} mulai
+                          </span>
+                        )}
+                        {ranges.length > 0 && (
+                          <span className="rounded-full bg-color-status-info-surface px-1.5 py-0.5 text-xs font-bold text-color-status-info">
+                            {ranges.length} berjalan
                           </span>
                         )}
                         {activeDeadlines.length > 0 && (
@@ -532,6 +609,8 @@ export function ProjectMonitoring() {
                               date
                             })
                           }
+                          onMouseDown={(event) => event.stopPropagation()}
+                          onClickCapture={(event) => event.stopPropagation()}
                           className={`flex w-full items-center gap-1.5 rounded-md border border-l-4 px-1.5 py-1 text-left text-xs font-semibold transition-colors hover:brightness-95 ${getMarkerBadgeClass(marker)}`}
                           style={getProjectMarkerStyle(marker.project)}
                         >
@@ -543,7 +622,7 @@ export function ProjectMonitoring() {
                           <span className="truncate">{getMarkerLabel(marker.type, marker.project)} - {marker.project.name}</span>
                         </button>
                       ))}
-                      {hiddenCount > 0 && <p className="text-xs font-semibold text-color-muted-foreground">+{hiddenCount} milestone lain</p>}
+                      {hiddenCount > 0 && <p className="text-xs font-semibold text-color-muted-foreground">+{hiddenCount} agenda lain</p>}
                     </div>
                   </div>
                 </div>
@@ -557,7 +636,7 @@ export function ProjectMonitoring() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-bold uppercase tracking-wide text-color-foreground">Agenda proyek</h2>
-                <p className="mt-1 text-xs text-color-muted-foreground">Daftar tanggal mulai dan deadline/end task sesuai periode, lengkap status dan prioritas.</p>
+                <p className="mt-1 text-xs text-color-muted-foreground">Daftar rentang agenda proyek penuh sesuai periode, lengkap status dan prioritas.</p>
               </div>
               <span className="rounded-full bg-color-primary/10 px-2.5 py-1 text-xs font-semibold text-color-primary">
                 {selectedAgenda.length}
@@ -574,7 +653,7 @@ export function ProjectMonitoring() {
 
               {selectedAgenda.length === 0 && (
                 <p className="rounded-lg border border-dashed border-color-border py-8 text-center text-sm text-color-muted-foreground">
-                  Belum ada tanggal mulai atau deadline pada periode ini.
+                  Belum ada agenda proyek pada periode ini.
                 </p>
               )}
             </div>
@@ -663,13 +742,32 @@ export function ProjectMonitoring() {
                   {getMarkerLabel(selectedProjectDetail.type, selectedProjectDetail.project)} - {formatReadableDate(selectedProjectDetail.date)}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedProjectDetail(null)}
-                className="rounded-md border border-color-border px-3 py-1.5 text-xs font-semibold text-color-foreground hover:bg-color-secondary"
-              >
-                Tutup
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedProjectDetail.sourceAgendaDate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const agendaDate = selectedProjectDetail.sourceAgendaDate;
+                      if (!agendaDate) return;
+                      setSelectedProjectDetail(null);
+                      setSelectedDateAgenda({
+                        date: agendaDate,
+                        markers: getDateAgendaMarkers(agendaDate)
+                      });
+                    }}
+                    className="rounded-md border border-color-primary/30 bg-color-primary/10 px-3 py-1.5 text-xs font-semibold text-color-primary hover:bg-color-primary/15"
+                  >
+                    Kembali
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedProjectDetail(null)}
+                  className="rounded-md border border-color-border px-3 py-1.5 text-xs font-semibold text-color-foreground hover:bg-color-secondary"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -707,6 +805,70 @@ export function ProjectMonitoring() {
               <div className="h-2 overflow-hidden rounded-full bg-color-accent">
                 <div className="h-full rounded-full bg-color-primary" style={{ width: `${getProgress(selectedProjectDetail.project)}%` }} />
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedDateAgenda && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+          style={{ backgroundColor: "rgba(15, 23, 42, 0.58)" }}
+          onClick={() => setSelectedDateAgenda(null)}
+        >
+          <div
+            className="isolate w-full max-w-2xl rounded-2xl border border-color-border bg-color-popover p-6 text-color-popover-foreground shadow-2xl"
+            style={{ backgroundColor: "var(--popover)" }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-color-primary">Agenda Harian</p>
+                <h3 className="mt-1 text-lg font-bold text-color-foreground">{formatReadableDate(selectedDateAgenda.date)}</h3>
+                <p className="mt-1 text-xs text-color-muted-foreground">{selectedDateAgenda.markers.length} event pada hari ini.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDateAgenda(null)}
+                className="rounded-md border border-color-border px-3 py-1.5 text-xs font-semibold text-color-foreground hover:bg-color-secondary"
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
+              {selectedDateAgenda.markers
+                .slice()
+                .sort((left, right) => {
+                  const leftEnd = parseDate(left.project.end_date)?.getTime() ?? Number.POSITIVE_INFINITY;
+                  const rightEnd = parseDate(right.project.end_date)?.getTime() ?? Number.POSITIVE_INFINITY;
+                  if (leftEnd !== rightEnd) return leftEnd - rightEnd;
+                  return left.project.name.localeCompare(right.project.name, "id-ID");
+                })
+                .map((marker, index) => (
+                <button
+                  key={`${selectedDateAgenda.date.toISOString()}-${marker.project.id}-${marker.type}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDateAgenda(null);
+                    setSelectedProjectDetail({
+                      project: marker.project,
+                      type: marker.type,
+                      date: selectedDateAgenda.date,
+                      sourceAgendaDate: selectedDateAgenda.date
+                    });
+                  }}
+                  className="w-full text-left"
+                >
+                  <ProjectAgendaItem marker={marker} highlightAttention />
+                </button>
+              ))}
+
+              {selectedDateAgenda.markers.length === 0 && (
+                <p className="rounded-lg border border-dashed border-color-border py-8 text-center text-sm text-color-muted-foreground">
+                  Tidak ada event pada tanggal ini.
+                </p>
+              )}
             </div>
           </div>
         </div>

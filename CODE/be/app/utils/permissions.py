@@ -7,16 +7,12 @@ from app.utils.exceptions import ApiError
 
 PERMISSION_ACTIONS = ("view", "create", "edit", "delete", "restore")
 PERMISSION_FALLBACKS = {
-    "projectPhases": ("masterProjects",),
-    "projectMembers": ("masterProjects",),
-    "projectIssues": ("issues", "masterProjects"),
-    "projectTasks": ("tasks", "masterProjects"),
-    "projectAttachments": ("masterProjects",),
-    "projectMeetings": ("masterProjects",),
+    "projectIssues": ("issues",),
 }
 
 MODULE_KEYS = (
     "dashboard",
+    "calendar",
     "tasks",
     "issues",
     "workload",
@@ -26,9 +22,13 @@ MODULE_KEYS = (
     "projectMembers",
     "projectTasks",
     "projectTaskComments",
+    "projectGantt",
+    "projectTimesheets",
     "projectIssues",
     "projectAttachments",
     "projectMeetings",
+    "emailPreferences",
+    "adminEmailLogs",
     "masterRoles",
     "masterOrganizations",
     "masterOrganizationUnits",
@@ -56,6 +56,7 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
     "Administrator": create_role_permissions(
         {
             "dashboard": {"view": True},
+            "calendar": {"view": True},
             "tasks": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "issues": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "workload": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
@@ -65,9 +66,13 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
             "projectMembers": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "projectTasks": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "projectTaskComments": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
+            "projectGantt": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
+            "projectTimesheets": {"view": True},
             "projectIssues": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "projectAttachments": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "projectMeetings": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
+            "emailPreferences": {"view": True, "edit": True},
+            "adminEmailLogs": {"view": True, "create": True, "edit": True},
             "masterRoles": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "masterOrganizations": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "masterOrganizationUnits": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
@@ -77,6 +82,7 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
     "Project Manager": create_role_permissions(
         {
             "dashboard": {"view": True},
+            "calendar": {"view": True},
             "tasks": {"view": True, "create": True, "edit": True},
             "issues": {"view": True, "create": True, "edit": True},
             "workload": {"view": True},
@@ -85,6 +91,8 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
             "projectMembers": {"view": True, "create": True, "delete": True},
             "projectTasks": {"view": True, "create": True, "edit": True},
             "projectTaskComments": {"view": True, "create": True},
+            "projectGantt": {"view": True},
+            "projectTimesheets": {"view": True},
             "projectIssues": {"view": True, "create": True, "edit": True},
             "projectAttachments": {"view": True, "create": True, "edit": True, "delete": True},
             "projectMeetings": {"view": True, "create": True, "edit": True, "delete": True},
@@ -96,6 +104,7 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
     "HR Admin": create_role_permissions(
         {
             "dashboard": {"view": True},
+            "calendar": {"view": True},
             "workload": {"view": True},
             "masterEmployees": {"view": True, "create": True, "edit": True, "delete": True, "restore": True},
             "masterRoles": {"view": True},
@@ -107,6 +116,7 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
     "Viewer": create_role_permissions(
         {
             "dashboard": {"view": True},
+            "calendar": {"view": True},
             "tasks": {"view": True},
             "issues": {"view": True},
             "workload": {"view": True},
@@ -116,6 +126,8 @@ DEFAULT_ROLE_PERMISSIONS_BY_NAME = {
             "projectMembers": {"view": True},
             "projectTasks": {"view": True},
             "projectTaskComments": {"view": True},
+            "projectGantt": {"view": True},
+            "projectTimesheets": {"view": True},
             "projectIssues": {"view": True},
             "projectAttachments": {"view": True},
             "projectMeetings": {"view": True},
@@ -154,7 +166,8 @@ def get_current_user():
 
 
 def get_user_permissions(user: User):
-    return normalize_permissions(user.role.permissions if user.role else None)
+    role = user.employee.role if user.employee_id and user.employee and user.employee.role else user.role
+    return normalize_permissions(role.permissions if role else None)
 
 
 def user_has_permission(user: User, module: str, action: str):
@@ -185,6 +198,22 @@ def require_permission(module: str, action: str):
                 raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)
             return handler(*args, **kwargs)
 
+        wrapper._required_permissions = [f"{module}.{action}"]
+        return wrapper
+
+    return decorator
+
+
+def require_any_permission(required_permissions: tuple[tuple[str, str], ...]):
+    def decorator(handler):
+        @wraps(handler)
+        def wrapper(*args, **kwargs):
+            user = get_current_user()
+            if any(user_has_permission(user, module, action) for module, action in required_permissions):
+                return handler(*args, **kwargs)
+            raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)
+
+        wrapper._required_permissions = [f"{module}.{action}" for module, action in required_permissions]
         return wrapper
 
     return decorator
@@ -200,6 +229,31 @@ def require_project_permission(module: str, action: str, project_id_arg: str = "
                 return handler(*args, **kwargs)
             raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)
 
+        wrapper._required_permissions = [f"{module}.{action}", "project member/manager"]
+        return wrapper
+
+    return decorator
+
+
+def require_project_any_permission(
+    required_permissions: tuple[tuple[str, str], ...],
+    project_id_arg: str = "project_id",
+):
+    def decorator(handler):
+        @wraps(handler)
+        def wrapper(*args, **kwargs):
+            user = get_current_user()
+            project_id = kwargs.get(project_id_arg)
+            if any(user_has_permission(user, module, action) for module, action in required_permissions):
+                return handler(*args, **kwargs)
+            if user_is_project_member(user, project_id):
+                return handler(*args, **kwargs)
+            raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)
+
+        wrapper._required_permissions = [
+            *(f"{module}.{action}" for module, action in required_permissions),
+            "project member/manager",
+        ]
         return wrapper
 
     return decorator

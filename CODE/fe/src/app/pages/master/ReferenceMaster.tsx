@@ -14,12 +14,14 @@ import type {
 import { loadAuthSession } from "../../data/auth";
 import type { ModuleKey } from "../../data/masterData";
 import { hasPermission } from "../../utils/permissions";
+import { PaginationControls } from "../../components/ui";
 
 type ModalMode = "create" | "edit";
 type ReferenceFormState = {
   name: string;
   status: MasterReferenceStatus;
 };
+const PAGE_SIZE = 10;
 
 type ReferenceMasterProps = {
   type: MasterReferenceType;
@@ -66,6 +68,7 @@ export function ReferenceMaster({
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState<ReferenceFormState>(emptyReferenceForm);
+  const [page, setPage] = useState(1);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -98,8 +101,15 @@ export function ReferenceMaster({
       return item.name.toLowerCase().includes(normalizedQuery);
     });
   }, [items, query, statusFilter]);
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredItems.slice(start, start + PAGE_SIZE);
+  }, [filteredItems, page]);
 
   const hasSearchInput = searchInput.trim().length > 0;
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, type]);
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -284,7 +294,7 @@ export function ReferenceMaster({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredItems.map((item) => (
+                {paginatedItems.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center">
@@ -329,6 +339,7 @@ export function ReferenceMaster({
                 ))}
               </tbody>
             </table>
+            <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={filteredItems.length} onPageChange={setPage} className="border-t border-slate-200" />
           </div>
         )}
       </div>

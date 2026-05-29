@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Filter, Pencil, Plus, Search, Shield, UserCheck, UserX, X } from "lucide-react";
 import {
-  modulePermissionLabels,
   type ModuleKey,
   type PermissionSet,
   type Role,
@@ -10,10 +9,12 @@ import {
 import { loadAuthSession } from "../../data/auth";
 import { createRole, fetchRoles, updateRole, updateRoleStatus } from "../../services/masterApi";
 import { hasPermission } from "../../utils/permissions";
+import { PaginationControls } from "../../components/ui";
 
 type ModalMode = "create" | "edit";
 type RoleFormState = Omit<Role, "id">;
-const permissionKeys: Array<keyof PermissionSet> = ["view", "create", "edit", "delete", "restore"];
+const permissionKeys: Array<keyof PermissionSet> = ["view", "create", "edit", "delete"];
+const PAGE_SIZE = 10;
 
 function createEmptyPermissionSet(): PermissionSet {
   return { view: false, create: false, edit: false, delete: false, restore: false };
@@ -22,6 +23,7 @@ function createEmptyPermissionSet(): PermissionSet {
 function createEmptyPermissions(): Record<ModuleKey, PermissionSet> {
   return {
     dashboard: createEmptyPermissionSet(),
+    calendar: createEmptyPermissionSet(),
     tasks: createEmptyPermissionSet(),
     issues: createEmptyPermissionSet(),
     workload: createEmptyPermissionSet(),
@@ -31,15 +33,154 @@ function createEmptyPermissions(): Record<ModuleKey, PermissionSet> {
     projectMembers: createEmptyPermissionSet(),
     projectTasks: createEmptyPermissionSet(),
     projectTaskComments: createEmptyPermissionSet(),
+    projectGantt: createEmptyPermissionSet(),
+    projectTimesheets: createEmptyPermissionSet(),
     projectIssues: createEmptyPermissionSet(),
     projectAttachments: createEmptyPermissionSet(),
     projectMeetings: createEmptyPermissionSet(),
+    emailPreferences: createEmptyPermissionSet(),
+    adminEmailLogs: createEmptyPermissionSet(),
     masterRoles: createEmptyPermissionSet(),
     masterOrganizations: createEmptyPermissionSet(),
     masterOrganizationUnits: createEmptyPermissionSet(),
     masterPositions: createEmptyPermissionSet()
   };
 }
+
+const actionLabels: Record<keyof PermissionSet, string> = {
+  view: "Lihat",
+  create: "Tambah",
+  edit: "Ubah",
+  delete: "Hapus",
+  restore: "Restore"
+};
+
+type MenuPermissionGroup = {
+  id: string;
+  label: string;
+  description: string;
+  modules: ModuleKey[];
+  actions?: Array<keyof PermissionSet>;
+  children?: MenuPermissionGroup[];
+};
+
+type MenuPermissionRow = {
+  group: MenuPermissionGroup;
+  depth: number;
+};
+
+const menuPermissionGroups: MenuPermissionGroup[] = [
+  {
+    id: "dashboard",
+    label: "Beranda",
+    description: "Dashboard utama aplikasi.",
+    modules: ["dashboard"],
+    actions: ["view"]
+  },
+  {
+    id: "calendar",
+    label: "Kalender",
+    description: "Kalender monitoring proyek.",
+    modules: ["calendar"],
+    actions: ["view"]
+  },
+  {
+    id: "my-tasks",
+    label: "Tugas Saya",
+    description: "Halaman tugas pribadi, isu aktif, kalender personal, dan timesheet.",
+    modules: ["tasks"]
+  },
+  {
+    id: "projects",
+    label: "Proyek",
+    description: "Daftar proyek, ringkasan detail, dan fase otomatis.",
+    modules: ["masterProjects"],
+    children: [
+      {
+        id: "project-members",
+        label: "Anggota",
+        description: "Tab anggota, RASCI, dan pengelolaan member proyek.",
+        modules: ["projectMembers"]
+      },
+      {
+        id: "project-tasks",
+        label: "Tugas",
+        description: "Tab tugas proyek dan komentar/checklist tugas.",
+        modules: ["projectTasks", "projectTaskComments"]
+      },
+      {
+        id: "project-gantt",
+        label: "Gantt",
+        description: "Tab timeline Gantt proyek.",
+        modules: ["projectGantt"],
+        actions: ["view"]
+      },
+      {
+        id: "project-timesheets",
+        label: "Timesheet",
+        description: "Tab matrix/rekap timesheet member proyek.",
+        modules: ["projectTimesheets"],
+        actions: ["view"]
+      },
+      {
+        id: "project-issues",
+        label: "Isu & Bug",
+        description: "Tab isu dan bug pada detail proyek.",
+        modules: ["projectIssues"]
+      },
+      {
+        id: "project-attachments",
+        label: "Lampiran",
+        description: "Tab folder dan file lampiran proyek.",
+        modules: ["projectAttachments"]
+      },
+      {
+        id: "project-meetings",
+        label: "Meeting",
+        description: "Tab meeting, meeting notes, dan file MoM.",
+        modules: ["projectMeetings"]
+      }
+    ]
+  },
+  {
+    id: "issues",
+    label: "Isu & Bug",
+    description: "Menu global daftar isu, bug board, dan SLA.",
+    modules: ["issues"]
+  },
+  {
+    id: "workload",
+    label: "SDM & Kapabilitas",
+    description: "Heatmap workload dan kapasitas SDM.",
+    modules: ["workload"],
+    actions: ["view"]
+  },
+  {
+    id: "master",
+    label: "Data Master",
+    description: "Pegawai, role, organisasi, unit organisasi, dan jabatan.",
+    modules: ["masterEmployees", "masterRoles", "masterOrganizations", "masterOrganizationUnits", "masterPositions"]
+  },
+  {
+    id: "email-preferences",
+    label: "Notifikasi Email",
+    description: "Preferensi email pengguna.",
+    modules: ["emailPreferences"],
+    actions: ["view", "edit"]
+  },
+  {
+    id: "email-log",
+    label: "Email Log",
+    description: "Monitoring dan resend outbox email.",
+    modules: ["adminEmailLogs"],
+    actions: ["view", "edit"]
+  }
+];
+
+const menuPermissionRows: MenuPermissionRow[] = menuPermissionGroups.flatMap((group) => [
+  { group, depth: 0 },
+  ...(group.children ?? []).map((child) => ({ group: child, depth: 1 }))
+]);
 
 function normalizePermissions(
   permissions: Partial<Record<ModuleKey, PermissionSet>> | undefined
@@ -82,6 +223,7 @@ export function RoleMaster() {
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState<RoleFormState>(emptyRoleFormState);
+  const [page, setPage] = useState(1);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -114,7 +256,15 @@ export function RoleMaster() {
       return `${role.name} ${role.description}`.toLowerCase().includes(normalizedQuery);
     });
   }, [query, roles, statusFilter]);
+  const paginatedRoles = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredRoles.slice(start, start + PAGE_SIZE);
+  }, [filteredRoles, page]);
   const hasSearchInput = searchInput.trim().length > 0;
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter]);
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -166,39 +316,71 @@ export function RoleMaster() {
     }
   };
 
-  const updatePermission = (moduleKey: ModuleKey, permissionKey: keyof PermissionSet, checked: boolean) => {
+  const isActionSupported = (group: MenuPermissionGroup, permissionKey: keyof PermissionSet) =>
+    (group.actions ?? permissionKeys).includes(permissionKey);
+
+  const updateMenuPermission = (
+    group: MenuPermissionGroup,
+    permissionKey: keyof PermissionSet,
+    checked: boolean
+  ) => {
+    if (!isActionSupported(group, permissionKey)) return;
     setForm((current) => ({
       ...current,
-      permissions: {
-        ...current.permissions,
-        [moduleKey]: {
-          ...current.permissions[moduleKey],
-          [permissionKey]: checked
-        }
-      }
+      permissions: group.modules.reduce<Record<ModuleKey, PermissionSet>>(
+        (acc, moduleKey) => {
+          acc[moduleKey] = {
+            ...acc[moduleKey],
+            [permissionKey]: checked
+          };
+          return acc;
+        },
+        { ...current.permissions }
+      )
     }));
   };
 
   const updateAllPermissionsByAction = (permissionKey: keyof PermissionSet, checked: boolean) => {
     setForm((current) => ({
       ...current,
-      permissions: (Object.keys(current.permissions) as ModuleKey[]).reduce<Record<ModuleKey, PermissionSet>>(
-        (acc, moduleKey) => {
-          acc[moduleKey] = {
-            ...current.permissions[moduleKey],
-            [permissionKey]: checked
-          };
-          return acc;
-        },
-        {} as Record<ModuleKey, PermissionSet>
+      permissions: menuPermissionRows.reduce<Record<ModuleKey, PermissionSet>>(
+        (acc, { group }) =>
+          isActionSupported(group, permissionKey)
+            ? group.modules.reduce<Record<ModuleKey, PermissionSet>>((moduleAcc, moduleKey) => {
+                moduleAcc[moduleKey] = {
+                  ...moduleAcc[moduleKey],
+                  [permissionKey]: checked
+                };
+                return moduleAcc;
+              }, acc)
+            : acc,
+        { ...current.permissions }
       )
     }));
   };
 
   const isAllCheckedForAction = (permissionKey: keyof PermissionSet) =>
-    (Object.keys(form.permissions) as ModuleKey[]).every(
-      (moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey])
-    );
+    menuPermissionRows
+      .filter(({ group }) => isActionSupported(group, permissionKey))
+      .every(({ group }) => group.modules.every((moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey])));
+
+  const isMenuActionChecked = (group: MenuPermissionGroup, permissionKey: keyof PermissionSet) =>
+    group.modules.every((moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey]));
+
+  const isMenuPartiallyChecked = (group: MenuPermissionGroup, permissionKey: keyof PermissionSet) =>
+    !isMenuActionChecked(group, permissionKey) &&
+    group.modules.some((moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey]));
+
+  const enabledMenuLabels = (permissions: Record<ModuleKey, PermissionSet>) =>
+    menuPermissionGroups
+      .filter(
+        (group) =>
+          group.modules.some((moduleKey) => Boolean(permissions[moduleKey]?.view)) ||
+          (group.children ?? []).some((child) =>
+            child.modules.some((moduleKey) => Boolean(permissions[moduleKey]?.view))
+          )
+      )
+      .map((group) => group.label);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -323,10 +505,8 @@ export function RoleMaster() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-color-border">
-                {filteredRoles.map((role) => {
-                  const enabledModules = Object.entries(role.permissions)
-                    .filter(([, permission]) => permission.view)
-                    .map(([moduleKey]) => modulePermissionLabels[moduleKey as ModuleKey]);
+                {paginatedRoles.map((role) => {
+                  const enabledMenus = enabledMenuLabels(role.permissions);
 
                   return (
                     <tr key={role.id} className="hover:bg-color-secondary transition-colors">
@@ -334,8 +514,8 @@ export function RoleMaster() {
                       <td className="px-4 py-3 text-color-muted-foreground">{role.description}</td>
                       <td className="px-4 py-3 text-color-muted-foreground">
                         <div className="flex flex-wrap gap-1.5">
-                          {enabledModules.length > 0
-                            ? enabledModules.map((label) => (
+                          {enabledMenus.length > 0
+                            ? enabledMenus.map((label) => (
                                 <span key={label} className="inline-flex px-2 py-0.5 text-xs rounded-full bg-color-accent text-color-foreground">
                                   {label}
                                 </span>
@@ -379,6 +559,7 @@ export function RoleMaster() {
                 })}
               </tbody>
             </table>
+            <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={filteredRoles.length} onPageChange={setPage} className="border-t border-color-border" />
           </div>
         )}
       </div>
@@ -439,17 +620,20 @@ export function RoleMaster() {
 
               <div className="rounded-xl border border-color-border overflow-hidden">
                 <div className="px-4 py-3 bg-color-secondary border-b border-color-border">
-                  <h3 className="text-sm font-semibold text-color-foreground">Permission Matrix</h3>
+                  <h3 className="text-sm font-semibold text-color-foreground">Akses Menu Utama</h3>
+                  <p className="mt-1 text-xs text-color-muted-foreground">
+                    Daftar ini mengikuti menu level 1 di sidebar. Menu Proyek dibuka sebagai tree agar akses tab detail bisa diatur terpisah.
+                  </p>
                 </div>
                 <div className="max-h-[42vh] overflow-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="sticky top-0 z-10 text-xs text-color-muted-foreground uppercase bg-color-secondary border-b border-color-border shadow-sm">
                       <tr>
-                        <th className="px-4 py-3 font-medium">Modul</th>
+                        <th className="px-4 py-3 font-medium">Menu</th>
                         {permissionKeys.map((permissionKey) => (
                           <th key={`header-${permissionKey}`} className="px-4 py-3 font-medium text-center">
                             <div className="flex flex-col items-center gap-1">
-                              <span>{permissionKey}</span>
+                              <span>{actionLabels[permissionKey]}</span>
                               <label className="inline-flex items-center gap-1 normal-case text-xs text-color-muted-foreground">
                                 <input
                                   type="checkbox"
@@ -465,21 +649,34 @@ export function RoleMaster() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-color-border">
-                      {Object.entries(modulePermissionLabels).map(([moduleKey, label]) => {
-                        const permission = form.permissions[moduleKey as ModuleKey];
+                      {menuPermissionRows.map(({ group, depth }) => {
                         return (
-                          <tr key={moduleKey}>
-                            <td className="px-4 py-3 font-medium text-color-foreground">{label}</td>
+                          <tr key={group.id} className={depth > 0 ? "bg-color-secondary/35" : undefined}>
+                            <td className="px-4 py-3">
+                              <div className={depth > 0 ? "pl-5 border-l-2 border-color-border" : undefined}>
+                                <p className={`font-medium ${depth > 0 ? "text-color-foreground/90" : "text-color-foreground"}`}>
+                                  {depth > 0 ? `-> ${group.label}` : group.label}
+                                </p>
+                                <p className="mt-0.5 text-xs text-color-muted-foreground">{group.description}</p>
+                              </div>
+                            </td>
                             {permissionKeys.map((permissionKey) => (
-                              <td key={`${moduleKey}-${permissionKey}`} className="px-4 py-3 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={permission[permissionKey]}
-                                  onChange={(event) =>
-                                    updatePermission(moduleKey as ModuleKey, permissionKey, event.target.checked)
-                                  }
-                                  className="rounded border-color-border text-color-primary focus:ring-color-ring"
-                                />
+                              <td key={`${group.id}-${permissionKey}`} className="px-4 py-3 text-center">
+                                {isActionSupported(group, permissionKey) ? (
+                                  <label className="inline-flex flex-col items-center gap-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={isMenuActionChecked(group, permissionKey)}
+                                      onChange={(event) => updateMenuPermission(group, permissionKey, event.target.checked)}
+                                      className="rounded border-color-border text-color-primary focus:ring-color-ring"
+                                    />
+                                    {isMenuPartiallyChecked(group, permissionKey) && (
+                                      <span className="text-[10px] normal-case text-color-status-warning">Sebagian</span>
+                                    )}
+                                  </label>
+                                ) : (
+                                  <span className="text-color-muted-foreground">-</span>
+                                )}
                               </td>
                             ))}
                           </tr>

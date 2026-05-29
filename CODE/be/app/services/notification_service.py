@@ -1,6 +1,7 @@
 from app.extensions import db
 from app.models import Employee, Notification, User
 from app.repositories import NotificationRepository
+from app.services.email_service import enqueue_event_email
 from app.utils.exceptions import ApiError
 
 
@@ -29,7 +30,15 @@ def _find_user_for_employee(employee_id: str | None = None, employee_name: str |
     return None
 
 
-def notify_user(user_id: int | None, title: str, message: str, entity_type: str, entity_id: str, target_url: str | None = None):
+def _template_for_entity(entity_type: str):
+    return {
+        "project": ("project.assigned", "project_assigned"),
+        "task": ("task.assigned", "task_assigned"),
+        "issue": ("issue.assigned", "issue_assigned"),
+    }.get(entity_type)
+
+
+def notify_user(user_id: int | None, title: str, message: str, entity_type: str, entity_id: str, target_url: str | None = None, send_email: bool = True):
     if not user_id:
         return None
 
@@ -43,6 +52,20 @@ def notify_user(user_id: int | None, title: str, message: str, entity_type: str,
         is_read=False,
     )
     db.session.add(notification)
+    if send_email:
+        user = db.session.get(User, user_id)
+        mapping = _template_for_entity(entity_type)
+        if user and mapping:
+            event_key, template_key = mapping
+            enqueue_event_email(
+                user=user,
+                event_key=event_key,
+                template_key=template_key,
+                subject=title,
+                context={"title": title, "description": message, "project_name": "", "target_url": target_url},
+                entity_type=entity_type,
+                entity_id=entity_id,
+            )
     return notification
 
 

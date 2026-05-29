@@ -2,15 +2,16 @@
 
 ## Purpose
 
-Mengelola login, register, refresh token, profil user, ganti password, project milik user, dan assignment counter.
+Mengelola login, register, refresh token, profil user, onboarding login pertama, ganti password, project milik user, dan assignment counter.
 
 ## Business Flow
 
 1. User login atau register dari frontend.
 2. Backend memvalidasi credential/data register dan menerbitkan JWT.
 3. Frontend menyimpan session dan permission.
-4. Protected route memakai permission untuk mengizinkan akses halaman.
-5. API authenticated memakai JWT dan permission backend.
+4. Jika `onboarding_completed` bernilai false, frontend menampilkan tur onboarding dan mengirim completion saat user selesai/lewati.
+5. Protected route memakai permission untuk mengizinkan akses halaman.
+6. API authenticated memakai JWT dan permission backend.
 
 ## User Roles / Permissions
 
@@ -29,6 +30,7 @@ Semua role dapat login jika user aktif. Akses halaman ditentukan oleh permission
 
 - `CODE/fe/src/app/pages/auth/LoginPage.tsx`
 - `CODE/fe/src/app/App.tsx`
+- `CODE/fe/src/app/components/onboarding/OnboardingTour.tsx`
 - `CODE/fe/src/app/data/auth.ts`
 - `CODE/fe/src/app/services/authApi.ts`
 - `CODE/fe/src/app/utils/permissions.ts`
@@ -42,6 +44,7 @@ Semua role dapat login jika user aktif. Akses halaman ditentukan oleh permission
 | GET | `/api/v1/auth/register-options` | Data master aktif untuk register |
 | POST | `/api/v1/auth/refresh` | Refresh access token |
 | GET | `/api/v1/auth/me` | Current user profile |
+| POST | `/api/v1/auth/onboarding/complete` | Menandai onboarding user selesai |
 | POST | `/api/v1/auth/change-password` | Change password |
 | GET | `/api/v1/auth/my-projects` | Project user saat ini |
 | GET | `/api/v1/auth/my-assignment-counter` | Counter task/issue aktif user |
@@ -50,7 +53,7 @@ Semua role dapat login jika user aktif. Akses halaman ditentukan oleh permission
 
 | Table/Model | Usage |
 |---|---|
-| `users` / `User` | Login identity |
+| `users` / `User` | Login identity dan status onboarding |
 | `roles` / `Role` | Permission source |
 | `employees` / `Employee` | Linked employee profile |
 | `projects`, `project_members` | My projects |
@@ -59,6 +62,8 @@ Semua role dapat login jika user aktif. Akses halaman ditentukan oleh permission
 ## Validation Rules
 
 - Login email/password wajib valid.
+- User baru default `onboarding_completed = false`; migration menandai user existing sebagai true agar onboarding fokus pada user baru.
+- Onboarding selesai dapat ditandai oleh user login sendiri.
 - Register wajib nama, email, password, dan password minimal 8 karakter.
 - Register `confirm_password` harus cocok.
 - Email user harus unik.
@@ -77,7 +82,9 @@ Menggunakan `ApiError`. Auth failure umumnya status 401; duplicate email status 
 
 - `CODE/be/app/api/v1/auth.py`
 - `CODE/be/app/services/auth_service.py`
+- `CODE/be/app/models/user.py`
 - `CODE/fe/src/app/pages/auth/LoginPage.tsx`
+- `CODE/fe/src/app/components/onboarding/OnboardingTour.tsx`
 - `CODE/fe/src/app/services/authApi.ts`
 - `CODE/fe/src/app/data/auth.ts`
 

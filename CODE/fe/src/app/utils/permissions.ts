@@ -3,13 +3,7 @@ import type { ModuleKey, PermissionSet } from "../data/masterData";
 
 const actions: Array<keyof PermissionSet> = ["view", "create", "edit", "delete", "restore"];
 const permissionFallbacks: Partial<Record<ModuleKey, ModuleKey[]>> = {
-  projectPhases: ["masterProjects"],
-  projectMembers: ["masterProjects"],
-  projectIssues: ["issues", "masterProjects"],
-  projectTasks: ["tasks", "masterProjects"],
-  projectTaskComments: ["tasks", "masterProjects"],
-  projectAttachments: ["masterProjects"],
-  projectMeetings: ["masterProjects"]
+  projectIssues: ["issues"]
 };
 
 export function hasPermission(

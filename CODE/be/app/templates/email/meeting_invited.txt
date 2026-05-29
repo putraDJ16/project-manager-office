@@ -1,0 +1,7 @@
+Undangan Rapat
+
+Anda diundang ke rapat: {{ title }}
+Waktu: {{ start }}. Lokasi/link: {{ location }} {{ meeting_url }}
+
+Buka di PMO: {{ frontend_url }}
+Anda menerima email ini karena terdaftar di PMO.

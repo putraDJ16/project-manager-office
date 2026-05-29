@@ -8,6 +8,7 @@ from app.repositories.project_attachment_repository import ProjectAttachmentRepo
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.role_repository import RoleRepository
 from app.repositories.task_repository import TaskRepository
+from app.repositories.timesheet_repository import TimesheetRepository
 
 __all__ = [
     "RoleRepository",
@@ -20,4 +21,5 @@ __all__ = [
     "OrganizationUnitRepository",
     "PositionRepository",
     "ProjectAttachmentRepository",
+    "TimesheetRepository",
 ]

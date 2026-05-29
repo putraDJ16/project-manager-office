@@ -98,6 +98,7 @@ export function LoginPage({ onLogin, themeMode, onToggleTheme }: LoginPageProps)
       role: result.user.role,
       employeeId: result.user.employee_id,
       employeeName: result.user.employee_name,
+      onboardingCompleted: result.user.onboarding_completed,
       permissions: result.user.permissions,
       loggedInAt: new Date().toISOString(),
       accessToken: result.access_token,

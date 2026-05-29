@@ -74,3 +74,18 @@ Missing notification returns 404 via `ApiError`.
 - Menambah event notification.
 - Menambah filter notification.
 - Mengubah unread badge behavior.
+
+
+## Email Notification Extension
+
+`notify_user` and `notify_employee` still create in-app rows, and now also enqueue email via `email_service.enqueue_event_email` by default. Callers can pass `send_email=False` when an in-app-only notification is required.
+
+Email enqueue is preference-aware: inactive users, empty email addresses, and disabled category flags are skipped for non-security events. Account/security emails (`auth.welcome`, `auth.password_reset`, `auth.password_changed`) are always allowed when the user has an active email.
+
+Related files:
+
+- `CODE/be/app/services/email_service.py`
+- `CODE/be/app/services/email_dispatcher.py`
+- `CODE/be/app/templates/email/`
+- `CODE/be/app/api/v1/email_preferences.py`
+- `CODE/be/app/api/v1/admin_email.py`

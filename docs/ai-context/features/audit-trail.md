@@ -8,8 +8,9 @@ Mencatat aktivitas request dan menyediakan API listing audit trail.
 
 1. Flask `after_request` hook memanggil audit trail service.
 2. Service menyaring/masking payload sensitif.
-3. Audit record disimpan.
-4. Frontend profile dapat mengambil riwayat aktivitas user.
+3. Service dapat menerima `g.audit_note` dari endpoint untuk menyimpan konteks perubahan domain (contoh perubahan status issue).
+4. Audit record disimpan.
+5. Frontend profile dapat mengambil riwayat aktivitas user.
 
 ## User Roles / Permissions
 

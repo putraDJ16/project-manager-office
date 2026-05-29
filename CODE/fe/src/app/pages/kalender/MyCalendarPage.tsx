@@ -15,10 +15,11 @@ import {
   subWeeks
 } from "date-fns";
 import { id as idLocale } from "date-fns/locale/id";
-import { CalendarDays, ChevronLeft, ChevronRight, Loader2, RotateCcw } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, FileClock, Loader2, RotateCcw } from "lucide-react";
 import type { CalendarMeeting, RsvpStatus } from "../../domain/meetings";
 import { projectCalendarColor } from "../../domain/meetings";
 import { fetchMyCalendar } from "../../services/meetingApi";
+import { fetchMyTimesheets, type ApiTimesheet } from "../../services/timesheetApi";
 
 type CalendarView = "month" | "week" | "day";
 type RsvpFilter = "all" | RsvpStatus;
@@ -60,10 +61,12 @@ export function MyCalendarPage() {
   const [view, setView] = useState<CalendarView>("month");
   const [anchorDate, setAnchorDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarMeeting[]>([]);
+  const [timesheets, setTimesheets] = useState<ApiTimesheet[]>([]);
   const [knownProjects, setKnownProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [rsvpFilter, setRsvpFilter] = useState<RsvpFilter>("all");
   const [selectedEvent, setSelectedEvent] = useState<CalendarMeeting | null>(null);
+  const [selectedTimesheetDay, setSelectedTimesheetDay] = useState<{ date: string; entries: ApiTimesheet[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,13 +77,22 @@ export function MyCalendarPage() {
     const loadEvents = async () => {
       setLoading(true);
       try {
-        const result = await fetchMyCalendar({
-          start_date: dateKey(activeRange.start),
-          end_date: dateKey(activeRange.end),
-          project_ids: selectedProjectIds
-        });
+        const startDate = dateKey(activeRange.start);
+        const endDate = dateKey(activeRange.end);
+        const [result, timesheetRows] = await Promise.all([
+          fetchMyCalendar({
+            start_date: startDate,
+            end_date: endDate,
+            project_ids: selectedProjectIds
+          }),
+          fetchMyTimesheets({
+            start_date: startDate,
+            end_date: endDate
+          })
+        ]);
         if (cancelled) return;
         setEvents(result);
+        setTimesheets(timesheetRows);
         setKnownProjects((current) => {
           const map = new Map(current.map((project) => [project.id, project]));
           result.forEach((event) => map.set(event.project_id, { id: event.project_id, name: event.project_name }));
@@ -104,6 +116,15 @@ export function MyCalendarPage() {
     [events, rsvpFilter]
   );
 
+  const visibleTimesheets = useMemo(
+    () =>
+      timesheets.filter((entry) => {
+        if (selectedProjectIds.length === 0) return true;
+        return Boolean(entry.project_id && selectedProjectIds.includes(entry.project_id));
+      }),
+    [selectedProjectIds, timesheets]
+  );
+
   const days = useMemo(() => {
     const dayCount = view === "month" ? 42 : view === "week" ? 7 : 1;
     return Array.from({ length: dayCount }, (_, index) => addDays(activeRange.start, index));
@@ -117,6 +138,14 @@ export function MyCalendarPage() {
     });
     return map;
   }, [visibleEvents]);
+
+  const timesheetsByDay = useMemo(() => {
+    const map = new Map<string, ApiTimesheet[]>();
+    visibleTimesheets.forEach((entry) => {
+      map.set(entry.work_date, [...(map.get(entry.work_date) ?? []), entry]);
+    });
+    return map;
+  }, [visibleTimesheets]);
 
   const toggleProject = (projectId: string) => {
     setSelectedProjectIds((current) =>
@@ -236,11 +265,25 @@ export function MyCalendarPage() {
             {days.map((day) => {
               const key = dateKey(day);
               const dayEvents = eventsByDay.get(key) ?? [];
+              const dayTimesheets = timesheetsByDay.get(key) ?? [];
+              const timesheetHours = dayTimesheets.reduce((sum, entry) => sum + Number(entry.hours_spent || 0), 0);
               const muted = view === "month" && !isSameMonth(day, anchorDate);
+              const isToday = isSameDay(day, new Date());
               return (
-                <div key={key} className={`min-h-32 border-b border-r border-color-border p-2 ${muted ? "bg-color-secondary/40" : ""}`}>
-                  <div className={`mb-2 text-xs font-semibold ${isSameDay(day, new Date()) ? "text-color-primary" : "text-color-muted-foreground"}`}>
-                    {format(day, view === "day" ? "EEEE, d MMMM yyyy" : "d MMM", { locale: idLocale })}
+                <div
+                  key={key}
+                  className={`min-h-32 border-b border-r border-color-border p-2 ${
+                    muted ? "bg-color-secondary/40" : isToday ? "bg-color-primary/10" : ""
+                  }`}
+                >
+                  <div className="mb-2">
+                    <span
+                      className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-semibold ${
+                        isToday ? "bg-color-primary text-color-primary-foreground" : "text-color-muted-foreground"
+                      }`}
+                    >
+                      {format(day, view === "day" ? "EEEE, d MMMM yyyy" : "d MMM", { locale: idLocale })}
+                    </span>
                   </div>
                   <div className="space-y-1.5">
                     {dayEvents.map((event) => (
@@ -255,6 +298,21 @@ export function MyCalendarPage() {
                         <span className="block truncate opacity-90">{event.project_name}</span>
                       </button>
                     ))}
+                    {dayTimesheets.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTimesheetDay({ date: key, entries: dayTimesheets })}
+                        className="w-full rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-left text-xs font-medium text-emerald-700 shadow-sm hover:bg-emerald-100"
+                      >
+                        <span className="flex items-center gap-1.5 truncate">
+                          <FileClock className="h-3.5 w-3.5 shrink-0" />
+                          Timesheet terisi
+                        </span>
+                        <span className="block truncate opacity-90">
+                          {timesheetHours} jam / {dayTimesheets.length} entri
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -284,6 +342,40 @@ export function MyCalendarPage() {
                   Buka link meeting
                 </a>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedTimesheetDay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSelectedTimesheetDay(null)}>
+          <div className="w-full max-w-lg rounded-xl border border-color-border bg-color-card p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-color-foreground">Timesheet Terisi</h2>
+                <p className="mt-1 text-sm text-color-muted-foreground">
+                  {format(new Date(selectedTimesheetDay.date), "EEEE, d MMMM yyyy", { locale: idLocale })}
+                </p>
+              </div>
+              <button type="button" onClick={() => setSelectedTimesheetDay(null)} className="rounded-md border border-color-border px-2 py-1 text-sm">
+                Tutup
+              </button>
+            </div>
+            <div className="space-y-2">
+              {selectedTimesheetDay.entries.map((entry) => (
+                <div key={entry.id} className="rounded-lg border border-color-border bg-color-secondary/40 p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-color-foreground">{entry.task_title ?? entry.task_id ?? "Tanpa tugas"}</p>
+                      <p className="mt-0.5 text-xs text-color-muted-foreground">{entry.project_id ?? "Tanpa project"}</p>
+                    </div>
+                    <span className="shrink-0 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                      {entry.hours_spent} jam
+                    </span>
+                  </div>
+                  {entry.notes && <p className="mt-2 text-xs text-color-muted-foreground">{entry.notes}</p>}
+                </div>
+              ))}
             </div>
           </div>
         </div>

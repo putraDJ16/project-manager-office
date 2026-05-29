@@ -5,12 +5,27 @@ from app.api.v1 import api_v1
 from app.schemas import employee_schema, employees_schema
 from app.services import employee_service
 from app.utils.http import success_response
-from app.utils.permissions import require_permission
+from app.utils.permissions import require_any_permission, require_permission
+
+
+EMPLOYEE_REFERENCE_READ_PERMISSIONS = (
+    ("masterEmployees", "view"),
+    ("masterProjects", "view"),
+    ("projectMembers", "view"),
+    ("projectTasks", "view"),
+    ("projectGantt", "view"),
+    ("projectTimesheets", "view"),
+    ("tasks", "view"),
+    ("projectIssues", "view"),
+    ("issues", "view"),
+    ("workload", "view"),
+    ("calendar", "view"),
+)
 
 
 @api_v1.get("/employees")
 @jwt_required()
-@require_permission("masterEmployees", "view")
+@require_any_permission(EMPLOYEE_REFERENCE_READ_PERMISSIONS)
 def list_employees_handler():
     employees = employee_service.list_employees()
     return success_response(employees_schema.dump(employees))

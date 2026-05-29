@@ -4,6 +4,8 @@ from sqlalchemy import or_
 
 from app.extensions import db
 from app.models import Employee, Project, ProjectMeeting, ProjectMeetingAttendee, ProjectMember, User
+from app.services.email_service import enqueue_event_email
+from app.services.ics_builder import build_meeting_ics
 from app.utils.exceptions import ApiError
 
 
@@ -82,6 +84,38 @@ def _validate_attendees(project_id: str, attendee_ids):
     return normalized
 
 
+def _meeting_context(meeting: ProjectMeeting):
+    return {
+        "meeting": meeting,
+        "meeting_title": meeting.title,
+        "target_url": f"/proyek/{meeting.project_id}?tab=meetings",
+    }
+
+
+def _user_for_employee(employee_id: str):
+    return User.query.filter_by(employee_id=employee_id, is_active=True).first()
+
+
+def _enqueue_meeting_email(meeting: ProjectMeeting, attendee_ids, event_key: str, template_key: str, subject: str, method: str = "REQUEST"):
+    attendees = ProjectMeetingAttendee.query.filter(
+        ProjectMeetingAttendee.meeting_id == meeting.id,
+        ProjectMeetingAttendee.employee_id.in_(list(attendee_ids)),
+    ).all()
+    ical = build_meeting_ics(meeting, attendees=attendees, method=method)
+    for attendee in attendees:
+        user = _user_for_employee(attendee.employee_id)
+        enqueue_event_email(
+            user=user,
+            event_key=event_key,
+            template_key=template_key,
+            subject=subject,
+            context=_meeting_context(meeting),
+            entity_type="meeting",
+            entity_id=meeting.id,
+            ical=ical,
+        )
+
+
 def effective_meeting_status(meeting: ProjectMeeting, now: datetime | None = None):
     if meeting.status == "Cancelled":
         return "Cancelled"
@@ -153,8 +187,11 @@ def create_meeting(project_id: str, payload: dict, user_id: int | None = None):
     _apply_meeting_payload(meeting, payload)
     db.session.add(meeting)
     db.session.flush()
-    for employee_id in _validate_attendees(project_id, payload.get("attendee_ids") or []):
+    attendee_ids = _validate_attendees(project_id, payload.get("attendee_ids") or [])
+    for employee_id in attendee_ids:
         db.session.add(ProjectMeetingAttendee(meeting_id=meeting.id, employee_id=employee_id))
+    db.session.flush()
+    _enqueue_meeting_email(meeting, attendee_ids, "meeting.invited", "meeting_invited", f"Undangan rapat: {meeting.title}")
     db.session.commit()
     return meeting
 
@@ -165,15 +202,29 @@ def get_meeting(project_id: str, meeting_id: int):
 
 def update_meeting(project_id: str, meeting_id: int, payload: dict):
     meeting = _ensure_meeting(project_id, meeting_id)
+    watched = {"start_datetime", "end_datetime", "meeting_url", "location", "status"}
+    should_notify = bool(watched & set(payload.keys()))
+    is_cancel = payload.get("status") == "Cancelled"
     _apply_meeting_payload(meeting, payload, partial=True)
     if "attendee_ids" in payload:
         replace_attendees(project_id, meeting_id, payload.get("attendee_ids") or [])
+        should_notify = True
+    db.session.flush()
+    attendee_ids = [attendee.employee_id for attendee in meeting.attendees]
+    if should_notify and attendee_ids:
+        if is_cancel:
+            _enqueue_meeting_email(meeting, attendee_ids, "meeting.cancelled", "meeting_cancelled", f"Rapat dibatalkan: {meeting.title}", method="CANCEL")
+        else:
+            _enqueue_meeting_email(meeting, attendee_ids, "meeting.updated", "meeting_updated", f"Perubahan jadwal rapat: {meeting.title}")
     db.session.commit()
     return meeting
 
 
 def delete_meeting(project_id: str, meeting_id: int):
     meeting = _ensure_meeting(project_id, meeting_id)
+    attendee_ids = [attendee.employee_id for attendee in meeting.attendees]
+    if attendee_ids:
+        _enqueue_meeting_email(meeting, attendee_ids, "meeting.cancelled", "meeting_cancelled", f"Rapat dibatalkan: {meeting.title}", method="CANCEL")
     db.session.delete(meeting)
     db.session.commit()
 
@@ -188,6 +239,9 @@ def add_attendees(project_id: str, meeting_id: int, attendee_ids):
         attendee = ProjectMeetingAttendee(meeting_id=meeting.id, employee_id=employee_id)
         db.session.add(attendee)
         added.append(attendee)
+    if added:
+        db.session.flush()
+        _enqueue_meeting_email(meeting, [attendee.employee_id for attendee in added], "meeting.invited", "meeting_invited", f"Undangan rapat: {meeting.title}")
     db.session.commit()
     return added
 

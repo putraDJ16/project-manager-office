@@ -14,6 +14,8 @@ class User(BaseModel, TimestampMixin):
     role_id: Mapped[str | None] = mapped_column(ForeignKey("roles.id"), nullable=True)
     employee_id: Mapped[str | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     role = relationship("Role", back_populates="users")
     employee = relationship("Employee")
+    email_preferences = relationship("UserEmailPreference", back_populates="user", cascade="all, delete-orphan", uselist=False)

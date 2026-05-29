@@ -2,6 +2,13 @@
 
 All endpoints are registered under `/api/v1`.
 
+Documentation endpoints:
+
+| Method | Endpoint | Feature | Controller/Handler | Service | Request | Response | Auth Required |
+|---|---|---|---|---|---|---|---|
+| GET | `/api/docs` | API Documentation | `CODE/be/app/docs/routes.py::swagger_ui_handler` | `docs.builder.build_openapi_spec` | None | Swagger UI HTML | Depends on `API_DOCS_VISIBILITY` |
+| GET | `/api/v1/openapi.json` | API Documentation | `CODE/be/app/docs/routes.py::openapi_json_handler` | `docs.builder.build_openapi_spec` | None | OpenAPI 3.0.3 JSON | Depends on `API_DOCS_VISIBILITY` |
+
 | Method | Endpoint | Feature | Controller/Handler | Service | Request | Response | Auth Required |
 |---|---|---|---|---|---|---|---|
 | POST | `/auth/login` | Auth and Session | `CODE/be/app/api/v1/auth.py::login_handler` | `auth_service.login` | JSON `{email,password}` | Login payload with tokens/session data | No |
@@ -9,22 +16,23 @@ All endpoints are registered under `/api/v1`.
 | GET | `/auth/register-options` | Auth and Session | `CODE/be/app/api/v1/auth.py::register_options_handler` | `auth_service.register_options` | None | Active organizations, units, positions | No |
 | POST | `/auth/refresh` | Auth and Session | `CODE/be/app/api/v1/auth.py::refresh_handler` | Flask JWT | Refresh JWT | `{access_token}` | Refresh JWT |
 | GET | `/auth/me` | Auth and Session | `CODE/be/app/api/v1/auth.py::me_handler` | `auth_service.get_profile` | None | Current profile/session data | JWT |
+| POST | `/auth/onboarding/complete` | Auth and Session | `CODE/be/app/api/v1/auth.py::complete_onboarding_handler` | `auth_service.complete_onboarding` | None | Current profile/session data with `onboarding_completed=true`, message | JWT |
 | POST | `/auth/change-password` | Auth and Session | `CODE/be/app/api/v1/auth.py::change_password_handler` | `auth_service.change_password` | JSON `{current_password,new_password,confirm_password}` | `null`, message | JWT |
-| GET | `/auth/my-projects` | Auth and Session | `CODE/be/app/api/v1/auth.py::my_projects_handler` | `auth_service.list_my_projects` | None | Project list | JWT |
+| GET | `/auth/my-projects` | Auth and Session | `CODE/be/app/api/v1/auth.py::my_projects_handler` | `auth_service.list_my_projects` | Query optional `member_only` (`true/1/yes`) | Project list | JWT |
 | GET | `/auth/my-assignment-counter` | Auth and Session | `CODE/be/app/api/v1/auth.py::my_assignment_counter_handler` | `auth_service.get_my_assignment_counter` | None | `{active_tasks,active_issues,total_active}` | JWT |
-| GET | `/projects` | Project Management | `CODE/be/app/api/v1/projects.py::list_projects_handler` | `project_service.list_projects` | None | Project list | JWT + `masterProjects.view` |
+| GET | `/projects` | Project Management | `CODE/be/app/api/v1/projects.py::list_projects_handler` | `project_service.list_projects` | None | Project list | JWT + project reference read permission (`masterProjects`, `calendar`, `dashboard`, `workload`, `tasks`, `projectTasks`, `projectGantt`, `projectTimesheets`, `issues`, or `projectIssues` view) |
 | POST | `/projects` | Project Management | `CODE/be/app/api/v1/projects.py::create_project_handler` | `project_service.create_project` | JSON project payload | Project, message | JWT + `masterProjects.create` |
-| GET | `/projects/<project_id>` | Project Management | `CODE/be/app/api/v1/projects.py::get_project_handler` | `project_service.get_project` | Path `project_id` | Project detail | JWT + `masterProjects.view` or project member |
+| GET | `/projects/<project_id>` | Project Management | `CODE/be/app/api/v1/projects.py::get_project_handler` | `project_service.get_project` | Path `project_id` | Project detail | JWT + project reference read permission or project member |
 | PATCH | `/projects/<project_id>` | Project Management | `CODE/be/app/api/v1/projects.py::update_project_handler` | `project_service.update_project` | JSON partial project payload | Project, message | JWT + `masterProjects.edit` or project member |
-| GET | `/projects/<project_id>/phases` | Project Management | `CODE/be/app/api/v1/projects.py::list_phases_handler` | `project_service.list_phases` | Path `project_id` | Phase list | JWT + `projectPhases.view` or project member |
+| GET | `/projects/<project_id>/phases` | Project Management | `CODE/be/app/api/v1/projects.py::list_phases_handler` | `project_service.list_phases` | Path `project_id` | Phase list | JWT + project phase reference read permission (`masterProjects`, `projectTasks`, `tasks`, `projectGantt`, `projectPhases` view) or project member |
 | POST | `/projects/<project_id>/phases` | Project Management | `CODE/be/app/api/v1/projects.py::create_phase_handler` | `project_service.create_phase` | JSON `{name}` | Phase, message | JWT + `projectPhases.create` or project member |
 | GET | `/projects/<project_id>/members` | Project Management | `CODE/be/app/api/v1/projects.py::list_members_handler` | `project_service.list_members` | Path `project_id` | Member list | JWT + `projectMembers.view` or project member |
 | POST | `/projects/<project_id>/members` | Project Management | `CODE/be/app/api/v1/projects.py::add_member_handler` | `project_service.add_member` | JSON `{employee_id}` plus optional RASCI data | Member, message | JWT + `projectMembers.create` or project member |
 | DELETE | `/projects/<project_id>/members/<employee_id>` | Project Management | `CODE/be/app/api/v1/projects.py::remove_member_handler` | `project_service.remove_member` | Path ids | `null`, message | JWT + `projectMembers.delete` or project member |
-| GET | `/projects/<project_id>/holidays` | Project Management | `CODE/be/app/api/v1/projects.py::list_project_holidays_handler` | `project_service.list_holidays` | Path `project_id` | Holiday list | JWT + `masterProjects.view` or project member |
+| GET | `/projects/<project_id>/holidays` | Project Management | `CODE/be/app/api/v1/projects.py::list_project_holidays_handler` | `project_service.list_holidays` | Path `project_id` | Holiday list | JWT + project reference read permission or project member |
 | POST | `/projects/<project_id>/holidays` | Project Management | `CODE/be/app/api/v1/projects.py::create_project_holiday_handler` | `project_service.create_holiday` | JSON `{holiday_date,name}` | Holiday, message | JWT + `masterProjects.edit` or project member |
 | DELETE | `/projects/<project_id>/holidays/<holiday_id>` | Project Management | `CODE/be/app/api/v1/projects.py::delete_project_holiday_handler` | `project_service.delete_holiday` | Path ids | `null`, message | JWT + `masterProjects.edit` or project member |
-| GET | `/tasks` | Task Management | `CODE/be/app/api/v1/tasks.py::list_tasks_handler` | `task_service.list_tasks` | Query `project_id`, `search` | Task list | JWT + `projectTasks.view` or project member |
+| GET | `/tasks` | Task Management | `CODE/be/app/api/v1/tasks.py::list_tasks_handler` | `task_service.list_tasks` | Query `project_id`, `search` | Task list | Without `project_id`: JWT + `tasks.view`; with `project_id`: JWT + `projectTasks.view`, `projectGantt.view`, or project member |
 | POST | `/tasks` | Task Management | `CODE/be/app/api/v1/tasks.py::create_task_handler` | `task_service.create_task` | JSON task payload | Task, message | JWT + `projectTasks.create` or project member |
 | PATCH | `/tasks/<task_id>` | Task Management | `CODE/be/app/api/v1/tasks.py::update_task_handler` | `task_service.update_task` | JSON partial task payload | Task, message | JWT + `projectTasks.edit`; limited assignee progress update allowed |
 | GET | `/tasks/<task_id>/comments` | Task Management | `CODE/be/app/api/v1/tasks.py::list_task_comments_handler` | `task_service.list_task_comments` | Path `task_id` | Comment list | JWT + comment permission, project member, or task assignee |
@@ -33,7 +41,12 @@ All endpoints are registered under `/api/v1`.
 | POST | `/tasks/<task_id>/checklist` | Task Management | `CODE/be/app/api/v1/tasks.py::create_task_checklist_handler` | `task_service.create_task_checklist_item` | JSON `{title}` | Checklist item, message | JWT + comment permission, project member, or task assignee |
 | PATCH | `/tasks/<task_id>/checklist/<item_id>` | Task Management | `CODE/be/app/api/v1/tasks.py::update_task_checklist_handler` | `task_service.update_task_checklist_item` | JSON `{title?,is_done?,order_index?}` | Checklist item, message | JWT + comment create permission, project member, or task assignee |
 | DELETE | `/tasks/<task_id>/checklist/<item_id>` | Task Management | `CODE/be/app/api/v1/tasks.py::delete_task_checklist_handler` | `task_service.delete_task_checklist_item` | Path ids | `null`, message | JWT + comment create permission, project member, or task assignee |
-| GET | `/issues` | Issue and SLA | `CODE/be/app/api/v1/issues.py::list_issues_handler` | `issue_service.list_issues` | Query `project_id` | Issue list | JWT + `projectIssues.view` or project member |
+| GET | `/my-timesheets` | Timesheet Harian | `CODE/be/app/api/v1/timesheets.py::list_my_timesheets_handler` | `timesheet_service.list_my_timesheets` | Query `start_date`, `end_date` | Timesheet milik user login | JWT |
+| POST | `/my-timesheets` | Timesheet Harian | `CODE/be/app/api/v1/timesheets.py::create_my_timesheet_handler` | `timesheet_service.create_my_timesheet` | JSON `{project_id,task_id?,work_date,hours_spent,notes?}` | Timesheet, message | JWT + project member (task opsional, bila diisi harus sesuai project) |
+| PATCH | `/my-timesheets/<timesheet_id>` | Timesheet Harian | `CODE/be/app/api/v1/timesheets.py::update_my_timesheet_handler` | `timesheet_service.update_my_timesheet` | JSON partial timesheet payload | Timesheet, message | JWT + owner timesheet |
+| DELETE | `/my-timesheets/<timesheet_id>` | Timesheet Harian | `CODE/be/app/api/v1/timesheets.py::delete_my_timesheet_handler` | `timesheet_service.delete_my_timesheet` | Path `timesheet_id` | `null`, message | JWT + owner timesheet |
+| GET | `/projects/<project_id>/timesheets` | Timesheet Harian | `CODE/be/app/api/v1/timesheets.py::list_project_timesheets_handler` | `timesheet_service.list_project_timesheets` | Query `start_date`, `end_date` | Rekap timesheet member project | JWT + `projectTimesheets.view` atau project member |
+| GET | `/issues` | Issue and SLA | `CODE/be/app/api/v1/issues.py::list_issues_handler` | `issue_service.list_issues` | Query `project_id` | Issue list | JWT + `projectIssues.view`, `issues.view` fallback, or project member |
 | POST | `/issues` | Issue and SLA | `CODE/be/app/api/v1/issues.py::create_issue_handler` | `issue_service.create_issue` | JSON issue payload | Issue, message | JWT + `projectIssues.create` or project member |
 | PATCH | `/issues/<issue_id>/status` | Issue and SLA | `CODE/be/app/api/v1/issues.py::update_issue_status_handler` | `issue_service.update_issue_status` | JSON `{status}` | Issue, message | JWT + `projectIssues.edit` or project member |
 | POST | `/issues/<issue_id>/escalate` | Issue and SLA | `CODE/be/app/api/v1/issues.py::escalate_issue_handler` | `issue_service.escalate_issue` | Path `issue_id` | Issue, message | JWT + `projectIssues.edit` or project member |
@@ -43,7 +56,7 @@ All endpoints are registered under `/api/v1`.
 | POST | `/roles` | Master Data | `CODE/be/app/api/v1/roles.py::create_role_handler` | `role_service.create_role` | JSON role payload | Role, message | JWT + `masterRoles.create` |
 | PATCH | `/roles/<role_id>` | Master Data | `CODE/be/app/api/v1/roles.py::update_role_handler` | `role_service.update_role` | JSON partial role payload | Role, message | JWT + `masterRoles.edit` |
 | PATCH | `/roles/<role_id>/status` | Master Data | `CODE/be/app/api/v1/roles.py::update_role_status_handler` | `role_service.update_role_status` | JSON `{status}` | Role, message | JWT + `masterRoles.edit` |
-| GET | `/employees` | Master Data | `CODE/be/app/api/v1/employees.py::list_employees_handler` | `employee_service.list_employees` | None | Employee list | JWT + `masterEmployees.view` |
+| GET | `/employees` | Master Data | `CODE/be/app/api/v1/employees.py::list_employees_handler` | `employee_service.list_employees` | None | Employee list | JWT + employee reference read permission (`masterEmployees`, project/task/gantt/timesheet/issue/workload/calendar view) |
 | POST | `/employees` | Master Data | `CODE/be/app/api/v1/employees.py::create_employee_handler` | `employee_service.create_employee` | JSON employee payload | Employee, default password message | JWT + `masterEmployees.create` |
 | PATCH | `/employees/<employee_id>` | Master Data | `CODE/be/app/api/v1/employees.py::update_employee_handler` | `employee_service.update_employee` | JSON partial employee payload | Employee, message | JWT + `masterEmployees.edit` |
 | PATCH | `/employees/<employee_id>/status` | Master Data | `CODE/be/app/api/v1/employees.py::update_employee_status_handler` | `employee_service.update_employee_status` | JSON `{status}` | Employee, message | JWT + `masterEmployees.edit` |
@@ -92,4 +105,8 @@ All endpoints are registered under `/api/v1`.
 | GET | `/notifications` | Notifications | `CODE/be/app/api/v1/notifications.py::list_notifications_handler` | `notification_service.list_notifications` | Query `unread_only` | `{items,unread_count}` | JWT |
 | PATCH | `/notifications/<notification_id>/read` | Notifications | `CODE/be/app/api/v1/notifications.py::mark_notification_read_handler` | `notification_service.mark_notification_read` | Path id | Notification, message | JWT |
 | POST | `/notifications/read-all` | Notifications | `CODE/be/app/api/v1/notifications.py::mark_all_notifications_read_handler` | `notification_service.mark_all_read` | None | `null`, message | JWT |
+| GET | `/me/email-preferences` | Email Notifications | `CODE/be/app/api/v1/email_preferences.py::get_email_preferences_handler` | `email_service.get_or_create_preferences` | None | Current email preference flags | JWT + `emailPreferences.view` |
+| PUT | `/me/email-preferences` | Email Notifications | `CODE/be/app/api/v1/email_preferences.py::update_email_preferences_handler` | `email_preferences` handler | JSON partial preference flags | Updated preference flags, message | JWT + `emailPreferences.edit` |
+| GET | `/admin/email-outbox` | Email Notifications | `CODE/be/app/api/v1/admin_email.py::list_email_outbox_handler` | `EmailOutbox` query | Query `status`, `to_email`, `start_date`, `end_date`, `page`, `per_page` | `{items,meta}` | JWT + `adminEmailLogs.view` |
+| POST | `/admin/email-outbox/<outbox_id>/resend` | Email Notifications | `CODE/be/app/api/v1/admin_email.py::resend_email_handler` | `EmailOutbox` update | Path `outbox_id` | Outbox row queued for resend, message | JWT + `adminEmailLogs.edit` |
 | GET | `/audit-trails` | Audit Trail | `CODE/be/app/api/v1/audit_trails.py::list_audit_trails_handler` | `audit_trail_service.list_audit_trails` | Query `page`, `per_page`, `user_id`, `method`, `path`, `status_code` | `{items,meta}` | JWT |

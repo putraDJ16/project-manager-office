@@ -1,4 +1,4 @@
-from flask import request
+from flask import g, request
 from flask_jwt_extended import get_jwt, jwt_required
 
 from app.api.v1 import api_v1
@@ -45,9 +45,16 @@ def create_issue_handler():
 @api_v1.patch("/issues/<string:issue_id>/status")
 @jwt_required()
 def update_issue_status_handler(issue_id: str):
-    _ensure_issue_access(issue_id, "edit")
+    current_user = get_current_user()
     payload = request.get_json(silent=True) or {}
-    issue = issue_service.update_issue_status(issue_id, payload.get("status", ""))
+    existing_issue = issue_service.get_issue(issue_id)
+    previous_status = existing_issue.status if existing_issue else None
+    issue = issue_service.update_issue_status(issue_id, payload.get("status", ""), actor=current_user)
+    if previous_status and previous_status != issue.status:
+        g.audit_note = (
+            f"Issue {issue.id} status changed from '{previous_status}' to '{issue.status}' by "
+            f"{current_user.display_name}"
+        )
     return success_response(issue_schema.dump(issue), message="Status isu berhasil diperbarui.")
 
 

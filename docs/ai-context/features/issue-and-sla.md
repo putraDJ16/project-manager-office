@@ -14,7 +14,8 @@ Mengelola issue project, status issue, escalation, dan konfigurasi SLA per sever
 
 ## User Roles / Permissions
 
-Issue memakai `projectIssues`; fallback legacy ke `issues` dan `masterProjects` ada di `PERMISSION_FALLBACKS`. Project member/manager juga dapat akses issue project.
+Menu global Isu & Bug memakai `issues`, sedangkan tab Isu & Bug di detail Proyek memakai `projectIssues`. Fallback legacy hanya dari `projectIssues` ke `issues` ada di `PERMISSION_FALLBACKS`, sehingga role global issue tetap dapat mengakses endpoint project issue lama. Akses Proyek (`masterProjects`) tidak otomatis membuka menu Isu & Bug. Project member/manager juga dapat akses issue project.
+Khusus endpoint ubah status (`PATCH /issues/<issue_id>/status`), hanya pelapor atau assignee issue tersebut yang dapat melakukan perubahan.
 
 ## Main Backend Files
 
@@ -57,6 +58,7 @@ Issue memakai `projectIssues`; fallback legacy ke `issues` dan `masterProjects` 
 
 - Create issue requires project, title, and reporter.
 - Issue status must be valid according to service/model constants.
+- Perubahan status issue ditolak (403) jika actor bukan pelapor atau assignee.
 - SLA rules normalize severity, target hours, auto escalate, and escalation delay.
 - Needs verification: exact SLA bounds should be checked in `issue_service.py` before changing.
 

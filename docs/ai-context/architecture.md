@@ -45,12 +45,20 @@ Typical authenticated flow:
 - JWT unauthorized/invalid token callbacks return status 401 with message.
 - Frontend `apiRequest` parses error payloads and throws `ApiRequestError`; it also attempts `/auth/refresh` on 401 when a refresh token exists.
 
+## API Documentation
+
+- Swagger UI is served by the backend at `/api/docs`.
+- The generated OpenAPI 3.0.3 document is served at `/api/v1/openapi.json`.
+- Documentation code lives in `CODE/be/app/docs/` and builds paths from registered Flask routes plus Marshmallow schemas from `CODE/be/app/schemas/`.
+- API docs access is controlled by `API_DOCS_VISIBILITY`: `public`, `jwt`, or `disabled`.
+- Swagger UI assets are vendored under `CODE/be/app/static/swagger-ui/` so the docs page can run without CDN access.
+
 ## Authentication And Authorization
 
 - JWT is configured in `CODE/be/app/config.py`.
 - Login/register/change password/profile logic is in `CODE/be/app/services/auth_service.py`.
 - Backend permission helpers are in `CODE/be/app/utils/permissions.py`.
-- Permission modules include `dashboard`, `tasks`, `issues`, `workload`, `masterEmployees`, `masterProjects`, `projectPhases`, `projectMembers`, `projectTasks`, `projectTaskComments`, `projectIssues`, `projectAttachments`, `masterRoles`, `masterOrganizations`, `masterOrganizationUnits`, and `masterPositions`.
+- Permission modules include `dashboard`, `calendar`, `tasks`, `issues`, `workload`, `masterEmployees`, `masterProjects`, `projectPhases`, `projectMembers`, `projectTasks`, `projectTaskComments`, `projectGantt`, `projectTimesheets`, `projectIssues`, `projectAttachments`, `projectMeetings`, `emailPreferences`, `adminEmailLogs`, `masterRoles`, `masterOrganizations`, `masterOrganizationUnits`, and `masterPositions`.
 - Project-scoped access can be granted by module permission or by project membership/manager checks in `user_is_project_member`.
 - Frontend route visibility uses `hasPermission` in `CODE/fe/src/app/utils/permissions.ts`.
 
@@ -70,3 +78,14 @@ Typical authenticated flow:
 - Users may link to roles and employees.
 - Notifications are created from assignment-related flows such as project member and issue assignment.
 - Audit trails are captured globally in an `after_request` hook.
+
+
+## Email Pipeline
+
+Email delivery is asynchronous and additive to existing API behavior:
+
+1. Domain services call `email_service.enqueue_event_email` or `notification_service.notify_user` after the business event succeeds.
+2. `email_service` renders Jinja templates from `CODE/be/app/templates/email/`, checks `user_email_preferences`, and inserts a `Queued` row into `email_outbox`.
+3. Meeting invite/update/cancel emails include a generated `.ics` payload from `ics_builder` with stable `meeting-{id}@pmo.indocyber.id` UID.
+4. `email_dispatcher` polls due queued rows, sends them through SMTP when `MAIL_ENABLED=true`, and marks rows `Sent` or schedules retries at 1, 5, and 30 minutes.
+5. Admins inspect and resend rows through `/api/v1/admin/email-outbox` endpoints guarded by `adminEmailLogs` permissions.

@@ -26,6 +26,10 @@ def _ensure_task_interaction_access(task_id: str, action: str):
 
 def _ensure_project_task_access(project_id: str | None, action: str):
     current_user = get_current_user()
+    if action == "view" and not project_id and user_has_permission(current_user, "tasks", "view"):
+        return
+    if action == "view" and user_has_permission(current_user, "projectGantt", "view"):
+        return
     if user_has_permission(current_user, "projectTasks", action) or user_is_project_member(current_user, project_id):
         return
     raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)

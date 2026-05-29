@@ -35,3 +35,4 @@ class Task(BaseModel, TimestampMixin):
     checklist_items = relationship(
         "TaskChecklistItem", back_populates="task", cascade="all, delete-orphan"
     )
+    timesheets = relationship("TaskTimesheet", back_populates="task", cascade="all, delete-orphan")

@@ -80,6 +80,7 @@ import { TaskDetailModal } from "../tugas/TaskDetailModal";
 import { ProjectIssuePanel } from "./ProjectIssuePanel";
 import { ProjectMeetingNotesPanel } from "./ProjectMeetingNotesPanel";
 import { ProjectMeetingPanel } from "./ProjectMeetingPanel";
+import { fetchProjectTimesheets, type ApiTimesheet } from "../../services/timesheetApi";
 
 const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 const PROJECT_PRIORITIES = ["Low", "Medium", "High", "Critical"];
@@ -100,7 +101,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   Low: "bg-color-status-success-surface text-color-status-success"
 };
 
-type Tab = "ringkasan" | "anggota" | "tugas" | "gantt" | "isu" | "meetings" | "meetingNotes" | "lampiran";
+type Tab = "ringkasan" | "anggota" | "tugas" | "gantt" | "isu" | "meetings" | "meetingNotes" | "timesheet" | "lampiran";
 type TaskView = "list" | "kanban";
 type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
 type TaskChecklistItem = { id: number; title: string; isDone: boolean };
@@ -200,7 +201,7 @@ export function ProjectDetail() {
   const navigate = useNavigate();
   const session = loadAuthSession();
   const baseCanEditProject = hasPermission(session, "masterProjects", "edit");
-  const baseCanViewPhases = hasPermission(session, "projectPhases", "view");
+  const baseCanViewMembers = hasPermission(session, "projectMembers", "view");
   const baseCanCreateMembers = hasPermission(session, "projectMembers", "create");
   const baseCanDeleteMembers = hasPermission(session, "projectMembers", "delete");
   const baseCanViewTasks = hasPermission(session, "projectTasks", "view");
@@ -208,6 +209,10 @@ export function ProjectDetail() {
   const baseCanEditTasks = hasPermission(session, "projectTasks", "edit");
   const baseCanViewTaskComments = hasPermission(session, "projectTaskComments", "view");
   const baseCanCreateTaskComments = hasPermission(session, "projectTaskComments", "create");
+  const baseCanViewGantt = hasPermission(session, "projectGantt", "view");
+  const baseCanViewProjectTimesheets = hasPermission(session, "projectTimesheets", "view");
+  const baseCanViewPhases =
+    hasPermission(session, "masterProjects", "view") || baseCanViewTasks || baseCanViewGantt;
   const baseCanViewIssues = hasPermission(session, "projectIssues", "view");
   const baseCanCreateIssues = hasPermission(session, "projectIssues", "create");
   const baseCanEditIssues = hasPermission(session, "projectIssues", "edit");
@@ -300,6 +305,7 @@ export function ProjectDetail() {
   const [previewFile, setPreviewFile] = useState<{ file: ApiAttachmentFile; url: string; text?: string } | null>(
     null
   );
+  const [projectTimesheets, setProjectTimesheets] = useState<ApiTimesheet[]>([]);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const isCurrentProjectMember = useMemo(() => {
@@ -315,6 +321,7 @@ export function ProjectDetail() {
 
   const canEditProject = baseCanEditProject || isCurrentProjectMember;
   const canViewPhases = baseCanViewPhases || isCurrentProjectMember;
+  const canViewMembers = baseCanViewMembers || isCurrentProjectMember;
   const canCreateMembers = baseCanCreateMembers || isCurrentProjectMember;
   const canDeleteMembers = baseCanDeleteMembers || isCurrentProjectMember;
   const canViewTasks = baseCanViewTasks || isCurrentProjectMember;
@@ -322,6 +329,8 @@ export function ProjectDetail() {
   const canEditTasks = baseCanEditTasks || isCurrentProjectMember;
   const canViewTaskComments = baseCanViewTaskComments || isCurrentProjectMember;
   const canCreateTaskComments = baseCanCreateTaskComments || isCurrentProjectMember;
+  const canViewGantt = baseCanViewGantt || isCurrentProjectMember;
+  const canViewProjectTimesheets = baseCanViewProjectTimesheets || isCurrentProjectMember;
   const canViewIssues = baseCanViewIssues || isCurrentProjectMember;
   const canCreateIssues = baseCanCreateIssues || isCurrentProjectMember;
   const canEditIssues = baseCanEditIssues || isCurrentProjectMember;
@@ -333,29 +342,63 @@ export function ProjectDetail() {
   const canCreateMeetings = baseCanCreateMeetings || isCurrentProjectMember;
   const canEditMeetings = baseCanEditMeetings || isCurrentProjectMember;
   const canDeleteMeetings = baseCanDeleteMeetings || isCurrentProjectMember;
+  const visibleTabs = useMemo(
+    () =>
+      ([
+        { key: "ringkasan", label: "Ringkasan", icon: Layers },
+        { key: "anggota", label: `Anggota (${project?.member_count ?? 0})`, icon: Users, visible: canViewMembers },
+        { key: "tugas", label: `Tugas (${tasks.length})`, icon: CheckSquare, visible: canViewTasks },
+        { key: "gantt", label: "Gantt", icon: GanttChartSquare, visible: canViewGantt },
+        { key: "isu", label: "Isu & Bug", icon: Bug, visible: canViewIssues },
+        { key: "meetings", label: "Meetings", icon: CalendarDays, visible: canViewMeetings },
+        { key: "meetingNotes", label: "Meeting Notes", icon: FileText, visible: canViewMeetings },
+        { key: "timesheet", label: `Timesheet (${projectTimesheets.length})`, icon: Activity, visible: canViewProjectTimesheets },
+        { key: "lampiran", label: `Lampiran (${attachmentFiles.length})`, icon: FolderClosed, visible: canViewAttachments }
+      ] as { key: Tab; label: string; icon: React.ElementType; visible?: boolean }[]).filter((tab) => tab.visible !== false),
+    [
+      attachmentFiles.length,
+      canViewAttachments,
+      canViewGantt,
+      canViewIssues,
+      canViewMeetings,
+      canViewMembers,
+      canViewProjectTimesheets,
+      canViewTasks,
+      project?.member_count,
+      projectTimesheets.length,
+      tasks.length
+    ]
+  );
+
+  useEffect(() => {
+    if (visibleTabs.some((tab) => tab.key === activeTab)) return;
+    setActiveTab(visibleTabs[0]?.key ?? "ringkasan");
+  }, [activeTab, visibleTabs]);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     Promise.all([
       getProject(id),
-      canViewPhases ? fetchPhases(id) : Promise.resolve([]),
-      canViewTasks ? fetchTasks(id, "") : Promise.resolve([]),
+      canViewPhases || canViewGantt ? fetchPhases(id) : Promise.resolve([]),
+      canViewTasks || canViewGantt ? fetchTasks(id, "") : Promise.resolve([]),
+      canViewProjectTimesheets ? fetchProjectTimesheets(id) : Promise.resolve([]),
       fetchEmployees(),
       canViewAttachments ? fetchAttachmentFolders(id) : Promise.resolve([]),
       fetchProjectHolidays(id)
     ])
-      .then(([projectResult, phaseResult, taskResult, employeeResult, folderResult, holidayResult]) => {
+      .then(([projectResult, phaseResult, taskResult, timesheetResult, employeeResult, folderResult, holidayResult]) => {
         setProject(projectResult);
         setPhases(phaseResult);
         setTasks(taskResult);
+        setProjectTimesheets(timesheetResult);
         setEmployees(employeeResult);
         setAttachmentFolders(folderResult);
         setProjectHolidays(holidayResult);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [id, canViewAttachments, canViewPhases, canViewTasks]);
+  }, [id, canViewAttachments, canViewGantt, canViewPhases, canViewProjectTimesheets, canViewTasks]);
 
   useEffect(() => {
     if (!id) return;
@@ -1237,18 +1280,7 @@ export function ProjectDetail() {
       )}
 
       <div className="px-6 border-b border-color-border flex items-center gap-0">
-        {([
-          { key: "ringkasan", label: "Ringkasan", icon: Layers },
-          { key: "anggota", label: `Anggota (${project.member_count})`, icon: Users, visible: hasPermission(session, "projectMembers", "view") },
-          { key: "tugas", label: `Tugas (${tasks.length})`, icon: CheckSquare, visible: canViewTasks },
-          { key: "gantt", label: "Gantt", icon: GanttChartSquare, visible: canViewTasks },
-          { key: "isu", label: "Isu & Bug", icon: Bug, visible: canViewIssues },
-          { key: "meetings", label: "Meetings", icon: CalendarDays, visible: canViewMeetings },
-          { key: "meetingNotes", label: "Meeting Notes", icon: FileText, visible: canViewMeetings },
-          { key: "lampiran", label: `Lampiran (${attachmentFiles.length})`, icon: FolderClosed, visible: canViewAttachments }
-        ] as { key: Tab; label: string; icon: React.ElementType; visible?: boolean }[])
-          .filter((tab) => tab.visible !== false)
-          .map(({ key, label, icon: Icon }) => (
+        {visibleTabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
@@ -1825,6 +1857,10 @@ export function ProjectDetail() {
             canDelete={canDeleteMeetings}
             onNotice={setSaveNotice}
           />
+        )}
+
+        {activeTab === "timesheet" && (
+          <ProjectTimesheetPanel timesheets={projectTimesheets} />
         )}
 
         {activeTab === "lampiran" && (
@@ -2418,6 +2454,52 @@ function ganttPriorityClass(priority: ApiTask["priority"]) {
     Low: "bg-color-status-success"
   };
   return styles[priority];
+}
+
+function ProjectTimesheetPanel({
+  timesheets
+}: {
+  timesheets: ApiTimesheet[];
+}) {
+  if (timesheets.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-color-border bg-color-secondary p-8 text-center text-sm text-color-muted-foreground">
+        Belum ada timesheet member pada proyek ini.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-color-border bg-color-card">
+      <table className="w-full text-sm">
+        <thead className="bg-color-secondary text-color-muted-foreground">
+          <tr className="text-left">
+            <th className="px-4 py-3 font-medium">Tanggal</th>
+            <th className="px-4 py-3 font-medium">Member</th>
+            <th className="px-4 py-3 font-medium">Task</th>
+            <th className="px-4 py-3 font-medium">Jam Kerja</th>
+            <th className="px-4 py-3 font-medium">Catatan</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-color-border">
+          {timesheets.map((item) => (
+            <tr key={item.id} className="bg-color-card align-top">
+              <td className="px-4 py-3 text-color-foreground">{formatDate(item.work_date)}</td>
+              <td className="px-4 py-3 text-color-foreground">
+                {item.employee_name ?? "-"}
+              </td>
+              <td className="px-4 py-3 text-color-foreground">
+                <p className="font-medium">{item.task_id ?? "-"}</p>
+                <p className="text-xs text-color-muted-foreground">{item.task_title ?? "-"}</p>
+              </td>
+              <td className="px-4 py-3 text-color-foreground">{item.hours_spent}</td>
+              <td className="px-4 py-3 text-color-muted-foreground">{item.notes?.trim() ? item.notes : "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function ProjectGanttChart({

@@ -11,6 +11,7 @@ from app.services import (
     project_service,
     role_service,
     task_service,
+    timesheet_service,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "project_service",
     "role_service",
     "task_service",
+    "timesheet_service",
 ]

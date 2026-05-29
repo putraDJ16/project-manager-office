@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Onboarding — PM Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: { fontFamily: { sans: ['Inter','system-ui','sans-serif'] } } }
+  }
+</script>
+<style>
+  body { font-family: Inter, system-ui, sans-serif; }
+  .fade { animation: fade .35s ease; }
+  @keyframes fade { from { opacity:0; transform: translateY(8px);} to {opacity:1; transform:none;} }
+  .dot-active { width: 26px; border-radius: 9999px; }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background:#c7d2fe; border-radius: 8px; }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen flex items-center justify-center p-4">
+
+<div class="w-full max-w-5xl">
+  <!-- Frame -->
+  <div class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+
+    <!-- ===== WELCOME SCREEN ===== -->
+    <section id="screen-welcome" class="relative">
+      <div class="grid md:grid-cols-2">
+        <!-- Left brand panel -->
+        <div class="bg-indigo-950 text-indigo-100 p-10 flex flex-col justify-between min-h-[520px]">
+          <div>
+            <div class="flex items-center gap-3">
+              <div class="h-11 w-11 rounded-lg bg-white text-indigo-700 font-black text-xl flex items-center justify-center">PM</div>
+              <div>
+                <div class="font-bold text-white leading-tight">PM Dashboard</div>
+                <div class="text-xs text-indigo-300">IGLO · Indocyber</div>
+              </div>
+            </div>
+            <h1 class="mt-12 text-3xl font-bold text-white leading-snug">Selamat datang di<br>PM Dashboard 👋</h1>
+            <p class="mt-4 text-indigo-200 text-sm leading-relaxed max-w-sm">
+              Satu tempat untuk mengelola proyek, tugas, isu, jadwal, dan beban kerja tim Anda.
+              Kami akan memandu Anda mengenal fitur utama dalam beberapa langkah singkat.
+            </p>
+          </div>
+          <div class="space-y-3 text-sm">
+            <div class="flex items-center gap-3 text-indigo-200"><span class="h-6 w-6 rounded-full bg-indigo-800 flex items-center justify-center text-xs">1</span> Kenali 7 modul inti</div>
+            <div class="flex items-center gap-3 text-indigo-200"><span class="h-6 w-6 rounded-full bg-indigo-800 flex items-center justify-center text-xs">2</span> Pahami alur kerja harian</div>
+            <div class="flex items-center gap-3 text-indigo-200"><span class="h-6 w-6 rounded-full bg-indigo-800 flex items-center justify-center text-xs">3</span> Mulai dari checklist Anda</div>
+          </div>
+        </div>
+        <!-- Right -->
+        <div class="p-10 flex flex-col justify-center bg-white">
+          <span class="inline-flex w-fit items-center gap-1.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold px-3 py-1">⏱️ ± 2 menit</span>
+          <h2 class="mt-5 text-2xl font-bold text-slate-900">Tur cepat fitur aplikasi</h2>
+          <p class="mt-3 text-slate-500 text-sm leading-relaxed">
+            Tur ini menjelaskan apa fungsi tiap modul dan bagaimana Anda menggunakannya sehari-hari —
+            mulai dari membuka tugas, melapor isu, memantau proyek, sampai mengelola data master.
+          </p>
+          <div class="mt-8 flex flex-col gap-3">
+            <button onclick="startTour()" class="w-full rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white font-semibold py-3 transition-colors">Mulai Tur →</button>
+            <button onclick="finishTour()" class="w-full rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 font-medium py-3 transition-colors">Lewati untuk sekarang</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TOUR SCREEN ===== -->
+    <section id="screen-tour" class="hidden">
+      <!-- top bar -->
+      <div class="flex items-center justify-between px-8 pt-6">
+        <div class="flex items-center gap-2 text-sm text-slate-500">
+          <div class="h-8 w-8 rounded-md bg-indigo-700 text-white font-bold text-xs flex items-center justify-center">PM</div>
+          <span>Tur Fitur</span>
+        </div>
+        <button onclick="finishTour()" class="text-sm text-slate-400 hover:text-slate-700">Lewati ✕</button>
+      </div>
+
+      <!-- progress dots -->
+      <div id="dots" class="flex items-center gap-2 px-8 pt-5"></div>
+
+      <!-- content -->
+      <div class="grid md:grid-cols-2 gap-0">
+        <!-- visual -->
+        <div class="p-8">
+          <div id="tour-visual" class="rounded-xl border border-slate-200 bg-slate-50 h-[360px] p-5 overflow-hidden"></div>
+        </div>
+        <!-- text -->
+        <div class="p-8 pr-10 flex flex-col">
+          <div id="tour-step-label" class="text-xs font-semibold uppercase tracking-wider text-indigo-600"></div>
+          <h2 id="tour-title" class="mt-2 text-2xl font-bold text-slate-900"></h2>
+          <p id="tour-desc" class="mt-3 text-sm text-slate-500 leading-relaxed"></p>
+          <div class="mt-5">
+            <div class="text-xs font-semibold text-slate-700 mb-2">Cara pakai</div>
+            <ul id="tour-howto" class="space-y-2 text-sm text-slate-600"></ul>
+          </div>
+          <div class="mt-auto pt-6 flex items-center justify-between">
+            <button id="btn-prev" onclick="prevStep()" class="rounded-lg px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-100">← Kembali</button>
+            <button id="btn-next" onclick="nextStep()" class="rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white text-sm font-semibold px-6 py-2.5 transition-colors">Lanjut →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FINISH SCREEN ===== -->
+    <section id="screen-finish" class="hidden p-10 text-center fade">
+      <div class="mx-auto h-16 w-16 rounded-full bg-emerald-100 text-emerald-600 text-3xl flex items-center justify-center">✓</div>
+      <h2 class="mt-5 text-2xl font-bold text-slate-900">Anda siap memulai!</h2>
+      <p class="mt-2 text-slate-500 text-sm max-w-md mx-auto">Selesaikan langkah pertama berikut agar tim Anda langsung produktif. Anda dapat membuka tur ini lagi kapan saja dari menu Bantuan.</p>
+
+      <div class="mt-8 max-w-md mx-auto text-left space-y-3" id="checklist"></div>
+
+      <div class="mt-8 flex gap-3 justify-center">
+        <button onclick="restart()" class="rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-medium px-5 py-2.5">Ulangi Tur</button>
+        <button onclick="alert('Menuju Beranda PM Dashboard')" class="rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white text-sm font-semibold px-6 py-2.5">Masuk ke Dashboard →</button>
+      </div>
+    </section>
+
+  </div>
+  <p class="text-center text-xs text-slate-400 mt-4">Mockup onboarding — PM Dashboard · prototipe desain, bukan aplikasi final</p>
+</div>
+
+<script>
+// ---- Module tour content (derived from the actual app modules) ----
+const steps = [
+  {
+    label: "Modul 1 dari 7",
+    icon: "🏠",
+    title: "Beranda — Dashboard",
+    desc: "Pusat ringkasan harian Anda: KPI proyek, grafik burndown, kapasitas tim, tabel prioritas, dan activity feed dalam satu layar.",
+    howto: ["Buka saat pertama login untuk melihat kondisi proyek terkini","Pantau kartu KPI & burndown untuk progres","Klik item prioritas untuk langsung menuju detailnya"],
+    visual: cardDashboard()
+  },
+  {
+    label: "Modul 2 dari 7",
+    icon: "📋",
+    title: "Tugas — List, Kanban & WBS",
+    desc: "Kelola pekerjaan Anda dalam 3 tampilan: List, papan Kanban drag-and-drop, dan WBS. Termasuk Timesheet untuk catat waktu kerja.",
+    howto: ["Geser kartu antar kolom Kanban untuk ubah status","Klik tugas untuk buka panel detail: subtask, komentar, lampiran","Gunakan tombol BUAT BARU → Tugas Baru untuk menambah"],
+    visual: cardKanban()
+  },
+  {
+    label: "Modul 3 dari 7",
+    icon: "🐞",
+    title: "Isu & Bug",
+    desc: "Tabel pelacakan isu/bug lengkap dengan severity, status, SLA, dan assignee. Panel detail menampilkan langkah reproduksi & log aktivitas.",
+    howto: ["Pantau indikator SLA agar tidak terlambat ditangani","Klik baris isu untuk lihat detail & komentar","Laporkan isu baru via BUAT BARU → Isu Baru"],
+    visual: cardIssues()
+  },
+  {
+    label: "Modul 4 dari 7",
+    icon: "📁",
+    title: "Proyek",
+    desc: "Kelola data proyek (Grid/List), monitoring, fase, anggota, meeting, dan catatan rapat. Satu proyek menyatukan tugas, isu, dan lampiran terkait.",
+    howto: ["Buka detail proyek untuk lihat fase & anggota","Gunakan menu Monitoring untuk pantau lintas proyek","Catat hasil rapat di panel Meeting Notes"],
+    visual: cardProjects()
+  },
+  {
+    label: "Modul 5 dari 7",
+    icon: "⏱️",
+    title: "Pengisian Timesheet",
+    desc: "Catat waktu kerja Anda pada tiap tugas lewat tab Timesheet di halaman Tugas Saya. Jam yang dicatat menjadi dasar pelaporan effort dan beban kerja tim.",
+    howto: ["Buka Tugas Saya → tab Timesheet","Klik BUAT BARU → Timesheet untuk catat entri baru","Pilih tugas, isi tanggal & durasi jam, lalu simpan","Catat rutin tiap hari agar laporan effort akurat"],
+    visual: cardTimesheet()
+  },
+  {
+    label: "Modul 6 dari 7",
+    icon: "🗂️",
+    title: "Master Data",
+    desc: "Sumber data inti aplikasi: Pegawai, Role & permission, Organisasi, Unit Organisasi, dan Jabatan. Mengatur siapa boleh mengakses apa.",
+    howto: ["Kelola data Pegawai (NIP, divisi, jabatan, status)","Atur Role untuk kontrol hak akses tiap modul (RBAC)","Tambah data lewat modal di masing-masing halaman master"],
+    visual: cardMaster()
+  },
+  {
+    label: "Modul 7 dari 7",
+    icon: "📅",
+    title: "Kalender Proyek",
+    desc: "Lihat seluruh jadwal proyek Anda dalam tampilan kalender: tenggat tugas, milestone fase, dan jadwal meeting tersusun per tanggal sehingga mudah memantau apa yang akan datang.",
+    howto: ["Buka menu Kalender dari sidebar","Pantau tenggat tugas & milestone yang jatuh tempo","Klik tanggal/agenda untuk lihat detail meeting atau tugas","Gunakan untuk merencanakan minggu kerja tim"],
+    visual: cardCalendar()
+  }
+];
+
+const checklistItems = [
+  "Lengkapi profil Anda",
+  "Buat atau buka proyek pertama",
+  "Tambah anggota tim ke proyek",
+  "Buat tugas pertama Anda",
+  "Atur preferensi notifikasi email"
+];
+
+let current = 0;
+
+function el(id){ return document.getElementById(id); }
+function show(id){ ['screen-welcome','screen-tour','screen-finish'].forEach(s=>el(s).classList.add('hidden')); el(id).classList.remove('hidden'); }
+
+function startTour(){ current = 0; show('screen-tour'); renderDots(); renderStep(); }
+function restart(){ startTour(); }
+
+function renderDots(){
+  el('dots').innerHTML = steps.map((_,i)=>
+    `<span class="h-2 transition-all ${i===current?'dot-active bg-indigo-600':'w-2 rounded-full bg-slate-300'}"></span>`
+  ).join('');
+}
+
+function renderStep(){
+  const s = steps[current];
+  const sec = el('screen-tour');
+  sec.classList.remove('fade'); void sec.offsetWidth; sec.classList.add('fade');
+  el('tour-step-label').textContent = s.label;
+  el('tour-title').textContent = s.icon + "  " + s.title;
+  el('tour-desc').textContent = s.desc;
+  el('tour-howto').innerHTML = s.howto.map(h=>`<li class="flex gap-2"><span class="text-indigo-500 mt-0.5">▸</span><span>${h}</span></li>`).join('');
+  el('tour-visual').innerHTML = s.visual;
+  el('btn-prev').style.visibility = current===0 ? 'hidden':'visible';
+  el('btn-next').textContent = current===steps.length-1 ? 'Selesai ✓' : 'Lanjut →';
+  renderDots();
+}
+
+function nextStep(){ if(current<steps.length-1){current++; renderStep();} else finishTour(); }
+function prevStep(){ if(current>0){current--; renderStep();} }
+
+function finishTour(){
+  show('screen-finish');
+  el('checklist').innerHTML = checklistItems.map((c,i)=>`
+    <label class="flex items-center gap-3 rounded-lg border border-slate-200 px-4 py-3 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors">
+      <input type="checkbox" onchange="this.nextElementSibling.classList.toggle('line-through');this.nextElementSibling.classList.toggle('text-slate-400')" class="h-4 w-4 accent-indigo-600">
+      <span class="text-sm text-slate-700">${i+1}. ${c}</span>
+    </label>`).join('');
+}
+
+// ---- mini visual mockups (pure HTML) ----
+function chrome(title, body){
+  return `<div class="text-[11px] text-slate-400 mb-2 flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-rose-300"></span><span class="h-2 w-2 rounded-full bg-amber-300"></span><span class="h-2 w-2 rounded-full bg-emerald-300"></span><span class="ml-2">${title}</span></div>${body}`;
+}
+function cardDashboard(){ return chrome("Beranda", `
+  <div class="grid grid-cols-3 gap-2">
+    ${['Proyek Aktif','Tugas Selesai','Isu Terbuka'].map((t,i)=>`<div class="rounded-lg bg-white border border-slate-200 p-2"><div class="text-[10px] text-slate-400">${t}</div><div class="text-lg font-bold text-indigo-700">${[12,84,7][i]}</div></div>`).join('')}
+  </div>
+  <div class="mt-2 rounded-lg bg-white border border-slate-200 p-3">
+    <div class="text-[10px] text-slate-400 mb-2">Burndown</div>
+    <div class="flex items-end gap-1 h-20">${[60,52,48,40,33,28,18,10].map(h=>`<div class="flex-1 rounded-t bg-indigo-400" style="height:${h}%"></div>`).join('')}</div>
+  </div>`); }
+function cardKanban(){ const col=(t,c,n)=>`<div class="flex-1"><div class="text-[10px] font-semibold mb-1 ${c}">${t}</div>${Array(n).fill(0).map(()=>`<div class="rounded-md bg-white border border-slate-200 p-2 mb-1.5 shadow-sm"><div class="h-1.5 w-2/3 bg-slate-300 rounded"></div><div class="mt-1 h-1.5 w-1/2 bg-slate-200 rounded"></div></div>`).join('')}</div>`;
+  return chrome("Tugas · Kanban", `<div class="flex gap-2">${col('To Do','text-slate-500',2)}${col('In Progress','text-indigo-600',2)}${col('Done','text-emerald-600',1)}</div>`); }
+function cardIssues(){ const rows=[['Login error','Tinggi','rose'],['Lambat load','Sedang','amber'],['Typo label','Rendah','emerald']];
+  return chrome("Isu & Bug", `<div class="rounded-lg bg-white border border-slate-200 overflow-hidden">
+   <div class="grid grid-cols-3 text-[10px] font-semibold text-slate-400 bg-slate-50 px-3 py-2"><span>Isu</span><span>Severity</span><span>SLA</span></div>
+   ${rows.map(r=>`<div class="grid grid-cols-3 items-center text-[11px] px-3 py-2 border-t border-slate-100"><span class="text-slate-700">${r[0]}</span><span><span class="px-1.5 py-0.5 rounded text-[10px] bg-${r[2]}-100 text-${r[2]}-700">${r[1]}</span></span><span class="text-slate-400">2h</span></div>`).join('')}
+  </div>`); }
+function cardProjects(){ return chrome("Proyek · Grid", `<div class="grid grid-cols-2 gap-2">
+   ${['Portal NDE','AMS Revamp','Dashboard SDM','Migrasi DB'].map((p,i)=>`<div class="rounded-lg bg-white border border-slate-200 p-3"><div class="flex items-center justify-between"><div class="text-xs font-semibold text-slate-700">${p}</div><span class="h-2 w-2 rounded-full bg-${['emerald','amber','indigo','emerald'][i]}-500"></span></div><div class="mt-2 h-1.5 bg-slate-100 rounded-full"><div class="h-1.5 rounded-full bg-indigo-500" style="width:${[70,40,55,90][i]}%"></div></div><div class="mt-2 flex -space-x-1">${Array(3).fill(0).map(()=>'<span class="h-4 w-4 rounded-full bg-indigo-200 border border-white"></span>').join('')}</div></div>`).join('')}
+  </div>`); }
+function cardTimesheet(){ const rows=[['Senin','Perbaikan modul login','3.5'],['Selasa','Review PR & testing','2.0'],['Rabu','Meeting + dokumentasi','4.0'],['Kamis','Integrasi API isu','5.5']];
+  return chrome("Tugas Saya · Timesheet", `<div class="rounded-lg bg-white border border-slate-200 overflow-hidden">
+   <div class="grid grid-cols-[1fr_2fr_0.7fr] text-[10px] font-semibold text-slate-400 bg-slate-50 px-3 py-2"><span>Tanggal</span><span>Tugas</span><span class="text-right">Jam</span></div>
+   ${rows.map(r=>`<div class="grid grid-cols-[1fr_2fr_0.7fr] items-center text-[11px] px-3 py-2 border-t border-slate-100"><span class="text-slate-500">${r[0]}</span><span class="text-slate-700 truncate">${r[1]}</span><span class="text-right font-semibold text-indigo-700">${r[2]}</span></div>`).join('')}
+   <div class="grid grid-cols-[1fr_2fr_0.7fr] items-center text-[11px] px-3 py-2 border-t-2 border-slate-200 bg-slate-50"><span class="font-semibold text-slate-600">Total</span><span></span><span class="text-right font-bold text-indigo-700">15.0</span></div>
+  </div>
+  <button class="mt-2 w-full rounded-md border border-dashed border-indigo-300 text-[11px] text-indigo-600 py-2 hover:bg-indigo-50">+ Catat entri timesheet</button>`); }
+function cardMaster(){ return chrome("Master · Pegawai", `<div class="rounded-lg bg-white border border-slate-200 overflow-hidden">
+   <div class="grid grid-cols-4 text-[10px] font-semibold text-slate-400 bg-slate-50 px-3 py-2"><span>NIP</span><span>Nama</span><span>Divisi</span><span>Status</span></div>
+   ${[['1021','Andi P','Dev'],['1044','Budi S','QA'],['1078','Citra L','PM']].map(r=>`<div class="grid grid-cols-4 items-center text-[11px] px-3 py-2 border-t border-slate-100"><span class="text-slate-400">${r[0]}</span><span class="text-slate-700">${r[1]}</span><span class="text-slate-500">${r[2]}</span><span><span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-700">Aktif</span></span></div>`).join('')}
+  </div>
+  <div class="mt-2 flex gap-1.5">${['Role','Organisasi','Unit','Jabatan'].map(t=>`<span class="text-[10px] px-2 py-1 rounded bg-indigo-50 text-indigo-600">${t}</span>`).join('')}</div>`); }
+function cardCalendar(){
+  const events={3:['t'],8:['m'],12:['t','i'],15:['m'],19:['t'],23:['m'],27:['t']};
+  const dayColor={t:'bg-indigo-500',m:'bg-amber-500',i:'bg-rose-500'};
+  let cells='';
+  for(let d=1; d<=30; d++){
+    const ev=events[d]||[];
+    cells+=`<div class="aspect-square rounded border border-slate-100 p-1 flex flex-col ${d===15?'ring-1 ring-indigo-400 bg-indigo-50':'bg-white'}"><span class="text-[9px] text-slate-400">${d}</span><div class="mt-auto flex gap-0.5">${ev.map(e=>`<span class="h-1 flex-1 rounded ${dayColor[e]}"></span>`).join('')}</div></div>`;
+  }
+  return chrome("Kalender Proyek · Mei", `
+   <div class="rounded-lg bg-white border border-slate-200 p-2">
+     <div class="grid grid-cols-7 gap-1 text-[9px] text-slate-400 mb-1 text-center">${['Sn','Sl','Rb','Km','Jm','Sb','Mg'].map(d=>`<span>${d}</span>`).join('')}</div>
+     <div class="grid grid-cols-7 gap-1">${cells}</div>
+   </div>
+   <div class="mt-2 flex gap-3 text-[9px] text-slate-500">
+     <span class="flex items-center gap-1"><span class="h-2 w-2 rounded bg-indigo-500"></span>Tenggat tugas</span>
+     <span class="flex items-center gap-1"><span class="h-2 w-2 rounded bg-amber-500"></span>Meeting</span>
+     <span class="flex items-center gap-1"><span class="h-2 w-2 rounded bg-rose-500"></span>Milestone</span>
+   </div>`); }
+</script>
+</body>
+</html>

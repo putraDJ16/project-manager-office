@@ -4,7 +4,7 @@ Primary ORM models are in `CODE/be/app/models/`. Alembic migrations are in `CODE
 
 | Table/Model | Purpose | Important Fields | Related Feature | Related Files |
 |---|---|---|---|---|
-| `users` / `User` | Login identity and session subject. | `id`, `email`, `password_hash`, `display_name`, `role_id`, `employee_id`, `is_active` | Auth and Session, Notifications, Audit Trail | `CODE/be/app/models/user.py`, `CODE/be/app/services/auth_service.py` |
+| `users` / `User` | Login identity and session subject. | `id`, `email`, `password_hash`, `display_name`, `role_id`, `employee_id`, `is_active`, `onboarding_completed` | Auth and Session, Notifications, Audit Trail | `CODE/be/app/models/user.py`, `CODE/be/app/services/auth_service.py` |
 | `roles` / `Role` | Permission roles. | `id`, `name`, `description`, `status`, `permissions` JSON | Auth and Session, Master Data | `CODE/be/app/models/role.py`, `CODE/be/app/utils/permissions.py`, `CODE/be/app/services/role_service.py` |
 | `employees` / `Employee` | Master employee record and optional user link target. | `id`, `nip`, `name`, `email`, `organization`, `unit_organization`, `position`, `role_id`, `status` | Master Data, Project Management, Workload | `CODE/be/app/models/employee.py`, `CODE/be/app/services/employee_service.py` |
 | `organizations` / `Organization` | Master organization reference. | `id`, `name`, `status` | Master Data, Auth registration options | `CODE/be/app/models/organization.py`, `CODE/be/app/services/organization_service.py` |
@@ -17,6 +17,7 @@ Primary ORM models are in `CODE/be/app/models/`. Alembic migrations are in `CODE
 | `tasks` / `Task` | Project task. | `id`, `title`, `priority`, `assignee`, `project_id`, `phase_id`, `created_by`, `phase_updated_at`, `progress_percentage`, `mandays`, `start_date`, `end_date` | Task Management, Dashboard, Auth assignment counter | `CODE/be/app/models/task.py`, `CODE/be/app/services/task_service.py` |
 | `task_comments` / `TaskComment` | Comments on tasks. | `id`, `task_id`, `author_name`, `content` | Task Management | `CODE/be/app/models/task_comment.py`, `CODE/be/app/services/task_service.py` |
 | `task_checklist_items` / `TaskChecklistItem` | Checklist items on tasks. | `id`, `task_id`, `title`, `is_done`, `order_index`, `created_by` | Task Management | `CODE/be/app/models/task_checklist_item.py`, `CODE/be/app/services/task_service.py` |
+| `task_timesheets` / `TaskTimesheet` | Timesheet harian project/tugas per user, mendukung multiple entry dalam satu tanggal. | `id`, `project_id`, `task_id?`, `user_id`, `work_date`, `hours_spent`, `notes` | Task Management | `CODE/be/app/models/task_timesheet.py`, `CODE/be/app/services/timesheet_service.py` |
 | `issues` / `Issue` | Project issue/bug/risk item. | `id`, `project_id`, `title`, `severity`, `status`, `reporter`, `assignee`, `description`, `module`, `environment`, `reproduction_steps`, `actual_result`, `expected_result`, `attachments` | Issue and SLA, Dashboard, Workload | `CODE/be/app/models/issue.py`, `CODE/be/app/services/issue_service.py` |
 | `sla_rules` / `SlaRule` | SLA target and escalation config per issue severity. | `id`, `severity`, `target_hours`, `auto_escalate`, `escalation_delay_minutes` | Issue and SLA | `CODE/be/app/models/sla_rule.py`, `CODE/be/app/services/issue_service.py` |
 | `project_attachment_folders` / `ProjectAttachmentFolder` | Folder tree for project attachments. | `id`, `project_id`, `name`, `parent_id` | Project Attachments | `CODE/be/app/models/project_attachment_folder.py`, `CODE/be/app/services/project_attachment_service.py` |
@@ -27,6 +28,8 @@ Primary ORM models are in `CODE/be/app/models/`. Alembic migrations are in `CODE
 | `project_meeting_action_items` / `ProjectMeetingActionItem` | Queryable action items attached to meeting notes. | `id`, `meeting_note_id`, `description`, `assignee_employee_id`, `due_date`, `is_done`, `order_index` | Meeting Notes (MoM) | `CODE/be/app/models/project_meeting_note.py`, `CODE/be/app/services/meeting_note_service.py` |
 | `project_meeting_files` / `ProjectMeetingFile` | Supporting documents uploaded to a meeting. | `id`, `meeting_id`, `original_name`, `stored_name`, `mime_type`, `size_bytes`, `description`, `uploaded_by` | Meeting Notes (MoM) | `CODE/be/app/models/project_meeting_file.py`, `CODE/be/app/services/meeting_file_service.py` |
 | `notifications` / `Notification` | In-app notifications. | `id`, `user_id`, `title`, `message`, `entity_type`, `entity_id`, `target_url`, `is_read` | Notifications | `CODE/be/app/models/notification.py`, `CODE/be/app/services/notification_service.py` |
+| `email_outbox` / `EmailOutbox` | Durable email queue and delivery audit log. | `id`, `to_email`, `to_user_id`, `event_key`, `entity_type`, `entity_id`, `subject`, `body_html`, `body_text`, `headers_json`, `ical`, `status`, `attempts`, `last_error`, `scheduled_at`, `sent_at` | Email Notifications | `CODE/be/app/models/email_outbox.py`, `CODE/be/app/services/email_service.py`, `CODE/be/app/services/email_dispatcher.py` |
+| `user_email_preferences` / `UserEmailPreference` | Per-user opt-out flags for non-security email categories. | `user_id`, `project_assignment`, `task_assignment`, `issue_events`, `meeting_invites`, `meeting_reminders`, `action_items`, `updated_at` | Email Notifications | `CODE/be/app/models/user_email_preference.py`, `CODE/be/app/api/v1/email_preferences.py` |
 | `audit_trails` / `AuditTrail` | Request audit records. | `id`, `user_id`, `user_email`, `action`, `method`, `path`, `status_code`, `ip_address`, `user_agent`, `request_query`, `request_body`, `note` | Audit Trail | `CODE/be/app/models/audit_trail.py`, `CODE/be/app/services/audit_trail_service.py` |
 
 ## Enums And Status Fields
@@ -47,10 +50,14 @@ Defined in `CODE/be/app/models/constants.py`:
 - `roles.name` is unique.
 - `organizations.name`, `organization_units.name`, and `positions.name` are unique.
 - `project_holidays` has unique constraint on `project_id + holiday_date`.
+- `users` linked by `employee_id` mirrors employee `email`, `name`, `role_id`, and active status when employee master data changes.
+- `users.onboarding_completed` defaults to false for new users and is set true after first-login onboarding is completed or skipped; migration marks existing users true.
 - `project_members` uses composite primary key `project_id + employee_id`.
 - Attachment folders cascade on project deletion and support self-parenting relationships; service prevents invalid parent/self-descendant moves.
 - File storage path depends on `ATTACHMENT_STORAGE_DIR`; runtime storage behavior needs environment verification outside code review.
 - Meeting files reuse `ATTACHMENT_STORAGE_DIR` with the project storage directory pattern from project attachments.
+- `email_outbox.status` uses `Queued`, `Sending`, `Sent`, or `Failed`; dispatcher retries with delayed `scheduled_at`.
+- `user_email_preferences` cascades on user deletion and security/account emails ignore opt-out flags.
 
 ## Migration Files
 
@@ -72,3 +79,8 @@ Current migration files include:
 - `CODE/be/migrations/versions/f2a3b4c5d6e7_add_project_rasci.py`
 - `CODE/be/migrations/versions/f3a4b5c6d7e8_add_task_checklist_items.py`
 - `CODE/be/migrations/versions/f4a5b6c7d8e9_add_project_meetings_tables.py`
+- `CODE/be/migrations/versions/a2b3c4d5e6f7_add_email_outbox_and_preferences.py`
+- `CODE/be/migrations/versions/b4c5d6e7f8a9_add_task_timesheets.py`
+- `CODE/be/migrations/versions/c5d6e7f8a9b0_update_timesheet_project_and_optional_task.py`
+- `CODE/be/migrations/versions/d6e7f8a9b0c1_allow_multiple_timesheet_entries.py`
+- `CODE/be/migrations/versions/e8f9a0b1c2d3_add_user_onboarding_completed.py`

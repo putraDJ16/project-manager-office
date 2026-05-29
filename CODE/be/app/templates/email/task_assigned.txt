@@ -1,0 +1,7 @@
+Tugas Baru
+
+Anda ditugaskan pada: {{ title }}
+Project: {{ project_name }}
+
+Buka di PMO: {{ frontend_url }}
+Anda menerima email ini karena terdaftar di PMO.

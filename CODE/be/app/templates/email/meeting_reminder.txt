@@ -1,0 +1,7 @@
+Pengingat Rapat
+
+Pengingat rapat: {{ title }}
+Waktu: {{ start }}
+
+Buka di PMO: {{ frontend_url }}
+Anda menerima email ini karena terdaftar di PMO.

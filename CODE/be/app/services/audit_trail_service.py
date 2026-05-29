@@ -1,6 +1,6 @@
 from typing import Any
 
-from flask import Request, Response
+from flask import Request, Response, g
 from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
 from sqlalchemy import desc, insert
 
@@ -133,7 +133,7 @@ def record_from_request(req: Request, response: Response):
         user_email = login_user_email or user_email
 
     user_agent = req.user_agent.string if req.user_agent else None
-    note = None
+    note = getattr(g, "audit_note", None)
     if req.path == "/api/v1/auth/login" and response.status_code >= 400:
         note = "Failed login attempt"
 

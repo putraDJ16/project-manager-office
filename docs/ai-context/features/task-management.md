@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Mengelola task project, progress, comments, checklist, date, dan mandays.
+Mengelola task project, progress, comments, checklist, date, mandays, dan timesheet harian user.
 
 ## Business Flow
 
-1. User melihat task by project atau semua task yang diizinkan.
+1. User membuka menu Tugas Saya untuk melihat tab tugas, isu/bug, kalender meeting, indikator timesheet harian, tabulasi proyek, dan input timesheet harian.
 2. User membuat task untuk project dan phase valid.
 3. User mengubah task fields atau progress sesuai permission.
 4. User menambah komentar/checklist jika punya permission, project member, atau assignee.
@@ -14,7 +14,7 @@ Mengelola task project, progress, comments, checklist, date, dan mandays.
 
 ## User Roles / Permissions
 
-Task memakai module `projectTasks` dan interaction memakai `projectTaskComments`. Project member dan assignee punya akses terbatas untuk interaction/progress sesuai helper di `CODE/be/app/api/v1/tasks.py`.
+Menu/route `Tugas Saya` memakai module `tasks` untuk akses halaman dan list tugas personal/global tanpa filter project. Tab Tugas di detail Proyek memakai module `projectTasks` dan tidak fallback ke `tasks`, supaya akses Tugas Saya tidak otomatis membuka tab tugas proyek. Tab rekap Timesheet di detail Proyek memakai module `projectTimesheets` dan tidak fallback ke `projectTasks`. Interaction memakai `projectTaskComments`. Project member dan assignee punya akses terbatas untuk interaction/progress sesuai helper di `CODE/be/app/api/v1/tasks.py`.
 
 ## Main Backend Files
 
@@ -24,6 +24,7 @@ Task memakai module `projectTasks` dan interaction memakai `projectTaskComments`
 - `CODE/be/app/models/task.py`
 - `CODE/be/app/models/task_comment.py`
 - `CODE/be/app/models/task_checklist_item.py`
+- `CODE/be/app/models/task_timesheet.py`
 - `CODE/be/app/models/project_holiday.py`
 
 ## Main Frontend Files
@@ -34,6 +35,7 @@ Task memakai module `projectTasks` dan interaction memakai `projectTaskComments`
 - `CODE/fe/src/app/pages/tugas/TaskDetailPanel.tsx`
 - `CODE/fe/src/app/pages/tugas/TaskFormFields.tsx`
 - `CODE/fe/src/app/services/taskApi.ts`
+- `CODE/fe/src/app/services/timesheetApi.ts`
 
 ## API Endpoints
 
@@ -48,6 +50,10 @@ Task memakai module `projectTasks` dan interaction memakai `projectTaskComments`
 | POST | `/api/v1/tasks/<task_id>/checklist` | Create checklist item |
 | PATCH | `/api/v1/tasks/<task_id>/checklist/<item_id>` | Update checklist item |
 | DELETE | `/api/v1/tasks/<task_id>/checklist/<item_id>` | Delete checklist item |
+| GET | `/api/v1/my-timesheets` | List timesheet milik user login |
+| POST | `/api/v1/my-timesheets` | Tambah timesheet harian (pilih project dulu, task opsional) |
+| PATCH | `/api/v1/my-timesheets/<timesheet_id>` | Update timesheet harian |
+| DELETE | `/api/v1/my-timesheets/<timesheet_id>` | Hapus timesheet harian |
 
 ## Database / Models
 
@@ -56,6 +62,7 @@ Task memakai module `projectTasks` dan interaction memakai `projectTaskComments`
 | `tasks` / `Task` | Main task |
 | `task_comments` / `TaskComment` | Comments |
 | `task_checklist_items` / `TaskChecklistItem` | Checklist |
+| `task_timesheets` / `TaskTimesheet` | Daily timesheet entries by user per task/date |
 | `projects` / `Project` | Project relation |
 | `phases` / `Phase` | Phase relation |
 | `project_holidays` / `ProjectHoliday` | Mandays/date calculation |
@@ -76,6 +83,7 @@ Not found uses 404 `ApiError`. Validation errors include field keys in `errors` 
 ## Tests
 
 - `CODE/be/tests/test_tasks_api.py`
+- `CODE/be/tests/test_timesheets_api.py`
 
 ## Safe Modification Scope
 

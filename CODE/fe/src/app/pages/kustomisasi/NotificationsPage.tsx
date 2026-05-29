@@ -7,8 +7,10 @@ import {
   markNotificationRead,
   type ApiNotification
 } from "../../services/notificationApi";
+import { PaginationControls } from "../../components/ui";
 
 type FilterMode = "all" | "unread";
+const PAGE_SIZE = 10;
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
@@ -38,6 +40,7 @@ export function NotificationsPage() {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -58,6 +61,14 @@ export function NotificationsPage() {
   }, [filter]);
 
   const groupedNotifications = useMemo(() => notifications, [notifications]);
+  const paginatedNotifications = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return groupedNotifications.slice(start, start + PAGE_SIZE);
+  }, [groupedNotifications, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, notifications.length]);
 
   const handleOpenNotification = async (notification: ApiNotification) => {
     if (!notification.is_read) {
@@ -134,7 +145,7 @@ export function NotificationsPage() {
 
         {!isLoading && !error && groupedNotifications.length > 0 && (
           <div className="divide-y divide-slate-100">
-            {groupedNotifications.map((notification) => (
+            {paginatedNotifications.map((notification) => (
               <div
                 key={notification.id}
                 className={`px-4 py-4 flex items-start gap-3 ${notification.is_read ? "bg-white" : "bg-indigo-50/50"}`}
@@ -183,6 +194,9 @@ export function NotificationsPage() {
               </div>
             ))}
           </div>
+        )}
+        {!isLoading && !error && groupedNotifications.length > 0 && (
+          <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={groupedNotifications.length} onPageChange={setPage} className="border-t border-slate-200" />
         )}
       </div>
     </div>

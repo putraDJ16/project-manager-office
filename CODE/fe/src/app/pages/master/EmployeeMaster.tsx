@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Building2,
+  ChevronDown,
+  Eye,
   Filter,
   Network,
   Pencil,
@@ -26,10 +28,12 @@ import {
 } from "../../services/masterApi";
 import { fetchMasterReferences } from "../../services/masterReferenceApi";
 import { hasPermission } from "../../utils/permissions";
+import { PaginationControls } from "../../components/ui";
 
 type EmployeeTab = "data" | "structure";
 type ModalMode = "create" | "edit";
 type EmployeeFormState = Omit<Employee, "id">;
+const PAGE_SIZE = 10;
 
 const emptyFormState: EmployeeFormState = {
   nip: "",
@@ -73,7 +77,7 @@ export function EmployeeMaster() {
   const [masterReferences, setMasterReferences] = useState<MasterReferenceItem[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | EmployeeStatus>("All");
+  const [statusFilter, setStatusFilter] = useState<"All" | EmployeeStatus>("Active");
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>("create");
@@ -81,6 +85,9 @@ export function EmployeeMaster() {
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState<EmployeeFormState>(emptyFormState);
+  const [collapsedOrganizations, setCollapsedOrganizations] = useState<Record<string, boolean>>({});
+  const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -149,6 +156,10 @@ export function EmployeeMaster() {
       return source.includes(normalizedQuery);
     });
   }, [employees, query, roleMap, statusFilter]);
+  const paginatedEmployees = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredEmployees.slice(start, start + PAGE_SIZE);
+  }, [filteredEmployees, page]);
   const hasSearchInput = searchInput.trim().length > 0;
 
   const groupedStructure = useMemo(() => {
@@ -162,6 +173,10 @@ export function EmployeeMaster() {
     return grouped;
   }, [filteredEmployees]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, activeTab]);
+
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setQuery(searchInput);
@@ -170,6 +185,21 @@ export function EmployeeMaster() {
   const handleClearSearch = () => {
     setSearchInput("");
     setQuery("");
+  };
+
+  const openDetailModal = (employeeId: string) => {
+    setDetailEmployeeId(employeeId);
+  };
+
+  const closeDetailModal = () => {
+    setDetailEmployeeId(null);
+  };
+
+  const toggleOrganizationCollapse = (organization: string) => {
+    setCollapsedOrganizations((current) => ({
+      ...current,
+      [organization]: !current[organization]
+    }));
   };
 
   const openCreateModal = () => {
@@ -303,6 +333,8 @@ export function EmployeeMaster() {
       setNotice(message);
     }
   };
+  const detailEmployee = detailEmployeeId ? employees.find((employee) => employee.id === detailEmployeeId) ?? null : null;
+  const detailEmployeeRole = detailEmployee ? roleMap[detailEmployee.roleId] : undefined;
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -412,11 +444,7 @@ export function EmployeeMaster() {
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3 font-medium">NIP</th>
-                  <th className="px-4 py-3 font-medium">Nama</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Organisasi</th>
-                  <th className="px-4 py-3 font-medium">Unit Organisasi</th>
+                  <th className="px-4 py-3 font-medium">Pegawai</th>
                   <th className="px-4 py-3 font-medium">Jabatan</th>
                   <th className="px-4 py-3 font-medium">Role</th>
                   <th className="px-4 py-3 font-medium">Status</th>
@@ -424,15 +452,18 @@ export function EmployeeMaster() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredEmployees.map((employee) => {
+                {paginatedEmployees.map((employee) => {
                   const employeeRole = roleMap[employee.roleId];
                   return (
                     <tr key={employee.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-slate-600">{employee.nip}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-900">{employee.name}</td>
-                      <td className="px-4 py-3 text-slate-600">{employee.email}</td>
-                      <td className="px-4 py-3 text-slate-600">{employee.organization}</td>
-                      <td className="px-4 py-3 text-slate-600">{employee.unitOrganization}</td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-semibold text-slate-900 whitespace-nowrap overflow-hidden text-ellipsis">
+                          {employee.name}
+                        </p>
+                        <p className="text-xs text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">
+                          {employee.nip} • {employee.email}
+                        </p>
+                      </td>
                       <td className="px-4 py-3 text-slate-600">{employee.position}</td>
                       <td className="px-4 py-3">
                         <RoleBadge roleName={employeeRole?.name ?? "Role tidak ditemukan"} status={employeeRole?.status} />
@@ -445,17 +476,10 @@ export function EmployeeMaster() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => openEditModal(employee)}
+                              onClick={() => openDetailModal(employee.id)}
                               className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-100"
                             >
-                              <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleResetPassword(employee)}
-                              className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Reset Password
+                              <Eye className="w-3.5 h-3.5 mr-1.5" /> Lihat Detail
                             </button>
                             {employee.status === "Active" ? (
                               <button
@@ -482,6 +506,7 @@ export function EmployeeMaster() {
                 })}
               </tbody>
             </table>
+            <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={filteredEmployees.length} onPageChange={setPage} className="border-t border-slate-200" />
           </div>
         )}
 
@@ -489,37 +514,48 @@ export function EmployeeMaster() {
           <div className="space-y-4">
             {Array.from(groupedStructure.entries()).map(([organization, byUnit]) => (
               <div key={organization} className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => toggleOrganizationCollapse(organization)}
+                  className="w-full px-5 py-4 border-b border-slate-100 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+                >
                   <div className="flex items-center">
-                    <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center mr-3">
+                    <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center mr-3 shrink-0">
                       <Building2 className="w-4 h-4" />
                     </div>
                     <h3 className="text-base font-semibold text-slate-900">{organization}</h3>
                   </div>
-                </div>
-                <div className="p-4 space-y-3">
-                  {Array.from(byUnit.entries()).map(([unitName, users]) => (
-                    <div key={unitName} className="rounded-lg border border-slate-200 overflow-hidden">
-                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-sm font-semibold text-slate-800">
-                        Unit Organisasi: <span className="font-medium">{unitName}</span>
-                      </div>
-                      <div className="divide-y divide-slate-50">
-                        {users.map((user) => (
-                          <div key={user.id} className="px-4 py-2.5 flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-slate-900">{user.name}</p>
-                              <p className="text-xs text-slate-500">
-                                {user.nip} - {user.email}
-                              </p>
-                              <p className="text-xs text-slate-500 mt-1">Jabatan: {user.position}</p>
+                  <ChevronDown
+                    className={`w-4 h-4 text-slate-500 transition-transform ${
+                      collapsedOrganizations[organization] ? "-rotate-90" : "rotate-0"
+                    }`}
+                  />
+                </button>
+                {!collapsedOrganizations[organization] && (
+                  <div className="p-4 space-y-3">
+                    {Array.from(byUnit.entries()).map(([unitName, users]) => (
+                      <div key={unitName} className="rounded-lg border border-slate-200 overflow-hidden">
+                        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-sm font-semibold text-slate-800">
+                          Unit Organisasi: <span className="font-medium">{unitName}</span>
+                        </div>
+                        <div className="divide-y divide-slate-50">
+                          {users.map((user) => (
+                            <div key={user.id} className="px-4 py-2.5 flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-slate-900">{user.name}</p>
+                                <p className="text-xs text-slate-500">
+                                  {user.nip} - {user.email}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">Jabatan: {user.position}</p>
+                              </div>
+                              <StatusBadge status={user.status} />
                             </div>
-                            <StatusBadge status={user.status} />
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -622,6 +658,61 @@ export function EmployeeMaster() {
           </div>
         </div>
       )}
+
+      {detailEmployee && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={closeDetailModal}>
+          <div className="w-full max-w-2xl bg-white rounded-xl border border-slate-200 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-900">Detail Pegawai</h2>
+              <button type="button" onClick={closeDetailModal} className="p-1 rounded hover:bg-slate-100 text-slate-500">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <DetailField label="NIP" value={detailEmployee.nip} />
+                <DetailField label="Nama" value={detailEmployee.name} />
+                <DetailField label="Email" value={detailEmployee.email} />
+                <DetailField label="Status" value={detailEmployee.status} />
+                <DetailField label="Organisasi" value={detailEmployee.organization} />
+                <DetailField label="Unit Organisasi" value={detailEmployee.unitOrganization} />
+                <DetailField label="Jabatan" value={detailEmployee.position} />
+                <DetailField label="Role" value={detailEmployeeRole?.name ?? "Role tidak ditemukan"} />
+              </div>
+              {canEdit && (
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeDetailModal();
+                      openEditModal(detailEmployee);
+                    }}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-100"
+                  >
+                    <Pencil className="w-4 h-4 mr-1.5" /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleResetPassword(detailEmployee)}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-1.5" /> Reset Password
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 px-3 py-2">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-sm font-medium text-slate-900 mt-0.5">{value}</p>
     </div>
   );
 }

@@ -5,6 +5,7 @@ from app.api.v1 import api_v1
 from app.schemas import projects_schema
 from app.services.auth_service import (
     change_password,
+    complete_onboarding,
     get_my_assignment_counter,
     get_profile,
     list_my_projects,
@@ -61,6 +62,15 @@ def me_handler():
     return success_response(profile)
 
 
+@api_v1.post("/auth/onboarding/complete")
+@jwt_required()
+def complete_onboarding_handler():
+    claims = get_jwt()
+    identity = claims["sub"]
+    profile = complete_onboarding(identity)
+    return success_response(profile, message="Onboarding selesai.")
+
+
 @api_v1.post("/auth/change-password")
 @jwt_required()
 def change_password_handler():
@@ -88,7 +98,8 @@ def change_password_handler():
 def my_projects_handler():
     claims = get_jwt()
     identity = claims["sub"]
-    projects = list_my_projects(identity)
+    member_only = request.args.get("member_only", "").strip().lower() in {"1", "true", "yes"}
+    projects = list_my_projects(identity, member_only=member_only)
     return success_response(projects_schema.dump(projects))
 
 

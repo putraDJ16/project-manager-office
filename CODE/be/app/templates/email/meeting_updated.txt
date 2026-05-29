@@ -1,0 +1,7 @@
+Perubahan Jadwal Rapat
+
+Jadwal rapat berubah: {{ title }}
+Waktu baru: {{ start }}
+
+Buka di PMO: {{ frontend_url }}
+Anda menerima email ini karena terdaftar di PMO.

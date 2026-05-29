@@ -1,0 +1,2 @@
+"""OpenAPI documentation helpers."""
+

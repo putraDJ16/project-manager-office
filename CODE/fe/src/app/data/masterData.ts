@@ -3,6 +3,7 @@ export type RoleStatus = "Active" | "Inactive";
 
 export type ModuleKey =
   | "dashboard"
+  | "calendar"
   | "tasks"
   | "issues"
   | "workload"
@@ -12,9 +13,13 @@ export type ModuleKey =
   | "projectMembers"
   | "projectTasks"
   | "projectTaskComments"
+  | "projectGantt"
+  | "projectTimesheets"
   | "projectIssues"
   | "projectAttachments"
   | "projectMeetings"
+  | "emailPreferences"
+  | "adminEmailLogs"
   | "masterRoles"
   | "masterOrganizations"
   | "masterOrganizationUnits"
@@ -55,6 +60,7 @@ export const DEFAULT_ORGANIZATION_NAME = "PM Dashboard";
 
 export const modulePermissionLabels: Record<ModuleKey, string> = {
   dashboard: "Beranda",
+  calendar: "Kalender",
   tasks: "Manajemen Tugas",
   issues: "Isu & Bug",
   workload: "SDM & Kapabilitas",
@@ -64,9 +70,13 @@ export const modulePermissionLabels: Record<ModuleKey, string> = {
   projectMembers: "Proyek - Anggota",
   projectTasks: "Proyek - Tugas",
   projectTaskComments: "Proyek - Komentar Tugas",
+  projectGantt: "Proyek - Gantt",
+  projectTimesheets: "Proyek - Timesheet",
   projectIssues: "Proyek - Isu & Bug",
   projectAttachments: "Proyek - Lampiran",
   projectMeetings: "Proyek - Meeting",
+  emailPreferences: "Pengaturan - Notifikasi Email",
+  adminEmailLogs: "Admin - Email Log",
   masterRoles: "Master - Role",
   masterOrganizations: "Master - Organisasi",
   masterOrganizationUnits: "Master - Unit Organisasi",
@@ -89,6 +99,7 @@ function createRolePermissions(
 ): Record<ModuleKey, PermissionSet> {
   return {
     dashboard: createPermissionSet(overrides?.dashboard),
+    calendar: createPermissionSet(overrides?.calendar),
     tasks: createPermissionSet(overrides?.tasks),
     issues: createPermissionSet(overrides?.issues),
     workload: createPermissionSet(overrides?.workload),
@@ -98,9 +109,13 @@ function createRolePermissions(
     projectMembers: createPermissionSet(overrides?.projectMembers),
     projectTasks: createPermissionSet(overrides?.projectTasks),
     projectTaskComments: createPermissionSet(overrides?.projectTaskComments),
+    projectGantt: createPermissionSet(overrides?.projectGantt),
+    projectTimesheets: createPermissionSet(overrides?.projectTimesheets),
     projectIssues: createPermissionSet(overrides?.projectIssues),
     projectAttachments: createPermissionSet(overrides?.projectAttachments),
     projectMeetings: createPermissionSet(overrides?.projectMeetings),
+    emailPreferences: createPermissionSet(overrides?.emailPreferences),
+    adminEmailLogs: createPermissionSet(overrides?.adminEmailLogs),
     masterRoles: createPermissionSet(overrides?.masterRoles),
     masterOrganizations: createPermissionSet(overrides?.masterOrganizations),
     masterOrganizationUnits: createPermissionSet(overrides?.masterOrganizationUnits),
@@ -116,6 +131,7 @@ export const initialRoles: Role[] = [
     status: "Active",
     permissions: createRolePermissions({
       dashboard: { view: true },
+      calendar: { view: true },
       tasks: { view: true, create: true, edit: true, delete: true, restore: true },
       issues: { view: true, create: true, edit: true, delete: true, restore: true },
       workload: { view: true, create: true, edit: true, delete: true, restore: true },
@@ -125,9 +141,13 @@ export const initialRoles: Role[] = [
       projectMembers: { view: true, create: true, edit: true, delete: true, restore: true },
       projectTasks: { view: true, create: true, edit: true, delete: true, restore: true },
       projectTaskComments: { view: true, create: true, edit: true, delete: true, restore: true },
+      projectGantt: { view: true, create: true, edit: true, delete: true, restore: true },
+      projectTimesheets: { view: true },
       projectIssues: { view: true, create: true, edit: true, delete: true, restore: true },
       projectAttachments: { view: true, create: true, edit: true, delete: true, restore: true },
       projectMeetings: { view: true, create: true, edit: true, delete: true, restore: true },
+      emailPreferences: { view: true, edit: true },
+      adminEmailLogs: { view: true, create: true, edit: true, delete: true, restore: true },
       masterRoles: { view: true, create: true, edit: true, delete: true, restore: true },
       masterOrganizations: { view: true, create: true, edit: true, delete: true, restore: true },
       masterOrganizationUnits: { view: true, create: true, edit: true, delete: true, restore: true },
@@ -141,6 +161,7 @@ export const initialRoles: Role[] = [
     status: "Active",
     permissions: createRolePermissions({
       dashboard: { view: true },
+      calendar: { view: true },
       tasks: { view: true, create: true, edit: true },
       issues: { view: true, create: true, edit: true },
       workload: { view: true },
@@ -149,6 +170,8 @@ export const initialRoles: Role[] = [
       projectMembers: { view: true, create: true, delete: true },
       projectTasks: { view: true, create: true, edit: true },
       projectTaskComments: { view: true, create: true },
+      projectGantt: { view: true },
+      projectTimesheets: { view: true },
       projectIssues: { view: true, create: true, edit: true },
       projectAttachments: { view: true, create: true, edit: true, delete: true },
       projectMeetings: { view: true, create: true, edit: true, delete: true },
@@ -164,6 +187,7 @@ export const initialRoles: Role[] = [
     status: "Active",
     permissions: createRolePermissions({
       dashboard: { view: true },
+      calendar: { view: true },
       workload: { view: true },
       masterEmployees: { view: true, create: true, edit: true, delete: true, restore: true },
       masterRoles: { view: true },
@@ -179,6 +203,7 @@ export const initialRoles: Role[] = [
     status: "Active",
     permissions: createRolePermissions({
       dashboard: { view: true },
+      calendar: { view: true },
       tasks: { view: true },
       issues: { view: true },
       workload: { view: true },
@@ -188,9 +213,12 @@ export const initialRoles: Role[] = [
       projectMembers: { view: true },
       projectTasks: { view: true },
       projectTaskComments: { view: true },
+      projectGantt: { view: true },
+      projectTimesheets: { view: true },
       projectIssues: { view: true },
       projectAttachments: { view: true },
       projectMeetings: { view: true },
+      adminEmailLogs: { view: true },
       masterRoles: { view: true },
       masterOrganizations: { view: true },
       masterOrganizationUnits: { view: true },

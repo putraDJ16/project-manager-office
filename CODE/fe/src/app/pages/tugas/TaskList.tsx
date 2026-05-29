@@ -15,7 +15,7 @@ import {
   type ApiTaskChecklistItem,
   type ApiTaskComment
 } from "../../services/taskApi";
-import { Badge, Button, Card, Input, Select, SelectItem } from "../../components/ui";
+import { Badge, Button, Card, Input, PaginationControls, Select, SelectItem } from "../../components/ui";
 import { TaskDetailModal } from "./TaskDetailModal";
 
 type Project = { id: string; name: string; status: string };
@@ -38,6 +38,7 @@ type TaskComment = { id: number; authorName: string; content: string; createdAt:
 type TaskChecklistItem = { id: number; title: string; isDone: boolean };
 type NoticeState = { type: "success" | "error"; message: string } | null;
 type DateStatus = "upcoming" | "on_progress" | "overdue";
+const PAGE_SIZE = 10;
 
 function toPhase(raw: { id: string; project_id: string; name: string; order_index: number }): Phase {
   return { id: raw.id, projectId: raw.project_id, name: raw.name, order: raw.order_index };
@@ -133,6 +134,7 @@ export function TaskList() {
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isLoadingChecklist, setIsLoadingChecklist] = useState(false);
   const [isSavingChecklist, setIsSavingChecklist] = useState(false);
+  const [page, setPage] = useState(1);
 
   const phasesForProject = useMemo(
     () =>
@@ -159,6 +161,10 @@ export function TaskList() {
         .includes(query);
     });
   }, [phaseById, searchQuery, selectedProjectId, tasks]);
+  const paginatedTasks = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredTasks.slice(start, start + PAGE_SIZE);
+  }, [filteredTasks, page]);
 
   const hasSearchInput = searchInput.trim().length > 0;
   const selectedTask = useMemo(
@@ -201,6 +207,9 @@ export function TaskList() {
     if (!selectedProjectId) return;
     void reloadProjectData(selectedProjectId, searchQuery);
   }, [searchQuery, selectedProjectId]);
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, selectedProjectId, view]);
 
   useEffect(() => {
     if (!notice) return;
@@ -448,7 +457,7 @@ export function TaskList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredTasks.map((task) => (
+                {paginatedTasks.map((task) => (
                   <tr key={task.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 text-slate-500 font-medium">{task.id}</td>
                     <td className="px-4 py-3 font-medium text-slate-900">{task.title}</td>
@@ -507,6 +516,7 @@ export function TaskList() {
                 ))}
               </tbody>
             </table>
+            <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={filteredTasks.length} onPageChange={setPage} className="border-t border-slate-200" />
           </Card>
         )}
 

@@ -4,6 +4,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
 from app.models import Employee, Issue, Organization, OrganizationUnit, Position, Project, ProjectMember, Role, Task, User
+from app.services.email_service import enqueue_event_email
 from app.utils.exceptions import ApiError
 from app.utils.ids import next_string_id
 from app.utils.permissions import get_user_permissions
@@ -21,6 +22,12 @@ def _abbreviated_name(name: str | None):
     if len(parts) < 2:
         return parts[0] if parts else None
     return f"{parts[0]} {parts[1][0]}."
+
+
+def _effective_role(user: User):
+    if user.employee_id and user.employee and user.employee.role:
+        return user.employee.role
+    return user.role
 
 
 def _assignment_aliases(user: User):
@@ -56,10 +63,11 @@ def login(email: str, password: str):
     if not user or not user.is_active or not check_password_hash(user.password_hash, password):
         raise ApiError("Email atau password tidak valid.", status_code=401)
 
+    role = _effective_role(user)
     claims = {
         "email": user.email,
         "name": user.display_name,
-        "role_id": user.role_id,
+        "role_id": role.id if role else user.role_id,
         "employee_id": user.employee_id,
     }
 
@@ -71,11 +79,12 @@ def login(email: str, password: str):
             "name": user.display_name,
             "email": user.email,
             "initials": _initials(user.display_name),
-            "role_id": user.role_id,
-            "role": user.role.name if user.role else None,
+            "role_id": role.id if role else user.role_id,
+            "role": role.name if role else None,
             "permissions": get_user_permissions(user),
             "employee_id": user.employee_id,
             "employee_name": user.employee.name if user.employee else None,
+            "onboarding_completed": bool(user.onboarding_completed),
         },
     }
 
@@ -169,21 +178,30 @@ def get_profile(user_id: str):
     employee = None
     if user.employee_id:
         employee = user.employee
+    role = _effective_role(user)
 
     return {
         "id": user.id,
         "name": user.display_name,
         "email": user.email,
         "initials": _initials(user.display_name),
-        "role_id": user.role_id,
-        "role": user.role.name if user.role else None,
+        "role_id": role.id if role else user.role_id,
+        "role": role.name if role else None,
         "permissions": get_user_permissions(user),
         "employee_id": employee.id if employee else None,
         "employee_name": employee.name if employee else None,
         "organization": employee.organization if employee else None,
         "unit_organization": employee.unit_organization if employee else None,
         "position": employee.position if employee else None,
+        "onboarding_completed": bool(user.onboarding_completed),
     }
+
+
+def complete_onboarding(user_id: str):
+    user = _get_active_user(user_id)
+    user.onboarding_completed = True
+    db.session.commit()
+    return get_profile(user_id)
 
 
 def change_password(user_id: str, current_password: str, new_password: str):
@@ -200,14 +218,31 @@ def change_password(user_id: str, current_password: str, new_password: str):
         raise ApiError("Password baru harus berbeda dari password saat ini.", status_code=400)
 
     user.password_hash = generate_password_hash(normalized_new_password)
+    enqueue_event_email(
+        user=user,
+        event_key="auth.password_changed",
+        template_key="password_changed",
+        subject="Konfirmasi: password berhasil diubah",
+        context={"target_url": "/profil"},
+        entity_type="auth",
+        entity_id=user.id,
+    )
     db.session.commit()
 
 
-def list_my_projects(user_id: str):
+def list_my_projects(user_id: str, member_only: bool = False):
     user = _get_active_user(user_id)
 
     if not user.employee_id:
         return []
+
+    if member_only:
+        return (
+            Project.query
+            .filter(Project.members.any(ProjectMember.employee_id == user.employee_id))
+            .order_by(Project.updated_at.desc(), Project.name.asc())
+            .all()
+        )
 
     return (
         Project.query

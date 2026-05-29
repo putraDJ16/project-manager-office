@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import { useSearchParams } from "react-router";
 import {
   ExternalLink,
   FileWarning,
@@ -39,16 +40,18 @@ import {
   type SlaIndicatorTone
 } from "../../services/issueSla";
 import { IssueDetailPanel } from "./IssueDetailPanel";
+import { PaginationControls } from "../../components/ui";
+import { loadAuthSession } from "../../data/auth";
 
 type ViewMode = "list" | "board";
 type RuleDraft = { targetHours: string; autoEscalate: boolean; escalationDelayMinutes: string };
 type RuleDraftMap = Record<IssueSeverity, RuleDraft>;
+const PAGE_SIZE = 10;
 
 type CreateIssueFormState = {
   projectId: string;
   title: string;
   severity: IssueSeverity;
-  reporter: string;
   assignee: string;
   module: string;
   environment: string;
@@ -63,7 +66,6 @@ function getDefaultCreateForm(defaultProjectId = ""): CreateIssueFormState {
     projectId: defaultProjectId,
     title: "",
     severity: "Major",
-    reporter: "",
     assignee: "",
     module: "",
     environment: "",
@@ -75,6 +77,9 @@ function getDefaultCreateForm(defaultProjectId = ""): CreateIssueFormState {
 }
 
 export function IssueList() {
+  const session = loadAuthSession();
+  const reporterName = session?.employeeName?.trim() || session?.name?.trim() || "";
+  const [searchParams] = useSearchParams();
   const [projects, setProjects] = useState<ApiProject[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -93,6 +98,7 @@ export function IssueList() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const [page, setPage] = useState(1);
   const defaultProjectId = projects[0]?.id ?? "";
 
   useEffect(() => {
@@ -100,6 +106,12 @@ export function IssueList() {
     const timeout = window.setTimeout(() => setNotice(null), 2600);
     return () => window.clearTimeout(timeout);
   }, [notice]);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "issue") return;
+    setCreateForm((current) => (current.projectId ? current : getDefaultCreateForm(defaultProjectId)));
+    setIsCreateModalOpen(true);
+  }, [defaultProjectId, searchParams]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -204,7 +216,15 @@ export function IssueList() {
       return source.includes(query);
     });
   }, [issues, searchQuery, severityFilter, statusFilter, projectById]);
+  const paginatedIssues = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredIssues.slice(start, start + PAGE_SIZE);
+  }, [filteredIssues, page]);
   const hasSearchInput = searchInput.trim().length > 0;
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, severityFilter, statusFilter, view]);
 
   const selectedIssue = useMemo(
     () => issues.find((issue) => issue.id === selectedIssueId) ?? null,
@@ -218,12 +238,16 @@ export function IssueList() {
 
   const handleCreateIssue = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!reporterName) {
+      setNotice("Pelapor tidak ditemukan dari sesi login. Silakan login ulang.");
+      return;
+    }
 
     await createIssue({
       projectId: createForm.projectId,
       title: createForm.title,
       severity: createForm.severity,
-      reporter: createForm.reporter,
+      reporter: reporterName,
       assignee: createForm.assignee || null,
       module: createForm.module,
       environment: createForm.environment,
@@ -448,13 +472,18 @@ export function IssueList() {
         )}
 
         {!isLoading && view === "list" && (
-          <IssueTable
-            issues={filteredIssues}
-            getIssueSlaInfo={getIssueSlaInfo}
-            getProjectName={getProjectName}
-            onRowClick={(id) => setSelectedIssueId(id)}
-            selectedIssueId={selectedIssueId}
-          />
+          <div className="space-y-4">
+            <IssueTable
+              issues={paginatedIssues}
+              getIssueSlaInfo={getIssueSlaInfo}
+              getProjectName={getProjectName}
+              onRowClick={(id) => setSelectedIssueId(id)}
+              selectedIssueId={selectedIssueId}
+            />
+            <div className="rounded-xl border border-slate-200 bg-white">
+              <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={filteredIssues.length} onPageChange={setPage} />
+            </div>
+          </div>
         )}
 
         {!isLoading && view === "board" && (
@@ -518,7 +547,7 @@ export function IssueList() {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Proyek</label>
                   <select
@@ -551,17 +580,6 @@ export function IssueList() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Pelapor</label>
-                  <input
-                    type="text"
-                    value={createForm.reporter}
-                    onChange={(event) => setCreateForm((current) => ({ ...current, reporter: event.target.value }))}
-                    className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Nama pelapor"
-                    required
-                  />
-                </div>
               </div>
 
               <div>

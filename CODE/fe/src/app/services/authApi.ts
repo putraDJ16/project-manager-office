@@ -13,6 +13,7 @@ type LoginResponse = {
     role?: string | null;
     employee_id?: string | null;
     employee_name?: string | null;
+    onboarding_completed?: boolean;
     permissions?: Partial<Record<ModuleKey, PermissionSet>>;
   };
 };
@@ -48,6 +49,7 @@ type MeResponse = {
   permissions?: Partial<Record<ModuleKey, PermissionSet>>;
   employee_id?: string | null;
   employee_name?: string | null;
+  onboarding_completed?: boolean;
   organization?: string | null;
   unit_organization?: string | null;
   position?: string | null;
@@ -130,6 +132,14 @@ export async function getMe() {
   return result.data;
 }
 
+export async function completeOnboarding() {
+  const result = await apiRequest<MeResponse>("/auth/onboarding/complete", { method: "POST" });
+  return {
+    profile: result.data,
+    message: result.message ?? "Onboarding selesai."
+  };
+}
+
 export async function changePassword(payload: {
   current_password: string;
   new_password: string;
@@ -142,8 +152,11 @@ export async function changePassword(payload: {
   return result.message ?? "Password berhasil diubah.";
 }
 
-export async function fetchMyProjects() {
-  const result = await apiRequest<MyProjectResponse[]>("/auth/my-projects", { method: "GET" });
+export async function fetchMyProjects(options?: { member_only?: boolean }) {
+  const query = new URLSearchParams();
+  if (options?.member_only) query.set("member_only", "true");
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const result = await apiRequest<MyProjectResponse[]>(`/auth/my-projects${suffix}`, { method: "GET" });
   return result.data;
 }
 

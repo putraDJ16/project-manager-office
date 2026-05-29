@@ -1,3 +1,10 @@
+def _login(client, email: str, password: str):
+    response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert response.status_code == 200
+    token = response.get_json()["data"]["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_issue_and_sla_endpoints(client, auth_headers):
     issues = client.get("/api/v1/issues", headers=auth_headers)
     assert issues.status_code == 200
@@ -52,3 +59,75 @@ def test_issue_and_sla_endpoints(client, auth_headers):
     next_rules = updated.get_json()["data"]["rules"]
     major_rule = next(rule for rule in next_rules if rule["severity"] == "Major")
     assert major_rule["target_hours"] == 12
+
+
+def test_issue_status_only_reporter_or_assignee_can_update(client, auth_headers):
+    created = client.post(
+        "/api/v1/issues",
+        headers=auth_headers,
+        json={
+            "project_id": "p1",
+            "title": "Bug Permission Status",
+            "severity": "Major",
+            "assignee": "Project Manager",
+        },
+    )
+    assert created.status_code == 201
+    issue_id = created.get_json()["data"]["id"]
+
+    pm_headers = _login(client, "pm@zoho.local", "Pm123456!")
+    status_by_assignee = client.patch(
+        f"/api/v1/issues/{issue_id}/status", headers=pm_headers, json={"status": "Investigating"}
+    )
+    assert status_by_assignee.status_code == 200
+    assert status_by_assignee.get_json()["data"]["status"] == "Investigating"
+
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "Outsider User",
+            "email": "outsider.user@company.co.id",
+            "password": "Outsider123!",
+            "confirm_password": "Outsider123!",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+        },
+    )
+    assert register.status_code == 201
+    outsider_headers = _login(client, "outsider.user@company.co.id", "Outsider123!")
+
+    status_by_outsider = client.patch(
+        f"/api/v1/issues/{issue_id}/status", headers=outsider_headers, json={"status": "Resolved"}
+    )
+    assert status_by_outsider.status_code == 403
+    assert "pelapor atau assignee" in status_by_outsider.get_json()["message"]
+
+
+def test_issue_status_change_recorded_in_audit_trail_note(client, auth_headers):
+    created = client.post(
+        "/api/v1/issues",
+        headers=auth_headers,
+        json={
+            "project_id": "p1",
+            "title": "Bug Audit Status",
+            "severity": "Major",
+            "assignee": "Project Manager",
+        },
+    )
+    assert created.status_code == 201
+    issue_id = created.get_json()["data"]["id"]
+
+    updated = client.patch(f"/api/v1/issues/{issue_id}/status", headers=auth_headers, json={"status": "In Progress"})
+    assert updated.status_code == 200
+
+    audit = client.get("/api/v1/audit-trails?per_page=100", headers=auth_headers)
+    assert audit.status_code == 200
+    items = audit.get_json()["data"]["items"]
+    status_logs = [
+        item
+        for item in items
+        if item["path"] == f"/api/v1/issues/{issue_id}/status" and item["method"] == "PATCH" and item["status_code"] == 200
+    ]
+    assert status_logs
+    assert "status changed from 'Open' to 'In Progress'" in (status_logs[0]["note"] or "")

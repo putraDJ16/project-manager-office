@@ -20,6 +20,7 @@ from app.schemas.role_schema import RoleSchema
 from app.schemas.task_schema import TaskSchema
 from app.schemas.task_checklist_schema import TaskChecklistItemSchema
 from app.schemas.task_comment_schema import TaskCommentSchema
+from app.schemas.task_timesheet_schema import TaskTimesheetSchema
 
 role_schema = RoleSchema()
 roles_schema = RoleSchema(many=True)
@@ -42,6 +43,8 @@ task_checklist_item_schema = TaskChecklistItemSchema()
 task_checklist_items_schema = TaskChecklistItemSchema(many=True)
 task_comment_schema = TaskCommentSchema()
 task_comments_schema = TaskCommentSchema(many=True)
+task_timesheet_schema = TaskTimesheetSchema()
+task_timesheets_schema = TaskTimesheetSchema(many=True)
 issue_schema = IssueSchema()
 issues_schema = IssueSchema(many=True)
 sla_rule_schema = SlaRuleSchema()

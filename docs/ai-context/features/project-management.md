@@ -2,19 +2,19 @@
 
 ## Purpose
 
-Mengelola project, detail project, phase, member, holiday project, dan RASCI metadata.
+Mengelola project, detail project, phase, member, holiday project, Gantt, dan RASCI metadata.
 
 ## Business Flow
 
 1. User melihat daftar project.
 2. User dengan permission membuat atau mengubah project.
-3. Project detail memuat members, phases, tasks, holidays, attachments, dan issues.
+3. Project detail memuat members, phases, tasks, holidays, attachments, issues, dan rekap timesheet member.
 4. Member dapat ditambahkan/dihapus dan dapat memicu notification.
 5. Holiday project digunakan oleh task mandays/date calculation.
 
 ## User Roles / Permissions
 
-Endpoint memakai `masterProjects`, `projectPhases`, dan `projectMembers`. Project member/manager dapat memperoleh akses melalui `require_project_permission`.
+Endpoint mutasi memakai permission tab terkait seperti `masterProjects`, `projectMembers`, `projectTasks`, `projectIssues`, `projectAttachments`, dan `projectMeetings`. Role Master menampilkan menu Proyek sebagai tree: daftar/ringkasan proyek memakai `masterProjects`, tab anggota memakai `projectMembers`, tab tugas memakai `projectTasks` dan `projectTaskComments`, tab Gantt memakai `projectGantt`, tab timesheet memakai `projectTimesheets`, tab isu/bug proyek memakai `projectIssues`, tab lampiran memakai `projectAttachments`, dan tab meeting/notes memakai `projectMeetings`. Fase tidak ditampilkan sebagai pilihan akses role; data fase terbuka otomatis sebagai data pendukung ketika user punya akses proyek/tugas/Gantt. Endpoint baca proyek dapat dipakai sebagai data referensi oleh menu operasional berizin seperti kalender, dashboard, workload, tugas, Gantt, timesheet, dan isu. Project member/manager dapat memperoleh akses melalui helper project-scoped permission.
 
 ## Main Backend Files
 

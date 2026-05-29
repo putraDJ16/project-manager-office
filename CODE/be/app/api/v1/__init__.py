@@ -6,8 +6,10 @@ api_v1 = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
 def register_api_routes():
     from app.api.v1 import (  # noqa: F401
+        admin_email,
         audit_trails,
         auth,
+        email_preferences,
         employees,
         issues,
         meeting_files,
@@ -22,6 +24,7 @@ def register_api_routes():
         roles,
         sla,
         tasks,
+        timesheets,
     )
 
     return api_v1

@@ -1,22 +1,31 @@
 import { useEffect, useMemo, useState, type ElementType } from "react";
-import { AlertTriangle, Bug, Calendar, CalendarDays, CheckCircle2, ListTodo } from "lucide-react";
+import { useSearchParams } from "react-router";
+import { AlertTriangle, Briefcase, Bug, Calendar, CalendarDays, CheckCircle2, ListTodo, Loader2, X } from "lucide-react";
 import { teamMembers } from "../../data/mockData";
+import type { Employee } from "../../data/masterData";
+import { fetchEmployees } from "../../services/masterApi";
 import { ISSUE_STATUS_ORDER, type Issue, type IssueStatus } from "../../domain/issues";
 import { fetchMyProjects, getMe, type MyProjectResponse } from "../../services/authApi";
 import { getIssues, updateIssueStatus } from "../../services/issueService";
 import {
+  createTask,
   createTaskChecklistItem,
   createTaskComment,
   deleteTaskChecklistItem,
   fetchAllTasks,
+  fetchPhases,
+  fetchTasks,
   fetchTaskChecklist,
   fetchTaskComments,
   updateTask,
   updateTaskChecklistItem,
   type ApiTask,
   type ApiTaskChecklistItem,
-  type ApiTaskComment
+  type ApiTaskComment,
+  type ApiPhase
 } from "../../services/taskApi";
+import { createMyTimesheet, deleteMyTimesheet, fetchMyTimesheets, updateMyTimesheet, type ApiTimesheet } from "../../services/timesheetApi";
+import { PaginationControls } from "../../components/ui";
 import { MyCalendarPage } from "../kalender/MyCalendarPage";
 import { TaskDetailModal } from "./TaskDetailModal";
 
@@ -32,6 +41,15 @@ type NoticeState = { type: "success" | "error"; message: string } | null;
 type TaskComment = { id: number; authorName: string; content: string; createdAt: string };
 type TaskChecklistItem = { id: number; title: string; isDone: boolean };
 type TaskCompletionFilter = "active" | "done" | "all";
+type MyTasksTab = "tasks" | "issues" | "projects" | "timesheets" | "calendar";
+
+const MY_TASKS_TABS = new Set<MyTasksTab>(["tasks", "issues", "projects", "timesheets", "calendar"]);
+const PAGE_SIZE = 10;
+
+function getTabFromSearch(searchParams: URLSearchParams): MyTasksTab {
+  const tab = searchParams.get("tab");
+  return tab && MY_TASKS_TABS.has(tab as MyTasksTab) ? (tab as MyTasksTab) : "tasks";
+}
 
 function toTaskComment(raw: ApiTaskComment): TaskComment {
   return {
@@ -51,11 +69,14 @@ function toTaskChecklistItem(raw: ApiTaskChecklistItem): TaskChecklistItem {
 }
 
 export function MyTasksPage() {
+  const [searchParams] = useSearchParams();
   const [profile, setProfile] = useState<ProfileIdentity | null>(null);
   const [projects, setProjects] = useState<MyProjectResponse[]>([]);
+  const [memberProjects, setMemberProjects] = useState<MyProjectResponse[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [tasks, setTasks] = useState<ApiTask[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [activeTab, setActiveTab] = useState<"tasks" | "issues" | "calendar">("tasks");
+  const [activeTab, setActiveTab] = useState<MyTasksTab>(() => getTabFromSearch(searchParams));
   const [taskFilter, setTaskFilter] = useState<TaskCompletionFilter>("active");
   const [progressDrafts, setProgressDrafts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -70,6 +91,37 @@ export function MyTasksPage() {
   const [isSavingTaskComment, setIsSavingTaskComment] = useState(false);
   const [isLoadingTaskChecklist, setIsLoadingTaskChecklist] = useState(false);
   const [isSavingTaskChecklist, setIsSavingTaskChecklist] = useState(false);
+  const [timesheets, setTimesheets] = useState<ApiTimesheet[]>([]);
+  const [timesheetForm, setTimesheetForm] = useState({
+    project_id: "",
+    task_id: "",
+    work_date: new Date().toISOString().slice(0, 10),
+    hours_spent: "1",
+    notes: "",
+  });
+  const [isSavingTimesheet, setIsSavingTimesheet] = useState(false);
+  const [editingTimesheetId, setEditingTimesheetId] = useState<number | null>(null);
+  const [deletingTimesheetId, setDeletingTimesheetId] = useState<number | null>(null);
+  const [timesheetTaskOptions, setTimesheetTaskOptions] = useState<ApiTask[]>([]);
+  const [isLoadingTimesheetTasks, setIsLoadingTimesheetTasks] = useState(false);
+  const [isTimesheetModalOpen, setIsTimesheetModalOpen] = useState(false);
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const [createTaskForm, setCreateTaskForm] = useState({
+    project_id: "",
+    phase_id: "",
+    assignee: "",
+    title: "",
+    priority: "Medium" as ApiTask["priority"],
+    start_date: "",
+    end_date: ""
+  });
+  const [createTaskPhaseOptions, setCreateTaskPhaseOptions] = useState<ApiPhase[]>([]);
+  const [isLoadingCreateTaskPhases, setIsLoadingCreateTaskPhases] = useState(false);
+  const [isSavingCreateTask, setIsSavingCreateTask] = useState(false);
+  const [taskPage, setTaskPage] = useState(1);
+  const [issuePage, setIssuePage] = useState(1);
+  const [projectPage, setProjectPage] = useState(1);
+  const [timesheetPage, setTimesheetPage] = useState(1);
 
   useEffect(() => {
     let isCancelled = false;
@@ -87,18 +139,25 @@ export function MyTasksPage() {
           employee_name: profileData.employee_name ?? null,
         };
 
-        const [projectRows, taskRows, issueRows] = await Promise.all([
+        const [projectRows, memberProjectRows, taskRows, issueRows, employeeRows] = await Promise.all([
           fetchMyProjects(),
+          fetchMyProjects({ member_only: true }),
           fetchAllTasks(),
           getIssues(),
+          fetchEmployees(),
         ]);
         if (isCancelled) return;
 
         const assignedTasks = taskRows.filter((task) => isAssignedToProfile(task.assignee, identity));
         setProfile(identity);
         setProjects(projectRows);
+        setMemberProjects(memberProjectRows);
+        setEmployees(employeeRows.filter((employee) => employee.status === "Active"));
         setTasks(assignedTasks);
         setIssues(issueRows.filter((issue) => isAssignedToProfile(issue.assignee, identity)));
+        const myTimesheetRows = await fetchMyTimesheets();
+        if (isCancelled) return;
+        setTimesheets(myTimesheetRows);
         setProgressDrafts(Object.fromEntries(assignedTasks.map((task) => [task.id, String(task.progress_percentage)])));
       } catch (loadError) {
         if (isCancelled) return;
@@ -115,10 +174,106 @@ export function MyTasksPage() {
   }, []);
 
   useEffect(() => {
+    const tab = getTabFromSearch(searchParams);
+    setActiveTab(tab);
+    if (searchParams.get("create") === "task") {
+      setIsCreateTaskModalOpen(true);
+    }
+    if (searchParams.get("create") === "timesheet") {
+      setEditingTimesheetId(null);
+      setIsTimesheetModalOpen(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!isCreateTaskModalOpen) return;
+    setCreateTaskForm((current) => ({
+      ...current,
+      project_id: current.project_id || projects[0]?.id || "",
+      assignee: current.assignee || profile?.employee_id || employees[0]?.id || ""
+    }));
+  }, [employees, isCreateTaskModalOpen, profile?.employee_id, projects]);
+
+  useEffect(() => {
+    if (!isTimesheetModalOpen) return;
+    setTimesheetForm((current) => ({
+      ...current,
+      project_id: current.project_id || memberProjects[0]?.id || "",
+      work_date: current.work_date || new Date().toISOString().slice(0, 10)
+    }));
+  }, [isTimesheetModalOpen, memberProjects]);
+
+  useEffect(() => {
+    if (!createTaskForm.project_id) {
+      setCreateTaskPhaseOptions([]);
+      setCreateTaskForm((current) => ({ ...current, phase_id: "" }));
+      return;
+    }
+
+    let isCancelled = false;
+    setIsLoadingCreateTaskPhases(true);
+    fetchPhases(createTaskForm.project_id)
+      .then((phaseRows) => {
+        if (isCancelled) return;
+        const sortedPhases = [...phaseRows].sort((left, right) => left.order_index - right.order_index);
+        setCreateTaskPhaseOptions(sortedPhases);
+        setCreateTaskForm((current) => ({
+          ...current,
+          phase_id: sortedPhases.some((phase) => phase.id === current.phase_id) ? current.phase_id : sortedPhases[0]?.id ?? ""
+        }));
+      })
+      .catch((phaseError) => {
+        if (isCancelled) return;
+        setCreateTaskPhaseOptions([]);
+        setNotice({
+          type: "error",
+          message: phaseError instanceof Error ? phaseError.message : "Gagal memuat fase project."
+        });
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoadingCreateTaskPhases(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [createTaskForm.project_id]);
+
+  useEffect(() => {
     if (!notice) return;
     const timeout = window.setTimeout(() => setNotice(null), 2600);
     return () => window.clearTimeout(timeout);
   }, [notice]);
+
+  const openCreateTimesheetModal = () => {
+    setEditingTimesheetId(null);
+    setTimesheetForm((current) => ({
+      project_id: current.project_id || memberProjects[0]?.id || "",
+      task_id: "",
+      work_date: new Date().toISOString().slice(0, 10),
+      hours_spent: "1",
+      notes: ""
+    }));
+    setIsTimesheetModalOpen(true);
+  };
+
+  const openEditTimesheetModal = (timesheet: ApiTimesheet) => {
+    setEditingTimesheetId(timesheet.id);
+    setTimesheetForm({
+      project_id: timesheet.project_id ?? "",
+      task_id: timesheet.task_id ?? "",
+      work_date: timesheet.work_date,
+      hours_spent: String(timesheet.hours_spent),
+      notes: timesheet.notes ?? ""
+    });
+    setIsTimesheetModalOpen(true);
+  };
+
+  const closeTimesheetModal = () => {
+    if (isSavingTimesheet) return;
+    setIsTimesheetModalOpen(false);
+    setEditingTimesheetId(null);
+  };
 
   const projectNameById = useMemo(
     () => projects.reduce<Record<string, string>>((acc, project) => ({ ...acc, [project.id]: project.name }), {}),
@@ -136,8 +291,9 @@ export function MyTasksPage() {
       doneTasks: tasks.filter((task) => task.progress_percentage >= 100).length,
       openIssues: issues.filter((issue) => issue.status !== "Resolved").length,
       severeIssues: issues.filter((issue) => issue.status !== "Resolved" && ["Blocker", "Critical"].includes(issue.severity)).length,
+      myProjects: projects.length,
     }),
-    [issues, tasks]
+    [issues, projects.length, tasks]
   );
 
   const filteredTasks = useMemo(() => {
@@ -145,6 +301,57 @@ export function MyTasksPage() {
     if (taskFilter === "all") return tasks;
     return tasks.filter((task) => task.progress_percentage < 100);
   }, [taskFilter, tasks]);
+  const paginatedTasks = useMemo(() => {
+    const start = (taskPage - 1) * PAGE_SIZE;
+    return filteredTasks.slice(start, start + PAGE_SIZE);
+  }, [filteredTasks, taskPage]);
+  const paginatedIssues = useMemo(() => {
+    const start = (issuePage - 1) * PAGE_SIZE;
+    return issues.slice(start, start + PAGE_SIZE);
+  }, [issues, issuePage]);
+  const paginatedProjects = useMemo(() => {
+    const start = (projectPage - 1) * PAGE_SIZE;
+    return projects.slice(start, start + PAGE_SIZE);
+  }, [projectPage, projects]);
+  const paginatedTimesheets = useMemo(() => {
+    const start = (timesheetPage - 1) * PAGE_SIZE;
+    return timesheets.slice(start, start + PAGE_SIZE);
+  }, [timesheetPage, timesheets]);
+
+  useEffect(() => {
+    setTaskPage(1);
+  }, [taskFilter, tasks.length]);
+  useEffect(() => {
+    setIssuePage(1);
+  }, [issues.length]);
+  useEffect(() => {
+    setProjectPage(1);
+  }, [projects.length]);
+  useEffect(() => {
+    setTimesheetPage(1);
+  }, [timesheets.length]);
+
+  useEffect(() => {
+    if (!timesheetForm.project_id) {
+      setTimesheetTaskOptions([]);
+      return;
+    }
+    let isCancelled = false;
+    setIsLoadingTimesheetTasks(true);
+    fetchTasks(timesheetForm.project_id, "")
+      .then((rows) => {
+        if (!isCancelled) setTimesheetTaskOptions(rows);
+      })
+      .catch(() => {
+        if (!isCancelled) setTimesheetTaskOptions([]);
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoadingTimesheetTasks(false);
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [timesheetForm.project_id]);
 
   const handleSaveTaskProgress = async (task: ApiTask) => {
     const rawValue = progressDrafts[task.id] ?? String(task.progress_percentage);
@@ -302,6 +509,126 @@ export function MyTasksPage() {
     }
   };
 
+  const handleCreateTask = async () => {
+    if (!createTaskForm.project_id) {
+      setNotice({ type: "error", message: "Pilih project terlebih dahulu." });
+      return;
+    }
+    if (!createTaskForm.phase_id) {
+      setNotice({ type: "error", message: "Pilih fase terlebih dahulu." });
+      return;
+    }
+    if (!createTaskForm.assignee) {
+      setNotice({ type: "error", message: "Pilih assignee terlebih dahulu." });
+      return;
+    }
+    if (!createTaskForm.title.trim()) {
+      setNotice({ type: "error", message: "Judul tugas wajib diisi." });
+      return;
+    }
+
+    setIsSavingCreateTask(true);
+    try {
+      const result = await createTask({
+        title: createTaskForm.title.trim(),
+        priority: createTaskForm.priority,
+        assignee: createTaskForm.assignee,
+        project_id: createTaskForm.project_id,
+        phase_id: createTaskForm.phase_id,
+        progress_percentage: 0,
+        start_date: createTaskForm.start_date || null,
+        end_date: createTaskForm.end_date || null
+      });
+      if (profile && isAssignedToProfile(result.data.assignee, profile)) {
+        setTasks((current) => [result.data, ...current]);
+        setProgressDrafts((current) => ({ ...current, [result.data.id]: String(result.data.progress_percentage) }));
+      }
+      setCreateTaskForm((current) => ({
+        ...current,
+        title: "",
+        phase_id: createTaskPhaseOptions[0]?.id ?? "",
+        priority: "Medium",
+        start_date: "",
+        end_date: ""
+      }));
+      setIsCreateTaskModalOpen(false);
+      setActiveTab("tasks");
+      setNotice({ type: "success", message: result.message ?? "Tugas berhasil dibuat." });
+    } catch (saveError) {
+      setNotice({
+        type: "error",
+        message: saveError instanceof Error ? saveError.message : "Gagal membuat tugas."
+      });
+    } finally {
+      setIsSavingCreateTask(false);
+    }
+  };
+
+  const handleSaveTimesheet = async () => {
+    const hours = Number(timesheetForm.hours_spent);
+    if (!timesheetForm.project_id) {
+      setNotice({ type: "error", message: "Pilih project terlebih dahulu." });
+      return;
+    }
+    if (!timesheetForm.work_date) {
+      setNotice({ type: "error", message: "Tanggal kerja wajib diisi." });
+      return;
+    }
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
+      setNotice({ type: "error", message: "Jam kerja harus di antara 0 sampai 24 jam." });
+      return;
+    }
+
+    setIsSavingTimesheet(true);
+    try {
+      const payload = {
+        project_id: timesheetForm.project_id,
+        task_id: timesheetForm.task_id || undefined,
+        work_date: timesheetForm.work_date,
+        hours_spent: hours,
+        notes: timesheetForm.notes.trim(),
+      };
+      const result = editingTimesheetId
+        ? await updateMyTimesheet(editingTimesheetId, payload)
+        : await createMyTimesheet(payload);
+      setTimesheets((current) =>
+        editingTimesheetId
+          ? current.map((item) => (item.id === result.data.id ? result.data : item))
+          : [result.data, ...current]
+      );
+      setTimesheetForm((current) => ({ ...current, notes: "", hours_spent: "1", task_id: "" }));
+      setIsTimesheetModalOpen(false);
+      setEditingTimesheetId(null);
+      setNotice({
+        type: "success",
+        message: result.message ?? (editingTimesheetId ? "Timesheet berhasil diperbarui." : "Timesheet berhasil ditambahkan."),
+      });
+    } catch (saveError) {
+      setNotice({
+        type: "error",
+        message: saveError instanceof Error ? saveError.message : "Gagal menyimpan timesheet.",
+      });
+    } finally {
+      setIsSavingTimesheet(false);
+    }
+  };
+
+  const handleDeleteTimesheet = async (timesheetId: number) => {
+    setDeletingTimesheetId(timesheetId);
+    try {
+      const result = await deleteMyTimesheet(timesheetId);
+      setTimesheets((current) => current.filter((item) => item.id !== timesheetId));
+      setNotice({ type: "success", message: result.message ?? "Timesheet berhasil dihapus." });
+    } catch (deleteError) {
+      setNotice({
+        type: "error",
+        message: deleteError instanceof Error ? deleteError.message : "Gagal menghapus timesheet.",
+      });
+    } finally {
+      setDeletingTimesheetId(null);
+    }
+  };
+
   return (
     <div className="h-full rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-6 py-4">
@@ -322,12 +649,13 @@ export function MyTasksPage() {
             <SummaryBadge icon={CheckCircle2} label={`${summary.doneTasks} tugas selesai`} tone="emerald" />
             <SummaryBadge icon={Bug} label={`${summary.openIssues} isu aktif`} tone="red" />
             <SummaryBadge icon={AlertTriangle} label={`${summary.severeIssues} high risk`} tone="amber" />
+            <SummaryBadge icon={Briefcase} label={`${summary.myProjects} proyek terlibat`} tone="slate" />
           </div>
         </div>
       </div>
 
       <div className="border-b border-slate-200 bg-slate-50 px-6 py-3">
-        <div className="grid w-full grid-cols-3 rounded-lg border border-slate-200 bg-white p-1 sm:w-[34rem]">
+        <div className="grid w-full grid-cols-5 rounded-lg border border-slate-200 bg-white p-1 sm:w-[52rem]">
           <button
             type="button"
             onClick={() => setActiveTab("tasks")}
@@ -347,6 +675,26 @@ export function MyTasksPage() {
           >
             <Bug className="h-4 w-4" />
             Isu & Bug
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("projects")}
+            className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium ${
+              activeTab === "projects" ? "bg-slate-100 text-slate-700" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Briefcase className="h-4 w-4" />
+            Proyek
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("timesheets")}
+            className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium ${
+              activeTab === "timesheets" ? "bg-slate-100 text-indigo-700" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Calendar className="h-4 w-4" />
+            Timesheet
           </button>
           <button
             type="button"
@@ -386,7 +734,7 @@ export function MyTasksPage() {
           <div className="space-y-4">
             <TaskFilterBar value={taskFilter} summary={summary} onChange={setTaskFilter} />
             <TaskTable
-              tasks={filteredTasks}
+              tasks={paginatedTasks}
               emptyMessage={taskFilter === "active" ? "Tidak ada tugas aktif. Tugas dengan progress 100% ada di filter Selesai." : undefined}
               projectNameById={projectNameById}
               progressDrafts={progressDrafts}
@@ -395,16 +743,248 @@ export function MyTasksPage() {
               onSaveProgress={handleSaveTaskProgress}
               onOpenDetail={handleOpenTaskDetail}
             />
+            <div className="rounded-lg border border-slate-200 bg-white">
+              <PaginationControls page={taskPage} pageSize={PAGE_SIZE} totalItems={filteredTasks.length} onPageChange={setTaskPage} />
+            </div>
+          </div>
+        ) : activeTab === "projects" ? (
+          <div className="space-y-4">
+            <ProjectTable projects={paginatedProjects} />
+            <div className="rounded-lg border border-slate-200 bg-white">
+              <PaginationControls page={projectPage} pageSize={PAGE_SIZE} totalItems={projects.length} onPageChange={setProjectPage} />
+            </div>
+          </div>
+        ) : activeTab === "timesheets" ? (
+          <div className="space-y-4">
+            <TimesheetPanel
+              projects={memberProjects}
+              timesheets={paginatedTimesheets}
+              deletingTimesheetId={deletingTimesheetId}
+              onOpenForm={openCreateTimesheetModal}
+              onEdit={openEditTimesheetModal}
+              onDelete={handleDeleteTimesheet}
+              projectNameById={projectNameById}
+            />
+            <div className="rounded-lg border border-slate-200 bg-white">
+              <PaginationControls page={timesheetPage} pageSize={PAGE_SIZE} totalItems={timesheets.length} onPageChange={setTimesheetPage} />
+            </div>
           </div>
         ) : (
-          <IssueTable
-            issues={issues}
-            projectNameById={projectNameById}
-            savingIssueId={savingIssueId}
-            onStatusChange={handleIssueStatusChange}
-          />
+          <div className="space-y-4">
+            <IssueTable
+              issues={paginatedIssues}
+              projectNameById={projectNameById}
+              savingIssueId={savingIssueId}
+              onStatusChange={handleIssueStatusChange}
+            />
+            <div className="rounded-lg border border-slate-200 bg-white">
+              <PaginationControls page={issuePage} pageSize={PAGE_SIZE} totalItems={issues.length} onPageChange={setIssuePage} />
+            </div>
+          </div>
         )}
       </div>
+
+      {isTimesheetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">
+                  {editingTimesheetId ? "Edit Timesheet Harian" : "Input Timesheet Harian"}
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">Catat jam kerja harian berdasarkan project dan tugas.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeTimesheetModal}
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                disabled={isSavingTimesheet}
+                aria-label="Tutup modal timesheet"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              <TimesheetFormFields
+                projects={memberProjects}
+                taskOptions={timesheetTaskOptions}
+                form={timesheetForm}
+                isSaving={isSavingTimesheet}
+                isLoadingTasks={isLoadingTimesheetTasks}
+                onFormChange={setTimesheetForm}
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+              <button
+                type="button"
+                onClick={closeTimesheetModal}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-60"
+                disabled={isSavingTimesheet}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTimesheet}
+                className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                disabled={isSavingTimesheet}
+              >
+                {isSavingTimesheet && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editingTimesheetId ? "Update Timesheet" : "Simpan Timesheet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCreateTaskModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Buat Tugas Baru</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Pilih project dan fase sebelum menyimpan tugas.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateTaskModalOpen(false)}
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                disabled={isSavingCreateTask}
+                aria-label="Tutup modal tugas baru"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <label className="block text-sm font-semibold text-slate-700">
+                Project
+                <select
+                  value={createTaskForm.project_id}
+                  onChange={(event) =>
+                    setCreateTaskForm((current) => ({ ...current, project_id: event.target.value, phase_id: "" }))
+                  }
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  disabled={isSavingCreateTask}
+                >
+                  <option value="">- Pilih Project -</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Judul Tugas
+                <input
+                  type="text"
+                  value={createTaskForm.title}
+                  onChange={(event) => setCreateTaskForm((current) => ({ ...current, title: event.target.value }))}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Contoh: Review kebutuhan modul reporting"
+                  disabled={isSavingCreateTask}
+                />
+              </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Fase
+                  <select
+                    value={createTaskForm.phase_id}
+                    onChange={(event) => setCreateTaskForm((current) => ({ ...current, phase_id: event.target.value }))}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={isSavingCreateTask || isLoadingCreateTaskPhases}
+                  >
+                    <option value="">- Pilih Fase -</option>
+                    {createTaskPhaseOptions.map((phase) => (
+                      <option key={phase.id} value={phase.id}>
+                        {phase.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold text-slate-700">
+                  Assignee
+                  <select
+                    value={createTaskForm.assignee}
+                    onChange={(event) => setCreateTaskForm((current) => ({ ...current, assignee: event.target.value }))}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={isSavingCreateTask}
+                  >
+                    <option value="">- Pilih Assignee -</option>
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold text-slate-700">
+                  Prioritas
+                  <select
+                    value={createTaskForm.priority}
+                    onChange={(event) =>
+                      setCreateTaskForm((current) => ({ ...current, priority: event.target.value as ApiTask["priority"] }))
+                    }
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={isSavingCreateTask}
+                  >
+                    {["Low", "Medium", "High", "Critical"].map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-sm font-semibold text-slate-700">
+                    Mulai
+                    <input
+                      type="date"
+                      value={createTaskForm.start_date}
+                      onChange={(event) => setCreateTaskForm((current) => ({ ...current, start_date: event.target.value }))}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      disabled={isSavingCreateTask}
+                    />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700">
+                    Selesai
+                    <input
+                      type="date"
+                      value={createTaskForm.end_date}
+                      min={createTaskForm.start_date || undefined}
+                      onChange={(event) => setCreateTaskForm((current) => ({ ...current, end_date: event.target.value }))}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      disabled={isSavingCreateTask}
+                    />
+                  </label>
+                </div>
+              </div>
+              {isLoadingCreateTaskPhases && (
+                <p className="text-xs text-slate-500">Memuat fase project...</p>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setIsCreateTaskModalOpen(false)}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-60"
+                disabled={isSavingCreateTask}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateTask}
+                className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                disabled={isSavingCreateTask || isLoadingCreateTaskPhases}
+              >
+                {isSavingCreateTask && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Simpan Tugas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedTask && (
         <TaskDetailModal
@@ -438,6 +1018,187 @@ export function MyTasksPage() {
           onDeleteChecklistItem={handleDeleteTaskChecklistItem}
         />
       )}
+    </div>
+  );
+}
+
+function TimesheetFormFields({
+  projects,
+  taskOptions,
+  form,
+  isSaving,
+  isLoadingTasks,
+  onFormChange,
+}: {
+  projects: MyProjectResponse[];
+  taskOptions: ApiTask[];
+  form: { project_id: string; task_id: string; work_date: string; hours_spent: string; notes: string };
+  isSaving: boolean;
+  isLoadingTasks: boolean;
+  onFormChange: (value: { project_id: string; task_id: string; work_date: string; hours_spent: string; notes: string }) => void;
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <label className="text-sm font-semibold text-slate-700">
+        Project
+        <select
+          value={form.project_id}
+          onChange={(event) => onFormChange({ ...form, project_id: event.target.value, task_id: "" })}
+          disabled={isSaving}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="">Pilih project</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.id} - {project.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-sm font-semibold text-slate-700">
+        Tugas (opsional)
+        <select
+          value={form.task_id}
+          onChange={(event) => onFormChange({ ...form, task_id: event.target.value })}
+          disabled={isSaving || !form.project_id || isLoadingTasks}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="">{isLoadingTasks ? "Memuat tugas..." : "Tanpa tugas"}</option>
+          {taskOptions.map((task) => (
+            <option key={task.id} value={task.id}>
+              {task.id} - {task.title}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-sm font-semibold text-slate-700">
+        Tanggal Kerja
+        <input
+          type="date"
+          value={form.work_date}
+          onChange={(event) => onFormChange({ ...form, work_date: event.target.value })}
+          disabled={isSaving}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </label>
+      <label className="text-sm font-semibold text-slate-700">
+        Jam Kerja
+        <input
+          type="number"
+          min={0.5}
+          max={24}
+          step={0.5}
+          value={form.hours_spent}
+          onChange={(event) => onFormChange({ ...form, hours_spent: event.target.value })}
+          disabled={isSaving}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </label>
+      <label className="md:col-span-2 text-sm font-semibold text-slate-700">
+        Catatan
+        <textarea
+          value={form.notes}
+          onChange={(event) => onFormChange({ ...form, notes: event.target.value })}
+          disabled={isSaving}
+          rows={3}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </label>
+    </div>
+  );
+}
+
+function TimesheetPanel({
+  projects,
+  timesheets,
+  deletingTimesheetId,
+  onOpenForm,
+  onEdit,
+  onDelete,
+  projectNameById,
+}: {
+  projects: MyProjectResponse[];
+  timesheets: ApiTimesheet[];
+  deletingTimesheetId: number | null;
+  onOpenForm: () => void;
+  onEdit: (timesheet: ApiTimesheet) => void;
+  onDelete: (timesheetId: number) => void;
+  projectNameById: Record<string, string>;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">Timesheet Harian</h3>
+          <p className="mt-0.5 text-xs text-slate-500">{projects.length} project tersedia untuk input timesheet.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenForm}
+          className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          Input Timesheet
+        </button>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="min-w-full text-sm">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr className="text-left">
+              <th className="px-4 py-3 font-medium">Tanggal</th>
+              <th className="px-4 py-3 font-medium">Tugas</th>
+              <th className="px-4 py-3 font-medium">Proyek</th>
+              <th className="px-4 py-3 font-medium">Jam</th>
+              <th className="px-4 py-3 font-medium">Catatan</th>
+              <th className="px-4 py-3 font-medium text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {timesheets.length === 0 ? (
+              <tr>
+                <td className="px-4 py-6 text-center text-slate-500" colSpan={6}>
+                  Belum ada data timesheet harian.
+                </td>
+              </tr>
+            ) : (
+              timesheets.map((item) => (
+                <tr key={item.id} className="bg-white align-middle">
+                  <td className="px-4 py-3 text-slate-700">{formatDate(item.work_date)}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    <p className="font-medium text-slate-900">{item.task_id ?? "-"}</p>
+                    <p className="text-xs text-slate-500">{displayValue(item.task_title ?? "-")}</p>
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {item.project_id ? projectNameById[item.project_id] ?? item.project_id : "-"}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">{item.hours_spent}</td>
+                  <td className="px-4 py-3 text-slate-700">{displayValue(item.notes)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(item)}
+                        disabled={deletingTimesheetId === item.id}
+                        className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(item.id)}
+                        disabled={deletingTimesheetId === item.id}
+                        className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        {deletingTimesheetId === item.id ? "Menghapus..." : "Hapus"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -663,13 +1424,14 @@ function SummaryBadge({
 }: {
   icon: ElementType;
   label: string;
-  tone: "indigo" | "emerald" | "red" | "amber";
+  tone: "indigo" | "emerald" | "red" | "amber" | "slate";
 }) {
   const styles: Record<typeof tone, string> = {
     indigo: "border-indigo-200 bg-indigo-50 text-indigo-700",
     emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
     red: "border-red-200 bg-red-50 text-red-700",
     amber: "border-amber-200 bg-amber-50 text-amber-700",
+    slate: "border-slate-200 bg-slate-50 text-slate-700",
   };
 
   return (
@@ -677,6 +1439,51 @@ function SummaryBadge({
       <Icon className="h-3.5 w-3.5" />
       {label}
     </span>
+  );
+}
+
+function ProjectTable({ projects }: { projects: MyProjectResponse[] }) {
+  if (projects.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+        Belum ada proyek yang melibatkan akun Anda.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <table className="min-w-full text-sm">
+        <thead className="bg-slate-50 text-slate-600">
+          <tr className="text-left">
+            <th className="px-4 py-3 font-medium">ID Proyek</th>
+            <th className="px-4 py-3 font-medium">Nama Proyek</th>
+            <th className="px-4 py-3 font-medium">Status</th>
+            <th className="px-4 py-3 font-medium">Prioritas</th>
+            <th className="px-4 py-3 font-medium">PM</th>
+            <th className="px-4 py-3 font-medium">Member</th>
+            <th className="px-4 py-3 font-medium">Task</th>
+            <th className="px-4 py-3 font-medium">Periode</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {projects.map((project) => (
+            <tr key={project.id} className="bg-white align-middle">
+              <td className="px-4 py-3 font-medium text-slate-500">{project.id}</td>
+              <td className="px-4 py-3 font-medium text-slate-900">{project.name}</td>
+              <td className="px-4 py-3 text-slate-700">{displayValue(project.status)}</td>
+              <td className="px-4 py-3 text-slate-700">{displayValue(project.priority)}</td>
+              <td className="px-4 py-3 text-slate-700">{displayValue(project.manager_name)}</td>
+              <td className="px-4 py-3 text-slate-700">{project.member_count}</td>
+              <td className="px-4 py-3 text-slate-700">{project.task_count}</td>
+              <td className="px-4 py-3 text-slate-700">
+                {formatDate(project.start_date)} - {formatDate(project.end_date)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

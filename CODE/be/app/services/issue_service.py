@@ -1,5 +1,5 @@
 from app.extensions import db
-from app.models import Issue, SlaRule
+from app.models import Issue, SlaRule, User
 from app.repositories import IssueRepository
 from app.services.notification_service import notify_employee
 from app.utils.exceptions import ApiError
@@ -63,11 +63,22 @@ def create_issue(payload: dict, reporter_from_claim: str | None = None):
     return issue
 
 
-def update_issue_status(issue_id: str, status: str):
+def update_issue_status(issue_id: str, status: str, actor: User | None = None):
     issue = IssueRepository.get_issue(issue_id)
     if not issue:
         raise ApiError("Isu tidak ditemukan.", status_code=404)
-    issue.status = status
+
+    normalized_status = (status or "").strip()
+    if not normalized_status:
+        raise ApiError("Status isu wajib diisi.")
+    valid_statuses = {"Open", "Investigating", "In Progress", "Escalated", "Resolved"}
+    if normalized_status not in valid_statuses:
+        raise ApiError("Status isu tidak valid.")
+
+    if actor and not _is_issue_status_actor(issue, actor):
+        raise ApiError("Hanya pelapor atau assignee yang dapat mengubah status isu.", status_code=403)
+
+    issue.status = normalized_status
     db.session.commit()
     return issue
 
@@ -145,3 +156,38 @@ def _sanitize_number(value, fallback: int, min_value: int, max_value: int):
     except (TypeError, ValueError):
         parsed = fallback
     return max(min_value, min(max_value, parsed))
+
+
+def _is_issue_status_actor(issue: Issue, actor: User):
+    aliases = _build_actor_aliases(actor)
+    reporter = (issue.reporter or "").strip().lower()
+    assignee = (issue.assignee or "").strip().lower()
+    return reporter in aliases or (assignee and assignee in aliases)
+
+
+def _build_actor_aliases(actor: User):
+    employee = actor.employee if actor.employee_id else None
+    aliases = {
+        str(actor.id).strip().lower(),
+        (actor.display_name or "").strip().lower(),
+        (actor.email or "").strip().lower(),
+        (actor.employee_id or "").strip().lower(),
+    }
+    if employee:
+        aliases.update(
+            {
+                (employee.id or "").strip().lower(),
+                (employee.name or "").strip().lower(),
+                (employee.email or "").strip().lower(),
+                (_abbreviated_name(employee.name) or "").strip().lower(),
+            }
+        )
+    aliases.add((_abbreviated_name(actor.display_name) or "").strip().lower())
+    return {alias for alias in aliases if alias}
+
+
+def _abbreviated_name(name: str | None):
+    parts = [part for part in (name or "").strip().split(" ") if part]
+    if len(parts) < 2:
+        return parts[0] if parts else None
+    return f"{parts[0]} {parts[1][0]}."

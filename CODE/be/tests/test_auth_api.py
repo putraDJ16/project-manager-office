@@ -5,6 +5,7 @@ def test_login_success(client):
     assert data["access_token"]
     assert data["refresh_token"]
     assert data["user"]["email"] == "admin@zoho.local"
+    assert data["user"]["onboarding_completed"] is False
 
 
 def test_login_fail(client):
@@ -75,10 +76,25 @@ def test_auth_me_and_refresh(client):
     assert me_data["organization"] == "ZOHO PM SaaS"
     assert me_data["unit_organization"] == "Engineering"
     assert me_data["position"] == "Lead Developer"
+    assert me_data["onboarding_completed"] is False
 
     refreshed = client.post("/api/v1/auth/refresh", headers={"Authorization": f"Bearer {refresh}"})
     assert refreshed.status_code == 200
     assert refreshed.get_json()["data"]["access_token"]
+
+
+def test_complete_onboarding(client):
+    login = client.post("/api/v1/auth/login", json={"email": "admin@zoho.local", "password": "Admin123!"}).get_json()
+    access = login["data"]["access_token"]
+
+    response = client.post("/api/v1/auth/onboarding/complete", headers={"Authorization": f"Bearer {access}"})
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["message"] == "Onboarding selesai."
+    assert payload["data"]["onboarding_completed"] is True
+
+    next_login = client.post("/api/v1/auth/login", json={"email": "admin@zoho.local", "password": "Admin123!"})
+    assert next_login.get_json()["data"]["user"]["onboarding_completed"] is True
 
 
 def test_change_password_success(client):
