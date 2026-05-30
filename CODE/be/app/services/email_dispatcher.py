@@ -19,7 +19,12 @@ def dispatch_once(limit: int = 25) -> int:
         row.status = "Sending"
         db.session.commit()
         try:
-            send_email(row)
+            was_sent = send_email(row)
+            if not was_sent:
+                row.status = "Queued"
+                row.last_error = "MAIL_ENABLED=false"
+                db.session.commit()
+                continue
             row.status = "Sent"
             row.sent_at = datetime.now(timezone.utc)
             row.last_error = None

@@ -8,10 +8,11 @@ Mengelola task project, progress, comments, checklist, date, mandays, dan timesh
 
 1. User membuka menu Tugas Saya untuk melihat tab tugas, isu/bug, kalender meeting, indikator timesheet harian, tabulasi proyek, dan input timesheet harian.
 2. Header aplikasi menampilkan reminder timesheet jika user memiliki project member berstatus `Active` dan belum memiliki timesheet pada tanggal hari ini.
-3. User membuat task untuk project dan phase valid.
-4. User mengubah task fields atau progress sesuai permission.
-5. User menambah komentar/checklist jika punya permission, project member, atau assignee.
-6. Mandays/date logic mempertimbangkan weekend dan project holidays.
+3. Form timesheet menampilkan status per project apakah sudah ada timesheet untuk tanggal kerja yang dipilih.
+4. User membuat task untuk project dan phase valid.
+5. User mengubah task fields atau progress sesuai permission.
+6. User menambah komentar/checklist jika punya permission, project member, atau assignee.
+7. Mandays/date logic mempertimbangkan weekend dan project holidays.
 
 ## User Roles / Permissions
 
@@ -56,6 +57,8 @@ Menu/route `Tugas Saya` memakai module `tasks` untuk akses halaman dan list tuga
 | POST | `/api/v1/my-timesheets` | Tambah timesheet harian (pilih project dulu, task opsional) |
 | PATCH | `/api/v1/my-timesheets/<timesheet_id>` | Update timesheet harian |
 | DELETE | `/api/v1/my-timesheets/<timesheet_id>` | Hapus timesheet harian |
+
+Timesheet response menyertakan `project_id`, `project_name`, `task_title`, dan `employee_name` untuk kebutuhan tampilan kalender dan rekap.
 
 ## Database / Models
 

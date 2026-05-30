@@ -29,6 +29,7 @@ Khusus endpoint ubah status (`PATCH /issues/<issue_id>/status`), hanya pelapor a
 ## Main Frontend Files
 
 - `CODE/fe/src/app/pages/isu/IssueList.tsx`
+- `CODE/fe/src/app/pages/isu/IssueDetailPage.tsx`
 - `CODE/fe/src/app/pages/isu/IssueDetailPanel.tsx`
 - `CODE/fe/src/app/pages/proyek/ProjectIssuePanel.tsx`
 - `CODE/fe/src/app/services/issueService.ts`
@@ -45,6 +46,13 @@ Khusus endpoint ubah status (`PATCH /issues/<issue_id>/status`), hanya pelapor a
 | POST | `/api/v1/issues/<issue_id>/escalate` | Escalate issue |
 | GET | `/api/v1/sla-config` | Get SLA rules |
 | PUT | `/api/v1/sla-config` | Update SLA rules |
+
+## Frontend Routes
+
+| Route | Purpose |
+|---|---|
+| `/isu/list` | Global issue list, board, create issue, and SLA config modal |
+| `/isu/:issueId` | Standalone issue detail page for status update, escalation, SLA state, evidence, and activity summary |
 
 ## Database / Models
 

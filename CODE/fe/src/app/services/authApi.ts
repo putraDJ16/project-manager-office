@@ -26,6 +26,7 @@ type RegisterPayload = {
   organization?: string;
   unit_organization?: string;
   position?: string;
+  otp?: string;
 };
 
 type RegisterOption = {
@@ -110,6 +111,29 @@ export async function loginWithApi(email: string, password: string) {
   }
 }
 
+export async function requestForgotPasswordOtp(email: string) {
+  const result = await apiRequest<{ expires_in_minutes: number }>("/auth/forgot-password/request-otp", {
+    method: "POST",
+    body: { email },
+    skipAuth: true
+  });
+  return result.message ?? `Jika email terdaftar, kode OTP telah dikirim. Berlaku ${result.data.expires_in_minutes} menit.`;
+}
+
+export async function resetForgotPassword(payload: {
+  email: string;
+  new_password: string;
+  confirm_password: string;
+  otp: string;
+}) {
+  const result = await apiRequest<null>("/auth/forgot-password/reset", {
+    method: "POST",
+    body: payload,
+    skipAuth: true
+  });
+  return result.message ?? "Password berhasil direset. Silakan login dengan password baru.";
+}
+
 export async function registerWithApi(payload: RegisterPayload) {
   const result = await apiRequest<LoginResponse>("/auth/register", {
     method: "POST",
@@ -117,6 +141,15 @@ export async function registerWithApi(payload: RegisterPayload) {
     skipAuth: true
   });
   return result.data;
+}
+
+export async function requestRegisterOtp(payload: RegisterPayload) {
+  const result = await apiRequest<{ expires_in_minutes: number }>("/auth/register/request-otp", {
+    method: "POST",
+    body: payload,
+    skipAuth: true
+  });
+  return result.message ?? `Kode OTP telah dikirim. Berlaku ${result.data.expires_in_minutes} menit.`;
 }
 
 export async function fetchRegisterOptions() {
@@ -144,12 +177,25 @@ export async function changePassword(payload: {
   current_password: string;
   new_password: string;
   confirm_password: string;
+  otp: string;
 }) {
   const result = await apiRequest<null>("/auth/change-password", {
     method: "POST",
     body: payload,
   });
   return result.message ?? "Password berhasil diubah.";
+}
+
+export async function requestChangePasswordOtp(payload: {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}) {
+  const result = await apiRequest<{ expires_in_minutes: number }>("/auth/change-password/request-otp", {
+    method: "POST",
+    body: payload,
+  });
+  return result.message ?? `Kode OTP telah dikirim. Berlaku ${result.data.expires_in_minutes} menit.`;
 }
 
 export async function fetchMyProjects(options?: { member_only?: boolean }) {

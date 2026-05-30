@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: zoho_pmo_api
 
+    env_file:
+      - ./CODE/be/.env
     environment:
       - FLASK_ENV=development
       - FLASK_APP=run.py
@@ -18,6 +20,27 @@ services:
       - "5000:5000"
     volumes:
       # Optional: bind mount for hot-reloading backend code during dev
+      - ./CODE/be:/app
+    restart: unless-stopped
+
+  email-worker:
+    build:
+      context: ./CODE/be
+      dockerfile: Dockerfile
+    container_name: zoho_pmo_email_worker
+    depends_on:
+      - api
+    env_file:
+      - ./CODE/be/.env
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=run.py
+      # Local PostgreSQL on host machine
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@host.docker.internal:5434/zoho_pm
+      - JWT_SECRET_KEY=dev-secret-key
+      - CORS_ORIGINS=http://localhost:5173
+    command: flask --app run.py email-worker
+    volumes:
       - ./CODE/be:/app
     restart: unless-stopped
 

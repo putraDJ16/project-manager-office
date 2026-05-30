@@ -1,0 +1,7 @@
+{% extends "email/base.html" %}
+{% block content %}
+<h1 style="font-size:22px;margin:0 0 12px">{{ title }}</h1>
+<p style="font-size:16px;line-height:1.6">{{ intro }}</p>
+<p style="font-size:28px;letter-spacing:6px;font-weight:700;margin:20px 0;color:#1f2937">{{ code }}</p>
+<p style="font-size:14px;line-height:1.6;color:#475467">Kode berlaku {{ expires_in_minutes }} menit. Abaikan email ini jika Anda tidak meminta kode.</p>
+{% endblock %}

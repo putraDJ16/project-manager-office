@@ -57,6 +57,16 @@ function shiftDate(view: CalendarView, anchor: Date, direction: -1 | 1) {
   return addDays(anchor, direction);
 }
 
+function timesheetProjectLabel(entry: ApiTimesheet) {
+  return entry.project_name ?? entry.project_id ?? "Tanpa project";
+}
+
+function timesheetProjectSummary(entries: ApiTimesheet[]) {
+  const names = Array.from(new Set(entries.map(timesheetProjectLabel)));
+  if (names.length <= 2) return names.join(", ");
+  return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+}
+
 export function MyCalendarPage() {
   const [view, setView] = useState<CalendarView>("month");
   const [anchorDate, setAnchorDate] = useState(new Date());
@@ -96,6 +106,11 @@ export function MyCalendarPage() {
         setKnownProjects((current) => {
           const map = new Map(current.map((project) => [project.id, project]));
           result.forEach((event) => map.set(event.project_id, { id: event.project_id, name: event.project_name }));
+          timesheetRows.forEach((entry) => {
+            if (entry.project_id && entry.project_name) {
+              map.set(entry.project_id, { id: entry.project_id, name: entry.project_name });
+            }
+          });
           return Array.from(map.values()).sort((left, right) => left.name.localeCompare(right.name, "id"));
         });
         setError(null);
@@ -311,6 +326,7 @@ export function MyCalendarPage() {
                         <span className="block truncate opacity-90">
                           {timesheetHours} jam / {dayTimesheets.length} entri
                         </span>
+                        <span className="block truncate opacity-90">{timesheetProjectSummary(dayTimesheets)}</span>
                       </button>
                     )}
                   </div>
@@ -367,7 +383,7 @@ export function MyCalendarPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-medium text-color-foreground">{entry.task_title ?? entry.task_id ?? "Tanpa tugas"}</p>
-                      <p className="mt-0.5 text-xs text-color-muted-foreground">{entry.project_id ?? "Tanpa project"}</p>
+                      <p className="mt-0.5 text-xs text-color-muted-foreground">{timesheetProjectLabel(entry)}</p>
                     </div>
                     <span className="shrink-0 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
                       {entry.hours_spent} jam

@@ -35,6 +35,7 @@ def test_my_timesheet_crud_flow(client, auth_headers):
     assert created_data["task_id"] == task_id
     assert created_data["hours_spent"] == 6.5
     assert created_data["task_title"] == "Task untuk timesheet"
+    assert created_data["project_name"] == "Transformasi Digital Kamsiber"
     timesheet_id = created_data["id"]
 
     listed = client.get("/api/v1/my-timesheets", headers=auth_headers)

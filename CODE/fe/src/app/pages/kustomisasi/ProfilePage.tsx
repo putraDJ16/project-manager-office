@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { teamMembers } from "../../data/mockData";
 import { ISSUE_STATUS_ORDER, type Issue, type IssueStatus } from "../../domain/issues";
-import { changePassword, fetchMyProjects, getMe, type MyProjectResponse } from "../../services/authApi";
+import { changePassword, fetchMyProjects, getMe, requestChangePasswordOtp, type MyProjectResponse } from "../../services/authApi";
 import { fetchUserAuditTrails, type ApiAuditTrail } from "../../services/auditTrailApi";
 import { getIssues, updateIssueStatus } from "../../services/issueService";
 import { fetchAllTasks, updateTask, type ApiTask } from "../../services/taskApi";
@@ -67,10 +67,12 @@ export function ProfilePage() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [isPasswordOtpSent, setIsPasswordOtpSent] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     current_password: "",
     new_password: "",
     confirm_password: "",
+    otp: "",
   });
 
   useEffect(() => {
@@ -222,9 +224,21 @@ export function ProfilePage() {
 
     setIsSubmittingPassword(true);
     try {
+      if (!isPasswordOtpSent) {
+        const message = await requestChangePasswordOtp({
+          current_password: passwordForm.current_password,
+          new_password: passwordForm.new_password,
+          confirm_password: passwordForm.confirm_password,
+        });
+        setIsPasswordOtpSent(true);
+        setPasswordSuccess(message);
+        return;
+      }
+
       const message = await changePassword(passwordForm);
       setPasswordSuccess(message);
-      setPasswordForm({ current_password: "", new_password: "", confirm_password: "" });
+      setPasswordForm({ current_password: "", new_password: "", confirm_password: "", otp: "" });
+      setIsPasswordOtpSent(false);
     } catch (submitError) {
       setPasswordError(submitError instanceof Error ? submitError.message : "Gagal mengubah password.");
     } finally {
@@ -344,18 +358,35 @@ export function ProfilePage() {
             <FormField
               label="Password Saat Ini"
               value={passwordForm.current_password}
-              onChange={(value) => setPasswordForm((current) => ({ ...current, current_password: value }))}
+              onChange={(value) => {
+                setPasswordForm((current) => ({ ...current, current_password: value, otp: "" }));
+                setIsPasswordOtpSent(false);
+              }}
             />
             <FormField
               label="Password Baru"
               value={passwordForm.new_password}
-              onChange={(value) => setPasswordForm((current) => ({ ...current, new_password: value }))}
+              onChange={(value) => {
+                setPasswordForm((current) => ({ ...current, new_password: value, otp: "" }));
+                setIsPasswordOtpSent(false);
+              }}
             />
             <FormField
               label="Konfirmasi Password Baru"
               value={passwordForm.confirm_password}
-              onChange={(value) => setPasswordForm((current) => ({ ...current, confirm_password: value }))}
+              onChange={(value) => {
+                setPasswordForm((current) => ({ ...current, confirm_password: value, otp: "" }));
+                setIsPasswordOtpSent(false);
+              }}
             />
+            {isPasswordOtpSent && (
+              <FormField
+                label="Kode OTP Email"
+                type="text"
+                value={passwordForm.otp}
+                onChange={(value) => setPasswordForm((current) => ({ ...current, otp: value }))}
+              />
+            )}
 
             {passwordError && (
               <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{passwordError}</div>
@@ -370,7 +401,7 @@ export function ProfilePage() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-60"
             >
               {isSubmittingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
-              {isSubmittingPassword ? "Menyimpan..." : "Simpan Password Baru"}
+              {isSubmittingPassword ? "Memproses..." : isPasswordOtpSent ? "Verifikasi OTP dan Simpan" : "Kirim OTP"}
             </button>
           </form>
         </section>
@@ -849,12 +880,22 @@ function ProfileItem({ icon, label, value }: { icon: ReactNode; label: string; v
   );
 }
 
-function FormField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function FormField({
+  label,
+  type = "password",
+  value,
+  onChange,
+}: {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <label className="block">
       <span className="text-sm font-medium text-slate-700">{label}</span>
       <input
-        type="password"
+        type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"

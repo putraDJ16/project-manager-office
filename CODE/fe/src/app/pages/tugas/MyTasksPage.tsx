@@ -336,6 +336,13 @@ export function MyTasksPage() {
     const start = (timesheetPage - 1) * PAGE_SIZE;
     return timesheets.slice(start, start + PAGE_SIZE);
   }, [timesheetPage, timesheets]);
+  const timesheetProjectCounts = useMemo(() => {
+    const selectedDate = timesheetForm.work_date || toLocalDateKey();
+    return timesheets.reduce<Record<string, number>>((acc, item) => {
+      if (!item.project_id || item.work_date !== selectedDate) return acc;
+      return { ...acc, [item.project_id]: (acc[item.project_id] ?? 0) + 1 };
+    }, {});
+  }, [timesheetForm.work_date, timesheets]);
 
   useEffect(() => {
     setTaskPage(1);
@@ -684,7 +691,7 @@ export function MyTasksPage() {
             type="button"
             onClick={() => setActiveTab("tasks")}
             className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium ${
-              activeTab === "tasks" ? "bg-slate-100 text-indigo-700" : "text-slate-600 hover:text-slate-900"
+              activeTab === "tasks" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <ListTodo className="h-4 w-4" />
@@ -714,7 +721,7 @@ export function MyTasksPage() {
             type="button"
             onClick={() => setActiveTab("timesheets")}
             className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium ${
-              activeTab === "timesheets" ? "bg-slate-100 text-indigo-700" : "text-slate-600 hover:text-slate-900"
+              activeTab === "timesheets" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <Calendar className="h-4 w-4" />
@@ -724,7 +731,7 @@ export function MyTasksPage() {
             type="button"
             onClick={() => setActiveTab("calendar")}
             className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium ${
-              activeTab === "calendar" ? "bg-slate-100 text-indigo-700" : "text-slate-600 hover:text-slate-900"
+              activeTab === "calendar" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <CalendarDays className="h-4 w-4" />
@@ -833,6 +840,7 @@ export function MyTasksPage() {
                 projects={memberProjects}
                 taskOptions={timesheetTaskOptions}
                 form={timesheetForm}
+                projectTimesheetCounts={timesheetProjectCounts}
                 isSaving={isSavingTimesheet}
                 isLoadingTasks={isLoadingTimesheetTasks}
                 onFormChange={setTimesheetForm}
@@ -850,7 +858,7 @@ export function MyTasksPage() {
               <button
                 type="button"
                 onClick={handleSaveTimesheet}
-                className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                className="btn-primary inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-60"
                 disabled={isSavingTimesheet}
               >
                 {isSavingTimesheet && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -887,7 +895,7 @@ export function MyTasksPage() {
                   onChange={(event) =>
                     setCreateTaskForm((current) => ({ ...current, project_id: event.target.value, phase_id: "" }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   disabled={isSavingCreateTask}
                 >
                   <option value="">- Pilih Project -</option>
@@ -904,7 +912,7 @@ export function MyTasksPage() {
                   type="text"
                   value={createTaskForm.title}
                   onChange={(event) => setCreateTaskForm((current) => ({ ...current, title: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   placeholder="Contoh: Review kebutuhan modul reporting"
                   disabled={isSavingCreateTask}
                 />
@@ -915,7 +923,7 @@ export function MyTasksPage() {
                   <select
                     value={createTaskForm.phase_id}
                     onChange={(event) => setCreateTaskForm((current) => ({ ...current, phase_id: event.target.value }))}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                     disabled={isSavingCreateTask || isLoadingCreateTaskPhases}
                   >
                     <option value="">- Pilih Fase -</option>
@@ -931,7 +939,7 @@ export function MyTasksPage() {
                   <select
                     value={createTaskForm.assignee}
                     onChange={(event) => setCreateTaskForm((current) => ({ ...current, assignee: event.target.value }))}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                     disabled={isSavingCreateTask}
                   >
                     <option value="">- Pilih Assignee -</option>
@@ -949,7 +957,7 @@ export function MyTasksPage() {
                     onChange={(event) =>
                       setCreateTaskForm((current) => ({ ...current, priority: event.target.value as ApiTask["priority"] }))
                     }
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                     disabled={isSavingCreateTask}
                   >
                     {["Low", "Medium", "High", "Critical"].map((priority) => (
@@ -966,7 +974,7 @@ export function MyTasksPage() {
                       type="date"
                       value={createTaskForm.start_date}
                       onChange={(event) => setCreateTaskForm((current) => ({ ...current, start_date: event.target.value }))}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                       disabled={isSavingCreateTask}
                     />
                   </label>
@@ -977,7 +985,7 @@ export function MyTasksPage() {
                       value={createTaskForm.end_date}
                       min={createTaskForm.start_date || undefined}
                       onChange={(event) => setCreateTaskForm((current) => ({ ...current, end_date: event.target.value }))}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                       disabled={isSavingCreateTask}
                     />
                   </label>
@@ -999,7 +1007,7 @@ export function MyTasksPage() {
               <button
                 type="button"
                 onClick={handleCreateTask}
-                className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                className="btn-primary inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-60"
                 disabled={isSavingCreateTask || isLoadingCreateTaskPhases}
               >
                 {isSavingCreateTask && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -1050,6 +1058,7 @@ function TimesheetFormFields({
   projects,
   taskOptions,
   form,
+  projectTimesheetCounts,
   isSaving,
   isLoadingTasks,
   onFormChange,
@@ -1057,10 +1066,13 @@ function TimesheetFormFields({
   projects: MyProjectResponse[];
   taskOptions: ApiTask[];
   form: { project_id: string; task_id: string; work_date: string; hours_spent: string; notes: string };
+  projectTimesheetCounts: Record<string, number>;
   isSaving: boolean;
   isLoadingTasks: boolean;
   onFormChange: (value: { project_id: string; task_id: string; work_date: string; hours_spent: string; notes: string }) => void;
 }) {
+  const selectedProjectTimesheetCount = form.project_id ? projectTimesheetCounts[form.project_id] ?? 0 : 0;
+
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <label className="text-sm font-semibold text-slate-700">
@@ -1069,15 +1081,28 @@ function TimesheetFormFields({
           value={form.project_id}
           onChange={(event) => onFormChange({ ...form, project_id: event.target.value, task_id: "" })}
           disabled={isSaving}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
         >
           <option value="">Pilih project</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
-              {project.id} - {project.name}
+              {project.id} - {project.name} ({projectTimesheetCounts[project.id] ? "Sudah ada" : "Belum ada"})
             </option>
           ))}
         </select>
+        {form.project_id && (
+          <span
+            className={`mt-2 block rounded-md border px-3 py-2 text-xs font-medium ${
+              selectedProjectTimesheetCount > 0
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-amber-200 bg-amber-50 text-amber-700"
+            }`}
+          >
+            {selectedProjectTimesheetCount > 0
+              ? `Project ini sudah memiliki ${selectedProjectTimesheetCount} timesheet pada tanggal kerja ini.`
+              : "Project ini belum memiliki timesheet pada tanggal kerja ini."}
+          </span>
+        )}
       </label>
       <label className="text-sm font-semibold text-slate-700">
         Tugas (opsional)
@@ -1085,7 +1110,7 @@ function TimesheetFormFields({
           value={form.task_id}
           onChange={(event) => onFormChange({ ...form, task_id: event.target.value })}
           disabled={isSaving || !form.project_id || isLoadingTasks}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
         >
           <option value="">{isLoadingTasks ? "Memuat tugas..." : "Tanpa tugas"}</option>
           {taskOptions.map((task) => (
@@ -1102,7 +1127,7 @@ function TimesheetFormFields({
           value={form.work_date}
           onChange={(event) => onFormChange({ ...form, work_date: event.target.value })}
           disabled={isSaving}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
         />
       </label>
       <label className="text-sm font-semibold text-slate-700">
@@ -1115,7 +1140,7 @@ function TimesheetFormFields({
           value={form.hours_spent}
           onChange={(event) => onFormChange({ ...form, hours_spent: event.target.value })}
           disabled={isSaving}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
         />
       </label>
       <label className="md:col-span-2 text-sm font-semibold text-slate-700">
@@ -1125,7 +1150,7 @@ function TimesheetFormFields({
           onChange={(event) => onFormChange({ ...form, notes: event.target.value })}
           disabled={isSaving}
           rows={3}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
         />
       </label>
     </div>
@@ -1159,7 +1184,7 @@ function TimesheetPanel({
         <button
           type="button"
           onClick={onOpenForm}
-          className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+          className="btn-primary inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium"
         >
           Input Timesheet
         </button>

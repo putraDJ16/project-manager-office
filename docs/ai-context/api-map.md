@@ -12,12 +12,16 @@ Documentation endpoints:
 | Method | Endpoint | Feature | Controller/Handler | Service | Request | Response | Auth Required |
 |---|---|---|---|---|---|---|---|
 | POST | `/auth/login` | Auth and Session | `CODE/be/app/api/v1/auth.py::login_handler` | `auth_service.login` | JSON `{email,password}` | Login payload with tokens/session data | No |
-| POST | `/auth/register` | Auth and Session | `CODE/be/app/api/v1/auth.py::register_handler` | `auth_service.register` | JSON registration payload | Login payload, message | No |
+| POST | `/auth/forgot-password/request-otp` | Auth and Session | `CODE/be/app/api/v1/auth.py::forgot_password_otp_handler` | `auth_service.request_forgot_password_otp` | JSON `{email}` | `{expires_in_minutes}`, generic message | No |
+| POST | `/auth/forgot-password/reset` | Auth and Session | `CODE/be/app/api/v1/auth.py::forgot_password_reset_handler` | `auth_service.reset_forgot_password` | JSON `{email,new_password,confirm_password,otp}` | `null`, message | No |
+| POST | `/auth/register/request-otp` | Auth and Session | `CODE/be/app/api/v1/auth.py::register_otp_handler` | `auth_service.request_register_otp` | JSON registration payload | `{expires_in_minutes}`, message | No |
+| POST | `/auth/register` | Auth and Session | `CODE/be/app/api/v1/auth.py::register_handler` | `auth_service.register` | JSON registration payload plus `otp` | Login payload, message | No |
 | GET | `/auth/register-options` | Auth and Session | `CODE/be/app/api/v1/auth.py::register_options_handler` | `auth_service.register_options` | None | Active organizations, units, positions | No |
 | POST | `/auth/refresh` | Auth and Session | `CODE/be/app/api/v1/auth.py::refresh_handler` | Flask JWT | Refresh JWT | `{access_token}` | Refresh JWT |
 | GET | `/auth/me` | Auth and Session | `CODE/be/app/api/v1/auth.py::me_handler` | `auth_service.get_profile` | None | Current profile/session data | JWT |
 | POST | `/auth/onboarding/complete` | Auth and Session | `CODE/be/app/api/v1/auth.py::complete_onboarding_handler` | `auth_service.complete_onboarding` | None | Current profile/session data with `onboarding_completed=true`, message | JWT |
-| POST | `/auth/change-password` | Auth and Session | `CODE/be/app/api/v1/auth.py::change_password_handler` | `auth_service.change_password` | JSON `{current_password,new_password,confirm_password}` | `null`, message | JWT |
+| POST | `/auth/change-password/request-otp` | Auth and Session | `CODE/be/app/api/v1/auth.py::change_password_otp_handler` | `auth_service.request_change_password_otp` | JSON `{current_password,new_password,confirm_password}` | `{expires_in_minutes}`, message | JWT |
+| POST | `/auth/change-password` | Auth and Session | `CODE/be/app/api/v1/auth.py::change_password_handler` | `auth_service.change_password` | JSON `{current_password,new_password,confirm_password,otp}` | `null`, message | JWT |
 | GET | `/auth/my-projects` | Auth and Session | `CODE/be/app/api/v1/auth.py::my_projects_handler` | `auth_service.list_my_projects` | Query optional `member_only` (`true/1/yes`) | Project list | JWT |
 | GET | `/auth/my-assignment-counter` | Auth and Session | `CODE/be/app/api/v1/auth.py::my_assignment_counter_handler` | `auth_service.get_my_assignment_counter` | None | `{active_tasks,active_issues,total_active}` | JWT |
 | GET | `/projects` | Project Management | `CODE/be/app/api/v1/projects.py::list_projects_handler` | `project_service.list_projects` | None | Project list | JWT + project reference read permission (`masterProjects`, `calendar`, `dashboard`, `workload`, `tasks`, `projectTasks`, `projectGantt`, `projectTimesheets`, `issues`, or `projectIssues` view) |

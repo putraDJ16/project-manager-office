@@ -1,6 +1,7 @@
 import { HomeDashboard } from "./pages/HomeDashboard";
 import { DesignSystemTest } from "./pages/DesignSystemTest";
 import { IssueList } from "./pages/isu/IssueList";
+import { IssueDetailPage } from "./pages/isu/IssueDetailPage";
 import { MyTasksPage } from "./pages/tugas/MyTasksPage";
 import { WorkloadHeatmap } from "./pages/sdm/WorkloadHeatmap";
 import { ProjectList } from "./pages/proyek/ProjectList";
@@ -31,6 +32,7 @@ export const routes: AppRoute[] = [
   { path: "/design-system-test", component: DesignSystemTest },
   { path: "/tugas-saya", component: MyTasksPage, module: "tasks" },
   { path: "/isu/list", component: IssueList, module: "issues" },
+  { path: "/isu/:issueId", component: IssueDetailPage, module: ["issues", "projectIssues"] },
   { path: "/sdm/workload", component: WorkloadHeatmap, module: "workload" },
   { path: "/proyek/list", component: ProjectList, module: ["masterProjects", "projectMembers", "projectTasks", "projectGantt", "projectTimesheets", "projectAttachments", "projectMeetings"] },
   { path: "/proyek/monitoring", component: ProjectMonitoring, module: "calendar" },

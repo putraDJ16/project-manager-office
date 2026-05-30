@@ -1,15 +1,16 @@
 @import "./tailwind.css";
 
+/* Dark mode color mappings for legacy Tailwind classes */
 .dark :where(.bg-white, .bg-white\/60) {
   background-color: var(--card);
 }
 
 .dark :where(.bg-slate-50, .bg-slate-50\/50, .bg-slate-50\/60) {
-  background-color: var(--background);
+  background-color: var(--bg);
 }
 
 .dark :where(.bg-slate-100, .bg-slate-100\/70, .bg-slate-200, .bg-slate-300) {
-  background-color: var(--secondary);
+  background-color: var(--panel);
 }
 
 .dark :where(.bg-indigo-50, .bg-indigo-50\/60, .bg-indigo-100, .bg-blue-50, .bg-blue-100) {
@@ -17,7 +18,7 @@
 }
 
 .dark :where(.bg-emerald-50, .bg-emerald-100, .bg-green-50, .bg-green-100) {
-  background-color: var(--status-success-surface);
+  background-color: var(--green-bg);
 }
 
 .dark :where(.bg-amber-50, .bg-amber-100, .bg-yellow-50, .bg-yellow-100, .bg-orange-50, .bg-orange-100) {
@@ -25,19 +26,19 @@
 }
 
 .dark :where(.bg-red-50, .bg-red-100, .bg-rose-50, .bg-rose-100) {
-  background-color: color-mix(in srgb, var(--destructive) 18%, transparent);
+  background-color: var(--accent-soft);
 }
 
 .dark :where(.text-slate-900, .text-slate-800) {
-  color: var(--foreground);
+  color: var(--ink);
 }
 
 .dark :where(.text-slate-700, .text-slate-600) {
-  color: #cbd5e1;
+  color: var(--ink-2);
 }
 
 .dark :where(.text-slate-500, .text-slate-400, .text-slate-300) {
-  color: var(--muted-foreground);
+  color: var(--ink-3);
 }
 
 .dark :where(.text-indigo-800, .text-indigo-700, .text-indigo-600, .text-indigo-500, .text-blue-800, .text-blue-700, .text-blue-600) {
@@ -45,7 +46,7 @@
 }
 
 .dark :where(.text-emerald-800, .text-emerald-700, .text-emerald-600, .text-green-800, .text-green-700, .text-green-600) {
-  color: var(--status-success);
+  color: var(--green);
 }
 
 .dark :where(.text-amber-800, .text-amber-700, .text-amber-600, .text-yellow-800, .text-yellow-700, .text-orange-800, .text-orange-700, .text-orange-600) {
@@ -53,7 +54,7 @@
 }
 
 .dark :where(.text-red-800, .text-red-700, .text-red-600, .text-red-500, .text-rose-800, .text-rose-700, .text-rose-600) {
-  color: #fca5a5;
+  color: var(--accent);
 }
 
 .dark :where(.border-slate-100, .border-slate-200, .border-slate-300, .border-dashed) {
@@ -73,7 +74,7 @@
 }
 
 .dark :where(.border-red-200, .border-red-300, .border-red-500, .border-red-600, .border-red-700, .border-red-950, .border-rose-200) {
-  border-color: color-mix(in srgb, var(--destructive) 46%, transparent);
+  border-color: var(--border-strong);
 }
 
 .dark :where(.divide-slate-100, .divide-slate-200) > :not([hidden]) ~ :not([hidden]) {
@@ -97,20 +98,21 @@
 }
 
 .dark :where(.hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover, .hover\:bg-white:hover) {
-  background-color: var(--secondary);
+  background-color: var(--panel);
 }
 
 .dark :where(.hover\:text-slate-700:hover, .hover\:text-slate-900:hover) {
-  color: var(--foreground);
+  color: var(--ink);
 }
 
 .dark :where(.focus\:bg-white:focus) {
-  background-color: var(--background);
+  background-color: var(--input-bg);
 }
 
+/* Sidebar scroll - updated for new color system */
 .sidebar-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #4338ca #312e81;
+  scrollbar-color: var(--accent) var(--panel);
 }
 
 .sidebar-scroll::-webkit-scrollbar {
@@ -118,16 +120,16 @@
 }
 
 .sidebar-scroll::-webkit-scrollbar-track {
-  background: #312e81;
+  background: var(--panel);
   border-radius: 9999px;
 }
 
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #6366f1 0%, #4338ca 100%);
+  background: var(--accent);
   border-radius: 9999px;
-  border: 1px solid #312e81;
+  border: 1px solid var(--panel);
 }
 
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #818cf8 0%, #4f46e5 100%);
+  background: var(--accent-hover);
 }

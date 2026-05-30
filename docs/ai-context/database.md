@@ -5,6 +5,7 @@ Primary ORM models are in `CODE/be/app/models/`. Alembic migrations are in `CODE
 | Table/Model | Purpose | Important Fields | Related Feature | Related Files |
 |---|---|---|---|---|
 | `users` / `User` | Login identity and session subject. | `id`, `email`, `password_hash`, `display_name`, `role_id`, `employee_id`, `is_active`, `onboarding_completed` | Auth and Session, Notifications, Audit Trail | `CODE/be/app/models/user.py`, `CODE/be/app/services/auth_service.py` |
+| `account_otps` / `AccountOtp` | One-time email verification codes for registration, forgot password, and password changes. | `id`, `email`, `purpose`, `code_hash`, `expires_at`, `consumed_at`, `attempts` | Auth and Session | `CODE/be/app/models/account_otp.py`, `CODE/be/app/services/auth_service.py` |
 | `roles` / `Role` | Permission roles. | `id`, `name`, `description`, `status`, `permissions` JSON, `is_default` | Auth and Session, Master Data | `CODE/be/app/models/role.py`, `CODE/be/app/utils/permissions.py`, `CODE/be/app/services/role_service.py` |
 | `employees` / `Employee` | Master employee record and optional user link target. | `id`, `nip`, `name`, `email`, `organization`, `unit_organization`, `position`, `role_id`, `status` | Master Data, Project Management, Workload | `CODE/be/app/models/employee.py`, `CODE/be/app/services/employee_service.py` |
 | `organizations` / `Organization` | Master organization reference. | `id`, `name`, `status` | Master Data, Auth registration options | `CODE/be/app/models/organization.py`, `CODE/be/app/services/organization_service.py` |
@@ -53,6 +54,7 @@ Defined in `CODE/be/app/models/constants.py`:
 - `users` linked by `employee_id` mirrors employee `email`, `name`, `role_id`, and active status when employee master data changes.
 - Only one role should be flagged `is_default=true` through service logic; default role must remain `Active`.
 - `users.onboarding_completed` defaults to false for new users and is set true after first-login onboarding is completed or skipped; migration marks existing users true.
+- `account_otps` stores hashed OTP codes only for register, forgot password, and profile password change; codes expire after 10 minutes, are consumed after use, and are limited to 5 verification attempts.
 - `project_members` uses composite primary key `project_id + employee_id`.
 - Attachment folders cascade on project deletion and support self-parenting relationships; service prevents invalid parent/self-descendant moves.
 - File storage path depends on `ATTACHMENT_STORAGE_DIR`; runtime storage behavior needs environment verification outside code review.
@@ -86,3 +88,4 @@ Current migration files include:
 - `CODE/be/migrations/versions/d6e7f8a9b0c1_allow_multiple_timesheet_entries.py`
 - `CODE/be/migrations/versions/e8f9a0b1c2d3_add_user_onboarding_completed.py`
 - `CODE/be/migrations/versions/e9f0a1b2c3d4_add_default_role_flag.py`
+- `CODE/be/migrations/versions/f0a1b2c3d4e5_add_account_otps.py`

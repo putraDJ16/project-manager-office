@@ -20,7 +20,7 @@ export function PaginationControls({
 
   return (
     <div className={`flex items-center justify-between gap-3 px-4 py-3 text-sm ${className ?? ""}`}>
-      <p className="text-slate-500">
+      <p className="text-[var(--ink-3)]">
         Menampilkan {start}-{end} dari {totalItems} data
       </p>
       <div className="flex items-center gap-2">
@@ -28,18 +28,18 @@ export function PaginationControls({
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-[var(--ink-2)] hover:bg-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Sebelumnya
         </button>
-        <span className="text-slate-600">
+        <span className="text-[var(--ink-2)]">
           Halaman {currentPage} / {totalPages}
         </span>
         <button
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-[var(--ink-2)] hover:bg-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Berikutnya
         </button>

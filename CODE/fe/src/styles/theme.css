@@ -2,29 +2,54 @@
 
 @layer base {
   :root {
-    --background: #ffffff;
-    --foreground: #09090b;
+    /* Background & Surfaces */
+    --bg: #f4f6fa;
+    --panel: #fbfcfe;
     --card: #ffffff;
-    --card-foreground: #09090b;
+    
+    /* Borders */
+    --border: #e4e8f0;
+    --border-strong: #d3d9e6;
+    
+    /* Brand Accent (Red IGLO) */
+    --accent: #e11d34;
+    --accent-hover: #c4162c;
+    --accent-soft: #fdeaec;
+    
+    /* Text Hierarchy */
+    --ink: #16203a;
+    --ink-2: #475068;
+    --ink-3: #7b8499;
+    
+    /* Input */
+    --input-bg: #ffffff;
+    --input-border: #e4e8f0;
+    
+    /* Success/Green */
+    --green: #0a8a5f;
+    --green-bg: #e7f6ef;
+    
+    /* Legacy compatibility */
+    --background: #f4f6fa;
+    --foreground: #16203a;
+    --card-foreground: #16203a;
     --popover: #ffffff;
-    --popover-foreground: #09090b;
-    --primary: #4f46e5;
-    --primary-foreground: #f8fafc;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #0f172a;
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
-    --accent: #f1f5f9;
-    --accent-foreground: #0f172a;
-    --destructive: #ef4444;
-    --destructive-foreground: #f8fafc;
-    --border: #e2e8f0;
-    --input: #e2e8f0;
-    --ring: #4f46e5;
+    --popover-foreground: #16203a;
+    --primary: #e11d34;
+    --primary-foreground: #ffffff;
+    --secondary: #fbfcfe;
+    --secondary-foreground: #16203a;
+    --muted: #f4f6fa;
+    --muted-foreground: #7b8499;
+    --destructive: #e11d34;
+    --destructive-foreground: #ffffff;
+    --input: #e4e8f0;
+    --ring: #e11d34;
     --radius: 0.5rem;
-
-    --status-success: #047857;
-    --status-success-surface: #d1fae5;
+    
+    /* Status colors */
+    --status-success: #0a8a5f;
+    --status-success-surface: #e7f6ef;
     --status-success-border: #a7f3d0;
     --status-warning: #b45309;
     --status-warning-surface: #fef3c7;
@@ -32,41 +57,71 @@
     --status-info: #1d4ed8;
     --status-info-surface: #dbeafe;
     --status-info-border: #bfdbfe;
-    --surface-gradient: linear-gradient(135deg, #f1f5f9 0%, #ffffff 52%, #e0e7ff 100%);
-    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-    --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
-    --shadow-lg: 0 12px 24px rgba(15, 23, 42, 0.12);
-    --shadow-xl: 0 18px 60px rgba(15, 23, 42, 0.14);
-    --shadow-right-md: 8px 0 12px -12px rgba(15, 23, 42, 0.08);
-    --shadow-right-lg: 8px 0 12px -12px rgba(15, 23, 42, 0.12);
-    --shadow-left-md: -8px 0 12px -12px rgba(15, 23, 42, 0.08);
-    --shadow-left-lg: -8px 0 12px -12px rgba(15, 23, 42, 0.12);
+    
+    /* Shadows - subtle, no glow */
+    --shadow-sm: 0 1px 2px rgba(22, 32, 58, 0.04);
+    --shadow-md: 0 1px 3px rgba(22, 32, 58, 0.06);
+    --shadow-lg: 0 2px 4px rgba(22, 32, 58, 0.08);
+    --shadow-xl: 0 4px 8px rgba(22, 32, 58, 0.1);
+    --shadow-right-md: 2px 0 3px rgba(22, 32, 58, 0.06);
+    --shadow-right-lg: 2px 0 4px rgba(22, 32, 58, 0.08);
+    --shadow-left-md: -2px 0 3px rgba(22, 32, 58, 0.06);
+    --shadow-left-lg: -2px 0 4px rgba(22, 32, 58, 0.08);
     --shadow-elevated: var(--shadow-xl);
+    
+    /* Focus ring */
+    --focus-ring: 0 0 0 3px rgba(225, 29, 52, 0.12);
   }
 
   .dark {
-    --background: #0f172a;
-    --foreground: #f8fafc;
-    --card: #111827;
-    --card-foreground: #f8fafc;
-    --popover: #111827;
-    --popover-foreground: #f8fafc;
-    --primary: #6366f1;
-    --primary-foreground: #f8fafc;
-    --secondary: #1f2937;
-    --secondary-foreground: #f8fafc;
-    --muted: #1f2937;
-    --muted-foreground: #94a3b8;
-    --accent: #1f2937;
-    --accent-foreground: #f8fafc;
-    --destructive: #f87171;
-    --destructive-foreground: #450a0a;
-    --border: #334155;
-    --input: #475569;
-    --ring: #6366f1;
-
-    --status-success: #6ee7b7;
-    --status-success-surface: rgba(5, 150, 105, 0.16);
+    /* Background & Surfaces */
+    --bg: #0d1017;
+    --panel: #11151f;
+    --card: #151a26;
+    
+    /* Borders */
+    --border: #222a3a;
+    --border-strong: #2d3648;
+    
+    /* Brand Accent (Lighter red for dark mode) */
+    --accent: #f2374f;
+    --accent-hover: #ff4a60;
+    --accent-link: #ff8090;
+    --accent-soft: rgba(242, 55, 79, 0.14);
+    
+    /* Text Hierarchy */
+    --ink: #eef1f7;
+    --ink-2: #a4adc2;
+    --ink-3: #6f7890;
+    
+    /* Input */
+    --input-bg: #1a2030;
+    --input-border: #2d3648;
+    
+    /* Success/Green */
+    --green: #34d399;
+    --green-bg: rgba(52, 211, 153, 0.12);
+    
+    /* Legacy compatibility */
+    --background: #0d1017;
+    --foreground: #eef1f7;
+    --card-foreground: #eef1f7;
+    --popover: #151a26;
+    --popover-foreground: #eef1f7;
+    --primary: #f2374f;
+    --primary-foreground: #ffffff;
+    --secondary: #11151f;
+    --secondary-foreground: #eef1f7;
+    --muted: #11151f;
+    --muted-foreground: #6f7890;
+    --destructive: #f2374f;
+    --destructive-foreground: #ffffff;
+    --input: #2d3648;
+    --ring: #f2374f;
+    
+    /* Status colors */
+    --status-success: #34d399;
+    --status-success-surface: rgba(52, 211, 153, 0.12);
     --status-success-border: rgba(52, 211, 153, 0.36);
     --status-warning: #fcd34d;
     --status-warning-surface: rgba(217, 119, 6, 0.18);
@@ -74,16 +129,20 @@
     --status-info: #a5b4fc;
     --status-info-surface: rgba(67, 56, 202, 0.22);
     --status-info-border: rgba(129, 140, 248, 0.42);
-    --surface-gradient: linear-gradient(135deg, #0f172a 0%, #111827 52%, #1e1b4b 100%);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.15);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
-    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.35);
-    --shadow-xl: 0 18px 60px rgba(0, 0, 0, 0.42);
-    --shadow-right-md: 8px 0 12px -12px rgba(0, 0, 0, 0.25);
-    --shadow-right-lg: 8px 0 12px -12px rgba(0, 0, 0, 0.35);
-    --shadow-left-md: -8px 0 12px -12px rgba(0, 0, 0, 0.25);
-    --shadow-left-lg: -8px 0 12px -12px rgba(0, 0, 0, 0.35);
+    
+    /* Shadows - subtle, no glow */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 4px 8px rgba(0, 0, 0, 0.5);
+    --shadow-right-md: 2px 0 3px rgba(0, 0, 0, 0.3);
+    --shadow-right-lg: 2px 0 4px rgba(0, 0, 0, 0.4);
+    --shadow-left-md: -2px 0 3px rgba(0, 0, 0, 0.3);
+    --shadow-left-lg: -2px 0 4px rgba(0, 0, 0, 0.4);
     --shadow-elevated: var(--shadow-xl);
+    
+    /* Focus ring */
+    --focus-ring: 0 0 0 3px rgba(242, 55, 79, 0.18);
   }
 }
 
@@ -93,8 +152,8 @@
   }
 
   body {
-    background-color: var(--background);
-    color: var(--foreground);
+    background-color: var(--bg);
+    color: var(--ink);
     font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   }
 
@@ -106,31 +165,34 @@
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
-    background-color: var(--background);
-    border-color: var(--input);
-    color: var(--foreground);
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--ink);
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: var(--muted-foreground);
+    color: var(--ink-3);
   }
 
   option {
-    background-color: var(--background);
-    color: var(--foreground);
+    background-color: var(--input-bg);
+    color: var(--ink);
+  }
+  
+  /* Focus states */
+  input:focus,
+  textarea:focus,
+  select:focus,
+  button:focus-visible,
+  a:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 }
 
 @layer components {
-  .ds-page-gradient {
-    background-image: var(--surface-gradient);
-  }
-
-  .ds-elevated-shadow {
-    box-shadow: var(--shadow-elevated);
-  }
-
+  /* Shadow utilities */
   .shadow-sm {
     box-shadow: var(--shadow-sm);
   }
@@ -163,6 +225,11 @@
     box-shadow: var(--shadow-left-lg);
   }
 
+  .ds-elevated-shadow {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  /* Status badges */
   .ds-status-success {
     background-color: var(--status-success-surface);
     border-color: var(--status-success-border);
@@ -179,5 +246,59 @@
     background-color: var(--status-info-surface);
     border-color: var(--status-info-border);
     color: var(--status-info);
+  }
+  
+  /* Accent utilities */
+  .text-accent {
+    color: var(--accent);
+  }
+  
+  .dark .text-accent-link {
+    color: var(--accent-link);
+  }
+  
+  .bg-accent {
+    background-color: var(--accent);
+  }
+  
+  .bg-accent-soft {
+    background-color: var(--accent-soft);
+  }
+  
+  .border-accent {
+    border-color: var(--accent);
+  }
+  
+  .hover\:bg-accent:hover {
+    background-color: var(--accent-hover);
+  }
+  
+  /* Button primary */
+  .btn-primary {
+    background-color: var(--accent);
+    color: #ffffff;
+    border: 1px solid var(--accent);
+  }
+  
+  .btn-primary:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+  
+  .btn-primary:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+  
+  /* Link styles */
+  .link-accent {
+    color: var(--accent);
+  }
+  
+  .dark .link-accent {
+    color: var(--accent-link);
+  }
+  
+  .link-accent:hover {
+    color: var(--accent-hover);
   }
 }

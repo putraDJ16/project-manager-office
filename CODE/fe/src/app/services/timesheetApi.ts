@@ -9,6 +9,7 @@ export type ApiTimesheet = {
   notes: string | null;
   task_title: string | null;
   project_id: string | null;
+  project_name: string | null;
   employee_name: string | null;
   created_at: string;
   updated_at: string;

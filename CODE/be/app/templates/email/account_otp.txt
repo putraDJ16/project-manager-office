@@ -1,0 +1,8 @@
+{{ title }}
+
+{{ intro }}
+
+Kode OTP: {{ code }}
+
+Kode berlaku {{ expires_in_minutes }} menit.
+Abaikan email ini jika Anda tidak meminta kode.

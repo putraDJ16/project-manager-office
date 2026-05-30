@@ -1,10 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { listEmailOutbox, resendEmail, type EmailOutboxItem } from "../../services/adminEmailApi";
 import { PaginationControls } from "../../components/ui";
+import { loadAuthSession } from "../../data/auth";
+import { hasPermission } from "../../utils/permissions";
 
 const PAGE_SIZE = 10;
+const dateTimeFormatter = new Intl.DateTimeFormat("id-ID", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit"
+});
+
+function formatSentAt(value: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return dateTimeFormatter.format(date);
+}
 
 export function EmailOutboxPage() {
+  const session = loadAuthSession();
+  const canResend = hasPermission(session, "adminEmailLogs", "edit");
   const [status, setStatus] = useState("");
   const [items, setItems] = useState<EmailOutboxItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -31,9 +49,9 @@ export function EmailOutboxPage() {
       </select>
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Recipient</th><th className="px-4 py-3">Event</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Recipient</th><th className="px-4 py-3">Event</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Berhasil Dikirim</th>{canResend && <th className="px-4 py-3">Action</th>}</tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {paginatedItems.map((item) => <tr key={item.id}><td className="px-4 py-3">{item.to_email}</td><td className="px-4 py-3">{item.event_key}</td><td className="px-4 py-3">{item.subject}</td><td className="px-4 py-3">{item.status} ({item.attempts})</td><td className="px-4 py-3"><button className="rounded-xl border border-color-border bg-color-card px-3 py-1 text-color-foreground transition-colors hover:bg-color-secondary" onClick={() => resendEmail(item.id).then(load)}>Resend</button></td></tr>)}
+            {paginatedItems.map((item) => <tr key={item.id}><td className="px-4 py-3">{item.to_email}</td><td className="px-4 py-3">{item.event_key}</td><td className="px-4 py-3">{item.subject}</td><td className="px-4 py-3">{item.status} ({item.attempts})</td><td className="px-4 py-3">{formatSentAt(item.sent_at)}</td>{canResend && <td className="px-4 py-3"><button className="rounded-xl border border-color-border bg-color-card px-3 py-1 text-color-foreground transition-colors hover:bg-color-secondary" onClick={() => resendEmail(item.id).then(load)}>Resend</button></td>}</tr>)}
           </tbody>
         </table>
         <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={items.length} onPageChange={setPage} className="border-t border-slate-200" />

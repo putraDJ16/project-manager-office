@@ -150,9 +150,9 @@ def build_message(row: EmailOutbox) -> EmailMessage:
     return msg
 
 
-def send_email(row: EmailOutbox) -> None:
+def send_email(row: EmailOutbox) -> bool:
     if not current_app.config.get("MAIL_ENABLED"):
-        return
+        return False
     msg = build_message(row)
     with smtplib.SMTP(current_app.config["MAIL_HOST"], current_app.config["MAIL_PORT"], timeout=20) as smtp:
         if current_app.config.get("MAIL_USE_TLS"):
@@ -160,6 +160,7 @@ def send_email(row: EmailOutbox) -> None:
         if current_app.config.get("MAIL_USERNAME") and current_app.config.get("MAIL_PASSWORD"):
             smtp.login(current_app.config["MAIL_USERNAME"], current_app.config["MAIL_PASSWORD"])
         smtp.send_message(msg)
+    return True
 
 
 def retry_at(attempts: int) -> datetime:

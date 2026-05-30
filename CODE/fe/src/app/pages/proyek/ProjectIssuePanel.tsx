@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import { FileWarning, KanbanSquare, List, Loader2, Paperclip, Search, X } from "lucide-react";
 import {
@@ -20,7 +21,6 @@ import {
 import { getSlaIndicator, shouldAutoEscalate, type SlaIndicatorTone } from "../../services/issueSla";
 import { loadAuthSession } from "../../data/auth";
 import { uploadAttachmentFile } from "../../services/projectAttachmentApi";
-import { IssueDetailPanel } from "../isu/IssueDetailPanel";
 
 type ViewMode = "list" | "board";
 
@@ -71,13 +71,13 @@ function parseLines(value: string) {
 
 export function ProjectIssuePanel({
   projectId,
-  projectName,
   assigneeOptions,
   canCreate,
   canEdit,
   canUploadAttachment,
   onNotice
 }: ProjectIssuePanelProps) {
+  const navigate = useNavigate();
   const reporterName = useMemo(() => loadAuthSession()?.name ?? "System", []);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [slaConfig, setSlaConfig] = useState<SlaConfig | null>(null);
@@ -86,7 +86,6 @@ export function ProjectIssuePanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<IssueSeverity | "all">("all");
   const [statusFilter, setStatusFilter] = useState<IssueStatus | "all">("all");
-  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<CreateIssueFormState>(() => getDefaultCreateForm(reporterName));
   const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -154,18 +153,6 @@ export function ProjectIssuePanel({
       window.clearInterval(interval);
     };
   }, [projectId, slaConfig, onNotice]);
-
-  useEffect(() => {
-    if (!selectedIssueId) return;
-    if (!issues.some((issue) => issue.id === selectedIssueId)) {
-      setSelectedIssueId(null);
-    }
-  }, [issues, selectedIssueId]);
-
-  const selectedIssue = useMemo(
-    () => issues.find((issue) => issue.id === selectedIssueId) ?? null,
-    [issues, selectedIssueId]
-  );
 
   const filteredIssues = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -255,17 +242,6 @@ export function ProjectIssuePanel({
         type: "error",
         msg: error instanceof Error ? error.message : "Gagal memperbarui status isu."
       });
-    }
-  };
-
-  const handleEscalate = async (issueId: string) => {
-    if (!canEdit) return;
-    try {
-      await escalateIssue(issueId);
-      await refreshIssues();
-      onNotice({ type: "success", msg: `Isu ${issueId} berhasil dieskalasi.` });
-    } catch (error) {
-      onNotice({ type: "error", msg: error instanceof Error ? error.message : "Gagal eskalasi isu." });
     }
   };
 
@@ -420,7 +396,7 @@ export function ProjectIssuePanel({
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"
-                        onClick={() => setSelectedIssueId(issue.id)}
+                        onClick={() => navigate(`/isu/${issue.id}?from=/proyek/${projectId}`)}
                         className="inline-flex px-3 py-1.5 rounded-md border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-100"
                       >
                         Detail
@@ -477,7 +453,7 @@ export function ProjectIssuePanel({
                                   <button
                                     type="button"
                                     onMouseDown={(event) => event.stopPropagation()}
-                                    onClick={() => setSelectedIssueId(issue.id)}
+                                    onClick={() => navigate(`/isu/${issue.id}?from=/proyek/${projectId}`)}
                                     className="mt-2 inline-flex px-2.5 py-1 text-xs rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100"
                                   >
                                     Buka Detail
@@ -496,18 +472,6 @@ export function ProjectIssuePanel({
             })}
           </div>
         </DragDropContext>
-      )}
-
-      {selectedIssue && (
-        <IssueDetailPanel
-          issue={selectedIssue}
-          projectName={projectName}
-          slaLabel={getIssueSlaInfo(selectedIssue).label}
-          slaTone={getIssueSlaInfo(selectedIssue).tone}
-          onClose={() => setSelectedIssueId(null)}
-          onStatusChange={(status) => void handleStatusChange(selectedIssue.id, status)}
-          onEscalate={() => void handleEscalate(selectedIssue.id)}
-        />
       )}
 
       {isCreateModalOpen && canCreate && (

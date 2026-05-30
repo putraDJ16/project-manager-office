@@ -1,4 +1,5 @@
 from app.models.audit_trail import AuditTrail
+from app.models.account_otp import AccountOtp
 from app.models.employee import Employee
 from app.models.email_outbox import EmailOutbox
 from app.models.issue import Issue
@@ -26,6 +27,7 @@ from app.models.user_email_preference import UserEmailPreference
 
 __all__ = [
     "AuditTrail",
+    "AccountOtp",
     "Role",
     "Employee",
     "EmailOutbox",

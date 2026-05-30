@@ -12,6 +12,10 @@ from app.services.auth_service import (
     login,
     register,
     register_options,
+    request_change_password_otp,
+    request_forgot_password_otp,
+    request_register_otp,
+    reset_forgot_password,
 )
 from app.utils.exceptions import ApiError
 from app.utils.http import success_response
@@ -24,11 +28,32 @@ def login_handler():
     return success_response(result)
 
 
+@api_v1.post("/auth/forgot-password/request-otp")
+def forgot_password_otp_handler():
+    payload = request.get_json(silent=True) or {}
+    result = request_forgot_password_otp(payload.get("email", ""))
+    return success_response(result, message="Jika email terdaftar, kode OTP reset password telah dikirim.")
+
+
+@api_v1.post("/auth/forgot-password/reset")
+def forgot_password_reset_handler():
+    payload = request.get_json(silent=True) or {}
+    reset_forgot_password(payload)
+    return success_response(None, message="Password berhasil direset. Silakan login dengan password baru.")
+
+
 @api_v1.post("/auth/register")
 def register_handler():
     payload = request.get_json(silent=True) or {}
     result = register(payload)
     return success_response(result, message="Pendaftaran berhasil.", status_code=201)
+
+
+@api_v1.post("/auth/register/request-otp")
+def register_otp_handler():
+    payload = request.get_json(silent=True) or {}
+    result = request_register_otp(payload)
+    return success_response(result, message="Kode OTP pendaftaran telah dikirim.")
 
 
 @api_v1.get("/auth/register-options")
@@ -71,6 +96,28 @@ def complete_onboarding_handler():
     return success_response(profile, message="Onboarding selesai.")
 
 
+@api_v1.post("/auth/change-password/request-otp")
+@jwt_required()
+def change_password_otp_handler():
+    claims = get_jwt()
+    identity = claims["sub"]
+    payload = request.get_json(silent=True) or {}
+
+    current_password = (payload.get("current_password") or "").strip()
+    new_password = (payload.get("new_password") or "").strip()
+    confirm_password = (payload.get("confirm_password") or "").strip()
+
+    if not current_password:
+        raise ApiError("Password saat ini wajib diisi.")
+    if not new_password:
+        raise ApiError("Password baru wajib diisi.")
+    if new_password != confirm_password:
+        raise ApiError("Konfirmasi password baru tidak cocok.")
+
+    result = request_change_password_otp(identity, current_password, new_password, confirm_password)
+    return success_response(result, message="Kode OTP perubahan password telah dikirim.")
+
+
 @api_v1.post("/auth/change-password")
 @jwt_required()
 def change_password_handler():
@@ -89,7 +136,9 @@ def change_password_handler():
     if new_password != confirm_password:
         raise ApiError("Konfirmasi password baru tidak cocok.")
 
-    change_password(identity, current_password, new_password)
+    otp = (payload.get("otp") or "").strip()
+
+    change_password(identity, current_password, new_password, otp)
     return success_response(None, message="Password berhasil diubah.")
 
 

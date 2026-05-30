@@ -13,8 +13,11 @@ from app.docs.envelopes import ErrorEnvelopeSchema, SuccessEnvelopeSchema
 
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 PUBLIC_ENDPOINTS = {
+    "forgot_password_otp_handler",
+    "forgot_password_reset_handler",
     "login_handler",
     "register_handler",
+    "register_otp_handler",
     "register_options_handler",
 }
 
@@ -300,7 +303,7 @@ def _error_response(description: str) -> dict[str, Any]:
 
 
 def _response_schema_for(module_name: str, rule: str, method: str) -> dict[str, Any]:
-    if method == "DELETE" or rule.endswith("/read-all") or rule.endswith("/change-password"):
+    if method == "DELETE" or rule.endswith("/read-all") or rule.endswith("/change-password") or rule.endswith("/forgot-password/reset"):
         return {"nullable": True}
     if rule.endswith("/download"):
         return {"type": "string", "format": "binary"}
@@ -310,7 +313,7 @@ def _response_schema_for(module_name: str, rule: str, method: str) -> dict[str, 
         return _ref_or_list("EmailOutbox", method == "GET" and not rule.endswith("/resend"))
     if "my-assignment-counter" in rule:
         return {"type": "object", "additionalProperties": {"type": "integer"}}
-    if "register-options" in rule or rule.endswith("/login") or rule.endswith("/register") or rule.endswith("/me"):
+    if "register-options" in rule or rule.endswith("/request-otp") or rule.endswith("/login") or rule.endswith("/register") or rule.endswith("/me"):
         return {"type": "object", "additionalProperties": True}
     if "sla-config" in rule:
         return {"type": "object", "properties": {"rules": {"type": "array", "items": {"$ref": "#/components/schemas/SlaRule"}}}}

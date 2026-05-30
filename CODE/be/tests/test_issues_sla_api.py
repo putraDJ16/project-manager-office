@@ -1,3 +1,21 @@
+import re
+
+from app.models import EmailOutbox
+
+
+def _latest_otp_for(email):
+    outbox = (
+        EmailOutbox.query
+        .filter(EmailOutbox.to_email == email)
+        .order_by(EmailOutbox.id.desc())
+        .first()
+    )
+    assert outbox is not None
+    match = re.search(r"Kode OTP:\s*(\d{6})", outbox.body_text or "")
+    assert match is not None
+    return match.group(1)
+
+
 def _login(client, email: str, password: str):
     response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
@@ -82,17 +100,20 @@ def test_issue_status_only_reporter_or_assignee_can_update(client, auth_headers)
     assert status_by_assignee.status_code == 200
     assert status_by_assignee.get_json()["data"]["status"] == "Investigating"
 
+    register_payload = {
+        "name": "Outsider User",
+        "email": "outsider.user@company.co.id",
+        "password": "Outsider123!",
+        "confirm_password": "Outsider123!",
+        "organization": "ZOHO PM SaaS",
+        "unit_organization": "Engineering",
+        "position": "Backend Developer",
+    }
+    otp_response = client.post("/api/v1/auth/register/request-otp", json=register_payload)
+    assert otp_response.status_code == 200
     register = client.post(
         "/api/v1/auth/register",
-        json={
-            "name": "Outsider User",
-            "email": "outsider.user@company.co.id",
-            "password": "Outsider123!",
-            "confirm_password": "Outsider123!",
-            "organization": "ZOHO PM SaaS",
-            "unit_organization": "Engineering",
-            "position": "Backend Developer",
-        },
+        json={**register_payload, "otp": _latest_otp_for("outsider.user@company.co.id")},
     )
     assert register.status_code == 201
     outsider_headers = _login(client, "outsider.user@company.co.id", "Outsider123!")

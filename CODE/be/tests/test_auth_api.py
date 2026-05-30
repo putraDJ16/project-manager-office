@@ -1,3 +1,21 @@
+import re
+
+from app.models import EmailOutbox
+
+
+def latest_otp_for(email):
+    outbox = (
+        EmailOutbox.query
+        .filter(EmailOutbox.to_email == email)
+        .order_by(EmailOutbox.id.desc())
+        .first()
+    )
+    assert outbox is not None
+    match = re.search(r"Kode OTP:\s*(\d{6})", outbox.body_text or "")
+    assert match is not None
+    return match.group(1)
+
+
 def test_login_success(client):
     response = client.post("/api/v1/auth/login", json={"email": "admin@zoho.local", "password": "Admin123!"})
     assert response.status_code == 200
@@ -13,18 +31,57 @@ def test_login_fail(client):
     assert response.status_code == 401
 
 
+def test_forgot_password_with_otp(client):
+    request_response = client.post(
+        "/api/v1/auth/forgot-password/request-otp",
+        json={"email": "admin@zoho.local"},
+    )
+    assert request_response.status_code == 200
+    assert "Jika email terdaftar" in request_response.get_json()["message"]
+
+    reset_response = client.post(
+        "/api/v1/auth/forgot-password/reset",
+        json={
+            "email": "admin@zoho.local",
+            "new_password": "Forgot123!",
+            "confirm_password": "Forgot123!",
+            "otp": latest_otp_for("admin@zoho.local"),
+        },
+    )
+    assert reset_response.status_code == 200
+
+    old_login = client.post("/api/v1/auth/login", json={"email": "admin@zoho.local", "password": "Admin123!"})
+    assert old_login.status_code == 401
+
+    new_login = client.post("/api/v1/auth/login", json={"email": "admin@zoho.local", "password": "Forgot123!"})
+    assert new_login.status_code == 200
+
+
+def test_forgot_password_request_does_not_reveal_unknown_email(client):
+    response = client.post(
+        "/api/v1/auth/forgot-password/request-otp",
+        json={"email": "unknown.user@example.com"},
+    )
+    assert response.status_code == 200
+    assert EmailOutbox.query.filter(EmailOutbox.to_email == "unknown.user@example.com").first() is None
+
+
 def test_register_success(client):
+    payload = {
+        "name": "User Mandiri",
+        "email": "user.mandiri@example.com",
+        "password": "Register123!",
+        "confirm_password": "Register123!",
+        "organization": "ZOHO PM SaaS",
+        "unit_organization": "Engineering",
+        "position": "Backend Developer",
+    }
+    otp_response = client.post("/api/v1/auth/register/request-otp", json=payload)
+    assert otp_response.status_code == 200
+
     response = client.post(
         "/api/v1/auth/register",
-        json={
-            "name": "User Mandiri",
-            "email": "user.mandiri@example.com",
-            "password": "Register123!",
-            "confirm_password": "Register123!",
-            "organization": "ZOHO PM SaaS",
-            "unit_organization": "Engineering",
-            "position": "Backend Developer",
-        },
+        json={**payload, "otp": latest_otp_for("user.mandiri@example.com")},
     )
     assert response.status_code == 201
     data = response.get_json()["data"]
@@ -53,17 +110,21 @@ def test_register_uses_configured_default_role(client, auth_headers):
     default_response = client.patch(f"/api/v1/roles/{role_id}/default", headers=auth_headers)
     assert default_response.status_code == 200
 
+    payload = {
+        "name": "User Staff",
+        "email": "user.staff@example.com",
+        "password": "Register123!",
+        "confirm_password": "Register123!",
+        "organization": "ZOHO PM SaaS",
+        "unit_organization": "Engineering",
+        "position": "Backend Developer",
+    }
+    otp_response = client.post("/api/v1/auth/register/request-otp", json=payload)
+    assert otp_response.status_code == 200
+
     response = client.post(
         "/api/v1/auth/register",
-        json={
-            "name": "User Staff",
-            "email": "user.staff@example.com",
-            "password": "Register123!",
-            "confirm_password": "Register123!",
-            "organization": "ZOHO PM SaaS",
-            "unit_organization": "Engineering",
-            "position": "Backend Developer",
-        },
+        json={**payload, "otp": latest_otp_for("user.staff@example.com")},
     )
     assert response.status_code == 201
     user = response.get_json()["data"]["user"]
@@ -137,12 +198,24 @@ def test_change_password_success(client):
     access = login["data"]["access_token"]
 
     change_response = client.post(
+        "/api/v1/auth/change-password/request-otp",
+        headers={"Authorization": f"Bearer {access}"},
+        json={
+            "current_password": "Admin123!",
+            "new_password": "Admin456!",
+            "confirm_password": "Admin456!",
+        },
+    )
+    assert change_response.status_code == 200
+
+    change_response = client.post(
         "/api/v1/auth/change-password",
         headers={"Authorization": f"Bearer {access}"},
         json={
             "current_password": "Admin123!",
             "new_password": "Admin456!",
             "confirm_password": "Admin456!",
+            "otp": latest_otp_for("admin@zoho.local"),
         },
     )
     assert change_response.status_code == 200

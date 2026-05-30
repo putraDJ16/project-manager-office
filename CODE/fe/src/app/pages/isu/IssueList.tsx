@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import {
   ExternalLink,
   FileWarning,
@@ -40,7 +40,6 @@ import {
   shouldAutoEscalate,
   type SlaIndicatorTone
 } from "../../services/issueSla";
-import { IssueDetailPanel } from "./IssueDetailPanel";
 import { PaginationControls } from "../../components/ui";
 import { loadAuthSession } from "../../data/auth";
 import { hasPermission } from "../../utils/permissions";
@@ -79,6 +78,7 @@ function getDefaultCreateForm(defaultProjectId = ""): CreateIssueFormState {
 }
 
 export function IssueList() {
+  const navigate = useNavigate();
   const session = loadAuthSession();
   const canCreateIssue = hasPermission(session, "issues", "create");
   const reporterName = session?.employeeName?.trim() || session?.name?.trim() || "";
@@ -88,7 +88,6 @@ export function IssueList() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [slaConfig, setSlaConfig] = useState<SlaConfig | null>(null);
   const [view, setView] = useState<ViewMode>("list");
-  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<IssueSeverity | "all">("all");
@@ -185,13 +184,6 @@ export function IssueList() {
     };
   }, [slaConfig]);
 
-  useEffect(() => {
-    if (!selectedIssueId) return;
-    if (!issues.some((issue) => issue.id === selectedIssueId)) {
-      setSelectedIssueId(null);
-    }
-  }, [issues, selectedIssueId]);
-
   const projectById = useMemo(() => {
     return projects.reduce<Record<string, string>>((acc, project) => {
       acc[project.id] = project.name;
@@ -230,11 +222,6 @@ export function IssueList() {
   useEffect(() => {
     setPage(1);
   }, [searchQuery, severityFilter, statusFilter, view]);
-
-  const selectedIssue = useMemo(
-    () => issues.find((issue) => issue.id === selectedIssueId) ?? null,
-    [issues, selectedIssueId]
-  );
 
   const visibleStatuses = useMemo(() => {
     if (statusFilter === "all") return ISSUE_STATUS_ORDER;
@@ -287,13 +274,6 @@ export function IssueList() {
     await updateIssueStatus(issueId, status);
     const refreshed = await getIssues();
     setIssues(refreshed);
-  };
-
-  const handleEscalate = async (issueId: string) => {
-    await escalateIssue(issueId);
-    const refreshed = await getIssues();
-    setIssues(refreshed);
-    setNotice(`Isu ${issueId} berhasil dieskalasi.`);
   };
 
   const handleSlaDraftChange = (
@@ -503,8 +483,7 @@ export function IssueList() {
               issues={paginatedIssues}
               getIssueSlaInfo={getIssueSlaInfo}
               getProjectName={getProjectName}
-              onRowClick={(id) => setSelectedIssueId(id)}
-              selectedIssueId={selectedIssueId}
+              onRowClick={(id) => navigate(`/isu/${id}`)}
             />
             <div className="rounded-xl border border-slate-200 bg-white">
               <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={filteredIssues.length} onPageChange={setPage} />
@@ -518,21 +497,8 @@ export function IssueList() {
             statuses={visibleStatuses}
             getIssueSlaInfo={getIssueSlaInfo}
             getProjectName={getProjectName}
-            onIssueClick={(id) => setSelectedIssueId(id)}
+            onIssueClick={(id) => navigate(`/isu/${id}`)}
             onMoveIssue={(id, status) => void handleStatusChange(id, status)}
-            selectedIssueId={selectedIssueId}
-          />
-        )}
-
-        {selectedIssue && (
-          <IssueDetailPanel
-            issue={selectedIssue}
-            projectName={getProjectName(selectedIssue.projectId)}
-            slaLabel={getIssueSlaInfo(selectedIssue).label}
-            slaTone={getIssueSlaInfo(selectedIssue).tone}
-            onClose={() => setSelectedIssueId(null)}
-            onStatusChange={(status) => void handleStatusChange(selectedIssue.id, status)}
-            onEscalate={() => void handleEscalate(selectedIssue.id)}
           />
         )}
       </div>
@@ -903,13 +869,11 @@ export function IssueList() {
 
 function IssueTable({
   issues,
-  selectedIssueId,
   onRowClick,
   getIssueSlaInfo,
   getProjectName
 }: {
   issues: Issue[];
-  selectedIssueId: string | null;
   onRowClick: (id: string) => void;
   getIssueSlaInfo: (issue: Issue) => { label: string; tone: SlaIndicatorTone };
   getProjectName: (projectId: string) => string;
@@ -935,7 +899,7 @@ function IssueTable({
             return (
               <tr
                 key={issue.id}
-                className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedIssueId === issue.id ? "bg-red-50/50" : ""}`}
+                className="hover:bg-slate-50 cursor-pointer transition-colors"
                 onClick={() => onRowClick(issue.id)}
               >
                 <td className="px-4 py-3 text-slate-500 font-bold">{issue.id}</td>
@@ -950,7 +914,14 @@ function IssueTable({
                 </td>
                 <td className="px-4 py-3 text-slate-600">{issue.assignee ?? "Unassigned"}</td>
                 <td className="px-4 py-3 text-right">
-                  <button type="button" className="text-slate-400 hover:text-indigo-600" onClick={() => onRowClick(issue.id)}>
+                  <button
+                    type="button"
+                    className="text-slate-400 hover:text-indigo-600"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRowClick(issue.id);
+                    }}
+                  >
                     <ExternalLink className="w-4 h-4 ml-auto" />
                   </button>
                 </td>
@@ -974,7 +945,6 @@ function IssueTable({
 function IssueBoard({
   issues,
   statuses,
-  selectedIssueId,
   onIssueClick,
   onMoveIssue,
   getIssueSlaInfo,
@@ -982,7 +952,6 @@ function IssueBoard({
 }: {
   issues: Issue[];
   statuses: readonly IssueStatus[];
-  selectedIssueId: string | null;
   onIssueClick: (id: string) => void;
   onMoveIssue: (id: string, status: IssueStatus) => void;
   getIssueSlaInfo: (issue: Issue) => { label: string; tone: SlaIndicatorTone };
@@ -1022,7 +991,7 @@ function IssueBoard({
                               {...draggableProvided.draggableProps}
                               {...draggableProvided.dragHandleProps}
                               onClick={() => onIssueClick(issue.id)}
-                              className={`bg-white p-4 rounded-xl border shadow-sm cursor-pointer hover:shadow-md hover:border-red-300 transition-all ${selectedIssueId === issue.id ? "border-red-500 ring-1 ring-red-500" : "border-slate-200"}`}
+                              className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:shadow-md hover:border-red-300 transition-all"
                             >
                               <div className="flex justify-between items-start mb-2">
                                 <span className="text-xs font-semibold text-slate-400">{issue.id}</span>

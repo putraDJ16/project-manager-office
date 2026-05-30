@@ -10,12 +10,16 @@ class TaskTimesheetSchema(Schema):
     hours_spent = fields.Float(required=True)
     notes = fields.String(allow_none=True)
     task_title = fields.Method("get_task_title")
+    project_name = fields.Method("get_project_name")
     employee_name = fields.Method("get_employee_name")
     created_at = fields.DateTime()
     updated_at = fields.DateTime()
 
     def get_task_title(self, obj):
         return obj.task.title if getattr(obj, "task", None) else None
+
+    def get_project_name(self, obj):
+        return obj.project.name if getattr(obj, "project", None) else None
 
     def get_employee_name(self, obj):
         if getattr(obj, "user", None) and getattr(obj.user, "employee", None):

@@ -140,8 +140,8 @@ const checklistItems = [
 
 function MiniWindow({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="h-full rounded-xl border border-slate-200 bg-slate-50 p-5">
-      <div className="mb-3 flex items-center gap-1.5 text-[11px] text-slate-400">
+    <div className="h-full rounded-xl border border-[var(--border)] bg-[var(--bg)] p-5">
+      <div className="mb-3 flex items-center gap-1.5 text-[11px] text-[var(--ink-3)]">
         <span className="h-2 w-2 rounded-full bg-rose-300" />
         <span className="h-2 w-2 rounded-full bg-amber-300" />
         <span className="h-2 w-2 rounded-full bg-emerald-300" />
@@ -162,17 +162,17 @@ function StepVisual({ type }: { type: OnboardingStep["visual"] }) {
             ["Tugas Selesai", "84"],
             ["Isu Terbuka", "7"]
           ].map(([label, value]) => (
-            <div key={label} className="rounded-lg border border-slate-200 bg-white p-2">
-              <p className="text-[10px] text-slate-400">{label}</p>
-              <p className="text-lg font-bold text-indigo-700">{value}</p>
+            <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2">
+              <p className="text-[10px] text-[var(--ink-3)]">{label}</p>
+              <p className="text-lg font-bold text-[var(--accent)]">{value}</p>
             </div>
           ))}
         </div>
-        <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-          <p className="mb-2 text-[10px] text-slate-400">Burndown</p>
+        <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
+          <p className="mb-2 text-[10px] text-[var(--ink-3)]">Burndown</p>
           <div className="flex h-24 items-end gap-1">
             {[70, 58, 52, 43, 36, 28, 18, 10].map((height) => (
-              <span key={height} className="flex-1 rounded-t bg-indigo-400" style={{ height: `${height}%` }} />
+              <span key={height} className="flex-1 rounded-t bg-[var(--accent)]" style={{ height: `${height}%` }} />
             ))}
           </div>
         </div>
@@ -185,16 +185,16 @@ function StepVisual({ type }: { type: OnboardingStep["visual"] }) {
       <MiniWindow title="Tugas Kanban">
         <div className="grid grid-cols-3 gap-2">
           {[
-            ["To Do", "text-slate-500", 2],
-            ["In Progress", "text-indigo-600", 2],
-            ["Done", "text-emerald-600", 1]
+            ["To Do", "text-[var(--ink-3)]", 2],
+            ["In Progress", "text-[var(--accent)]", 2],
+            ["Done", "text-[var(--green)]", 1]
           ].map(([title, color, count]) => (
             <div key={title as string}>
               <p className={`mb-1 text-[10px] font-semibold ${color}`}>{title}</p>
               {Array.from({ length: count as number }).map((_, index) => (
-                <div key={index} className="mb-1.5 rounded-md border border-slate-200 bg-white p-2 shadow-sm">
-                  <div className="h-1.5 w-2/3 rounded bg-slate-300" />
-                  <div className="mt-1 h-1.5 w-1/2 rounded bg-slate-200" />
+                <div key={index} className="mb-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] p-2 shadow-sm">
+                  <div className="h-1.5 w-2/3 rounded bg-[var(--border-strong)]" />
+                  <div className="mt-1 h-1.5 w-1/2 rounded bg-[var(--border)]" />
                 </div>
               ))}
             </div>
@@ -207,8 +207,8 @@ function StepVisual({ type }: { type: OnboardingStep["visual"] }) {
   if (type === "issues") {
     return (
       <MiniWindow title="Isu dan Bug">
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="grid grid-cols-3 bg-slate-50 px-3 py-2 text-[10px] font-semibold text-slate-400">
+        <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--card)]">
+          <div className="grid grid-cols-3 bg-[var(--bg)] px-3 py-2 text-[10px] font-semibold text-[var(--ink-3)]">
             <span>Isu</span>
             <span>Severity</span>
             <span>SLA</span>
@@ -218,12 +218,12 @@ function StepVisual({ type }: { type: OnboardingStep["visual"] }) {
             ["Load lambat", "Sedang", "bg-amber-100 text-amber-700"],
             ["Typo label", "Rendah", "bg-emerald-100 text-emerald-700"]
           ].map(([issue, severity, color]) => (
-            <div key={issue} className="grid grid-cols-3 items-center border-t border-slate-100 px-3 py-2 text-[11px]">
-              <span className="text-slate-700">{issue}</span>
+            <div key={issue} className="grid grid-cols-3 items-center border-t border-[var(--border)] px-3 py-2 text-[11px]">
+              <span className="text-[var(--ink-2)]">{issue}</span>
               <span>
                 <span className={`rounded px-1.5 py-0.5 text-[10px] ${color}`}>{severity}</span>
               </span>
-              <span className="text-slate-400">2h</span>
+              <span className="text-[var(--ink-3)]">2h</span>
             </div>
           ))}
         </div>

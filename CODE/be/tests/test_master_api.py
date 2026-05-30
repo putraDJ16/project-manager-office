@@ -1,3 +1,21 @@
+import re
+
+from app.models import EmailOutbox
+
+
+def _latest_otp_for(email):
+    outbox = (
+        EmailOutbox.query
+        .filter(EmailOutbox.to_email == email)
+        .order_by(EmailOutbox.id.desc())
+        .first()
+    )
+    assert outbox is not None
+    match = re.search(r"Kode OTP:\s*(\d{6})", outbox.body_text or "")
+    assert match is not None
+    return match.group(1)
+
+
 def _login(client, email="pm@zoho.local", password="Pm123456!"):
     response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
@@ -273,12 +291,24 @@ def test_employee_reset_password(client, auth_headers):
     employee_access_token = login_default.get_json()["data"]["access_token"]
 
     change_response = client.post(
+        "/api/v1/auth/change-password/request-otp",
+        headers={"Authorization": f"Bearer {employee_access_token}"},
+        json={
+            "current_password": "Welcome123!",
+            "new_password": "ResetMe123!",
+            "confirm_password": "ResetMe123!",
+        },
+    )
+    assert change_response.status_code == 200
+
+    change_response = client.post(
         "/api/v1/auth/change-password",
         headers={"Authorization": f"Bearer {employee_access_token}"},
         json={
             "current_password": "Welcome123!",
             "new_password": "ResetMe123!",
             "confirm_password": "ResetMe123!",
+            "otp": _latest_otp_for("reset.password@company.co.id"),
         },
     )
     assert change_response.status_code == 200

@@ -70,6 +70,7 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
   const [quickCreatePosition, setQuickCreatePosition] = useState({ top: 0, left: 0 });
   const quickCreateRef = useRef<HTMLDivElement | null>(null);
   const quickCreateButtonRef = useRef<HTMLButtonElement | null>(null);
+  const notificationRef = useRef<HTMLDivElement | null>(null);
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [assignmentCounter, setAssignmentCounter] = useState<MyAssignmentCounterResponse>({
@@ -169,9 +170,13 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
-      if (!quickCreateRef.current) return;
-      if (quickCreateRef.current.contains(event.target as Node)) return;
-      setIsQuickCreateOpen(false);
+      const target = event.target as Node;
+      if (quickCreateRef.current && !quickCreateRef.current.contains(target)) {
+        setIsQuickCreateOpen(false);
+      }
+      if (notificationRef.current && !notificationRef.current.contains(target)) {
+        setIsNotificationOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
@@ -226,11 +231,11 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
   };
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-slate-900">
+    <div className="flex h-screen w-full bg-[var(--bg)] overflow-hidden text-[var(--ink)]">
 
-      {/* Left Sidebar (Dark Indigo) */}
-      <aside className={`bg-indigo-950 text-indigo-100 flex flex-col shrink-0 transition-all duration-300 ${isSidebarMinimized ? "w-20" : "w-64"}`}>
-        <div className={`h-16 flex items-center font-bold text-lg tracking-tight border-b border-indigo-900 ${isSidebarMinimized ? "justify-between px-1.5" : "justify-between px-4"}`}>
+      {/* Left Sidebar */}
+      <aside className={`bg-[var(--panel)] text-[var(--ink)] flex flex-col shrink-0 transition-all duration-300 border-r border-[var(--border)] ${isSidebarMinimized ? "w-20" : "w-64"}`}>
+        <div className={`h-16 flex items-center font-bold text-lg tracking-tight border-b border-[var(--border)] ${isSidebarMinimized ? "justify-between px-1.5" : "justify-between px-4"}`}>
           <div className="flex items-center min-w-0">
             <img
               src={appLogo}
@@ -243,7 +248,7 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
             type="button"
             onClick={() => setIsSidebarMinimized((current) => !current)}
             aria-label={isSidebarMinimized ? "Expand sidebar" : "Minimize sidebar"}
-            className={`inline-flex items-center justify-center rounded-md border border-indigo-800 text-indigo-200 hover:bg-indigo-900 hover:text-white transition-colors ${isSidebarMinimized ? "h-7 w-7" : "h-8 w-8"}`}
+            className={`inline-flex items-center justify-center rounded-md border border-[var(--border)] text-[var(--ink-3)] hover:bg-[var(--bg)] hover:text-[var(--ink)] transition-colors ${isSidebarMinimized ? "h-7 w-7" : "h-8 w-8"}`}
             title={isSidebarMinimized ? "Expand sidebar" : "Minimize sidebar"}
           >
             {isSidebarMinimized ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -258,13 +263,13 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                   type="button"
                   ref={quickCreateButtonRef}
                   onClick={() => setIsQuickCreateOpen((current) => !current)}
-                  className={`w-full rounded-md border border-indigo-600/60 bg-indigo-700/35 text-indigo-100 hover:bg-indigo-600/50 transition-colors ${
+                  className={`w-full rounded-md border border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition-colors ${
                     isSidebarMinimized ? "h-10 flex items-center justify-center" : "px-3 py-2.5"
                   }`}
                   title="Buat Baru"
                 >
                   <span className={`inline-flex items-center ${isSidebarMinimized ? "" : "gap-2"}`}>
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-indigo-300/80 text-indigo-100 text-sm font-bold leading-none">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-current text-sm font-bold leading-none">
                       +
                     </span>
                     {!isSidebarMinimized && <span className="text-xs font-bold tracking-wide">BUAT BARU</span>}
@@ -272,16 +277,16 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                 </button>
                 {isQuickCreateOpen && (
                 <div
-                  className="fixed z-50 w-56 overflow-hidden rounded-md border border-indigo-800 bg-indigo-950 shadow-xl"
+                  className="fixed z-50 w-56 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--card)] shadow-xl"
                   style={{ top: quickCreatePosition.top, left: quickCreatePosition.left }}
                 >
                   {canCreateProjects && (
                     <Link
                       to="/proyek/list?create=project"
                       onClick={() => setIsQuickCreateOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-indigo-100 hover:bg-indigo-900"
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
                     >
-                      <FolderKanban className="h-4 w-4 text-indigo-300" />
+                      <FolderKanban className="h-4 w-4 text-[var(--accent)]" />
                       Proyek Baru
                     </Link>
                   )}
@@ -289,9 +294,9 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                     <Link
                       to="/tugas-saya?create=task"
                       onClick={() => setIsQuickCreateOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-indigo-100 hover:bg-indigo-900"
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
                     >
-                      <ClipboardList className="h-4 w-4 text-indigo-300" />
+                      <ClipboardList className="h-4 w-4 text-[var(--accent)]" />
                       Tugas Baru
                     </Link>
                   )}
@@ -299,9 +304,9 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                     <Link
                       to="/isu/list?create=issue"
                       onClick={() => setIsQuickCreateOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-indigo-100 hover:bg-indigo-900"
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
                     >
-                      <Bug className="h-4 w-4 text-indigo-300" />
+                      <Bug className="h-4 w-4 text-[var(--accent)]" />
                       Issue Baru
                     </Link>
                   )}
@@ -309,9 +314,9 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                     <Link
                       to="/tugas-saya?tab=timesheets&create=timesheet"
                       onClick={() => setIsQuickCreateOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-indigo-100 hover:bg-indigo-900"
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
                     >
-                      <FileClock className="h-4 w-4 text-indigo-300" />
+                      <FileClock className="h-4 w-4 text-[var(--accent)]" />
                       Timesheet Baru
                     </Link>
                   )}
@@ -321,8 +326,8 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
             )}
 
             {canViewDashboard && (
-              <Link to="/" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`}>
-                <Home className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+              <Link to="/" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`}>
+                <Home className={`w-5 h-5 ${isSidebarMinimized ? "" : "mr-3"}`} />
                 {!isSidebarMinimized && "Beranda"}
               </Link>
             )}
@@ -330,17 +335,17 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
             {canViewCalendar && (
               <Link
                 to="/proyek/monitoring"
-                className={`${navItemClass} hover:bg-indigo-900 hover:text-white`}
+                className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`}
                 title="Kalender"
               >
-                <CalendarRange className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                <CalendarRange className={`w-5 h-5 ${isSidebarMinimized ? "" : "mr-3"}`} />
                 {!isSidebarMinimized && "Kalender"}
               </Link>
             )}
 
             {!isSidebarMinimized && (
               <div className="pt-4 pb-1">
-                <p className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-wider">Modul</p>
+                <p className="px-3 text-xs font-semibold text-[var(--ink-3)] uppercase tracking-wider">Modul</p>
               </div>
             )}
 
@@ -349,7 +354,7 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
             {canViewTasks && (
               <Link
                 to="/tugas-saya"
-                className={`${navItemClass} relative hover:bg-indigo-900 hover:text-white`}
+                className={`${navItemClass} relative text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`}
                 title={
                   assignmentCounter.total_active > 0
                     ? `Tugas aktif: ${assignmentCounter.active_tasks}, Isu aktif: ${assignmentCounter.active_issues}`
@@ -357,9 +362,9 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                 }
               >
                 <span className="relative inline-flex">
-                  <ListTodo className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                  <ListTodo className={`w-5 h-5 ${isSidebarMinimized ? "" : "mr-3"}`} />
                   {assignmentCounter.total_active > 0 && isSidebarMinimized && (
-                    <span className="absolute -right-2 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                    <span className="absolute -right-2 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-bold leading-none text-white">
                       {assignmentCounter.total_active > 9 ? "9+" : assignmentCounter.total_active}
                     </span>
                   )}
@@ -368,7 +373,7 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                   <>
                     <span className="min-w-0 flex-1">Tugas Saya</span>
                     {assignmentCounter.total_active > 0 && (
-                      <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold leading-none text-white">
+                      <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[var(--accent)] px-2 py-0.5 text-[11px] font-bold leading-none text-white">
                         <Bell className="h-3 w-3" />
                         {assignmentCounter.total_active}
                       </span>
@@ -380,23 +385,23 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
 
             {canViewProjects && (
               <>
-                <Link to="/proyek/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Proyek">
-                  <FolderKanban className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+                <Link to="/proyek/list" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="Proyek">
+                  <FolderKanban className={`w-5 h-5 ${isSidebarMinimized ? "" : "mr-3"}`} />
                   {!isSidebarMinimized && "Proyek"}
                 </Link>
               </>
             )}
 
             {canViewIssues && (
-              <Link to="/isu/list" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Isu & Bug">
-                <Bug className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+              <Link to="/isu/list" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="Isu & Bug">
+                <Bug className={`w-5 h-5 ${isSidebarMinimized ? "" : "mr-3"}`} />
                 {!isSidebarMinimized && "Isu & Bug"}
               </Link>
             )}
 
             {canViewWorkload && (
-              <Link to="/sdm/workload" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="SDM & Kapabilitas">
-                <Users className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+              <Link to="/sdm/workload" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="SDM & Kapabilitas">
+                <Users className={`w-5 h-5 ${isSidebarMinimized ? "" : "mr-3"}`} />
                 {!isSidebarMinimized && "SDM & Kapabilitas"}
               </Link>
             )}
@@ -406,28 +411,28 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
               <>
                 <div className="pt-2" />
                 {canViewMasterEmployees && (
-                  <Link to="/master/pegawai" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Pegawai">
-                    <User className="w-5 h-5 opacity-75" />
+                  <Link to="/master/pegawai" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="Master - Pegawai">
+                    <User className="w-5 h-5" />
                   </Link>
                 )}
                 {canViewMasterRoles && (
-                  <Link to="/master/role" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Role">
-                    <Shield className="w-5 h-5 opacity-75" />
+                  <Link to="/master/role" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="Master - Role">
+                    <Shield className="w-5 h-5" />
                   </Link>
                 )}
                 {canViewMasterOrganizations && (
-                  <Link to="/master/organisasi" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Organisasi">
-                    <Building2 className="w-5 h-5 opacity-75" />
+                  <Link to="/master/organisasi" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="Master - Organisasi">
+                    <Building2 className="w-5 h-5" />
                   </Link>
                 )}
                 {canViewMasterUnits && (
-                  <Link to="/master/unit-organisasi" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Unit Organisasi">
-                    <Network className="w-5 h-5 opacity-75" />
+                  <Link to="/master/unit-organisasi" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="Master - Unit Organisasi">
+                    <Network className="w-5 h-5" />
                   </Link>
                 )}
                 {canViewMasterPositions && (
-                  <Link to="/master/jabatan" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Master - Jabatan">
-                    <BriefcaseBusiness className="w-5 h-5 opacity-75" />
+                  <Link to="/master/jabatan" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="Master - Jabatan">
+                    <BriefcaseBusiness className="w-5 h-5" />
                   </Link>
                 )}
               </>
@@ -435,16 +440,16 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
               <div className="mt-1">
                 {!isSidebarMinimized && (
                   <div className="pt-3 pb-1">
-                    <p className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-wider">Master Data</p>
+                    <p className="px-3 text-xs font-semibold text-[var(--ink-3)] uppercase tracking-wider">Master Data</p>
                   </div>
                 )}
                 <button
                   type="button"
                   onClick={() => setIsMasterMenuOpen((current) => !current)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md hover:bg-indigo-900 hover:text-white transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)] transition-colors"
                 >
                   <span className="flex items-center">
-                    <Users className="w-5 h-5 mr-3 opacity-75" />
+                    <Users className="w-5 h-5 mr-3" />
                     Data Master
                   </span>
                   <ChevronDown className={`w-4 h-4 transition-transform ${isMasterMenuOpen ? "rotate-180" : ""}`} />
@@ -455,45 +460,45 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                     {canViewMasterEmployees && (
                       <Link
                         to="/master/pegawai"
-                        className="flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                        className="flex items-center px-3 py-1.5 text-sm rounded-md text-[var(--ink-2)] hover:text-[var(--accent)] hover:bg-[var(--bg)] transition-colors"
                       >
-                        <User className="w-4 h-4 mr-2 opacity-80" />
+                        <User className="w-4 h-4 mr-2" />
                         Pegawai
                       </Link>
                     )}
                     {canViewMasterRoles && (
                       <Link
                         to="/master/role"
-                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-[var(--ink-2)] hover:text-[var(--accent)] hover:bg-[var(--bg)] transition-colors"
                       >
-                        <Shield className="w-4 h-4 mr-2 opacity-80" />
+                        <Shield className="w-4 h-4 mr-2" />
                         Role
                       </Link>
                     )}
                     {canViewMasterOrganizations && (
                       <Link
                         to="/master/organisasi"
-                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-[var(--ink-2)] hover:text-[var(--accent)] hover:bg-[var(--bg)] transition-colors"
                       >
-                        <Building2 className="w-4 h-4 mr-2 opacity-80" />
+                        <Building2 className="w-4 h-4 mr-2" />
                         Organisasi
                       </Link>
                     )}
                     {canViewMasterUnits && (
                       <Link
                         to="/master/unit-organisasi"
-                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-[var(--ink-2)] hover:text-[var(--accent)] hover:bg-[var(--bg)] transition-colors"
                       >
-                        <Network className="w-4 h-4 mr-2 opacity-80" />
+                        <Network className="w-4 h-4 mr-2" />
                         Unit Organisasi
                       </Link>
                     )}
                     {canViewMasterPositions && (
                       <Link
                         to="/master/jabatan"
-                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-indigo-200 hover:text-white hover:bg-indigo-900 transition-colors"
+                        className="mt-1 flex items-center px-3 py-1.5 text-sm rounded-md text-[var(--ink-2)] hover:text-[var(--accent)] hover:bg-[var(--bg)] transition-colors"
                       >
-                        <BriefcaseBusiness className="w-4 h-4 mr-2 opacity-80" />
+                        <BriefcaseBusiness className="w-4 h-4 mr-2" />
                         Jabatan
                       </Link>
                     )}
@@ -504,27 +509,27 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
 
             {(canViewEmailPreferences || canViewEmailLogs) && (
               <div className="pt-3 pb-1">
-                {!isSidebarMinimized && <p className="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-wider">Pengaturan</p>}
+                {!isSidebarMinimized && <p className="px-3 text-xs font-semibold text-[var(--ink-3)] uppercase tracking-wider">Pengaturan</p>}
               </div>
             )}
             {canViewEmailPreferences && (
-              <Link to="/pengaturan/email" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Notifikasi Email">
-                <Mail className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+              <Link to="/pengaturan/email" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="Notifikasi Email">
+                <Mail className={`w-5 h-5 ${isSidebarMinimized ? "" : "mr-3"}`} />
                 {!isSidebarMinimized && "Notifikasi Email"}
               </Link>
             )}
             {canViewEmailLogs && (
-              <Link to="/admin/email-log" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`} title="Email Log">
-                <Shield className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+              <Link to="/admin/email-log" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`} title="Email Log">
+                <Shield className={`w-5 h-5 ${isSidebarMinimized ? "" : "mr-3"}`} />
                 {!isSidebarMinimized && "Email Log"}
               </Link>
             )}
           </nav>
         </div>
 
-        <div className="p-4 border-t border-indigo-900">
-          <Link to="/profile" className={`${navItemClass} hover:bg-indigo-900 hover:text-white`}>
-            <User className={`w-5 h-5 opacity-75 ${isSidebarMinimized ? "" : "mr-3"}`} />
+        <div className="p-4 border-t border-[var(--border)]">
+          <Link to="/profile" className={`${navItemClass} text-[var(--ink-2)] hover:bg-[var(--bg)] hover:text-[var(--accent)]`}>
+            <User className={`w-5 h-5 ${isSidebarMinimized ? "" : "mr-3"}`} />
             {!isSidebarMinimized && "Profile"}
           </Link>
         </div>
@@ -534,7 +539,7 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
       <main className="flex-1 flex flex-col h-full overflow-hidden">
 
         {/* Topbar */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-10">
+        <header className="h-16 bg-[var(--card)] border-b border-[var(--border)] flex items-center justify-between px-6 shrink-0 z-10">
           <div className="flex min-w-0 items-center">
             {timesheetReminder.shouldShow && (
               <Link
@@ -555,7 +560,7 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
             <button
               type="button"
               onClick={onToggleTheme}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--ink-3)] transition-colors hover:bg-[var(--bg)] hover:text-[var(--ink)]"
               aria-label={themeMode === "dark" ? "Aktifkan light mode" : "Aktifkan dark mode"}
               title={themeMode === "dark" ? "Light mode" : "Dark mode"}
             >
@@ -565,34 +570,34 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
             <button
               type="button"
               onClick={onOpenOnboarding}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--card)] text-[var(--ink-3)] transition-colors hover:bg-[var(--bg)] hover:text-[var(--ink)]"
               aria-label="Buka materi onboarding"
               title="Materi onboarding"
             >
               <CircleHelp className="h-4 w-4" />
             </button>
 
-            <div className="relative">
+            <div className="relative" ref={notificationRef}>
             <button
               type="button"
               onClick={() => setIsNotificationOpen((current) => !current)}
-              className="relative text-slate-500 hover:text-slate-700"
+              className="relative text-[var(--ink-3)] hover:text-[var(--ink)]"
               aria-label="Buka notifikasi"
             >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
-                <span className="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center font-bold">
+                <span className="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-[var(--accent)] text-white text-[10px] leading-4 text-center font-bold">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </button>
 
             {isNotificationOpen && (
-              <div className="absolute right-0 top-9 w-96 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white shadow-xl z-50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+              <div className="absolute right-0 top-9 w-96 max-w-[calc(100vw-2rem)] rounded-lg border border-[var(--border)] bg-[var(--card)] shadow-xl z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">Notifikasi</p>
-                    <p className="text-xs text-slate-500">{unreadCount} belum dibaca</p>
+                    <p className="text-sm font-semibold text-[var(--ink)]">Notifikasi</p>
+                    <p className="text-xs text-[var(--ink-3)]">{unreadCount} belum dibaca</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -601,14 +606,14 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                         setIsNotificationOpen(false);
                         navigate("/notifications");
                       }}
-                      className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                      className="text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)]"
                     >
                       Lihat semua
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleMarkAllRead()}
-                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+                      className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] disabled:opacity-50"
                       disabled={unreadCount === 0}
                     >
                       Tandai dibaca
@@ -618,11 +623,11 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
 
                 <div className="max-h-96 overflow-y-auto">
                   {notificationError && (
-                    <div className="px-4 py-3 text-sm text-red-600 bg-red-50">{notificationError}</div>
+                    <div className="px-4 py-3 text-sm text-[var(--accent)] bg-[var(--accent-soft)]">{notificationError}</div>
                   )}
 
                   {!notificationError && notifications.length === 0 && (
-                    <div className="px-4 py-8 text-center text-sm text-slate-500">
+                    <div className="px-4 py-8 text-center text-sm text-[var(--ink-3)]">
                       Belum ada notifikasi.
                     </div>
                   )}
@@ -633,20 +638,20 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
                         key={notification.id}
                         type="button"
                         onClick={() => void handleNotificationClick(notification)}
-                        className={`w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50 ${
-                          notification.is_read ? "bg-white" : "bg-indigo-50/60"
+                        className={`w-full text-left px-4 py-3 border-b border-[var(--border)] hover:bg-[var(--bg)] ${
+                          notification.is_read ? "bg-[var(--card)]" : "bg-[var(--accent-soft)]"
                         }`}
                       >
                         <div className="flex items-start gap-3">
                           <span
                             className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
-                              notification.is_read ? "bg-slate-300" : "bg-indigo-600"
+                              notification.is_read ? "bg-[var(--ink-3)]" : "bg-[var(--accent)]"
                             }`}
                           />
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-900 truncate">{notification.title}</p>
-                            <p className="text-xs text-slate-600 mt-0.5 line-clamp-2">{notification.message}</p>
-                            <p className="text-[11px] text-slate-400 mt-1">
+                            <p className="text-sm font-semibold text-[var(--ink)] truncate">{notification.title}</p>
+                            <p className="text-xs text-[var(--ink-2)] mt-0.5 line-clamp-2">{notification.message}</p>
+                            <p className="text-[11px] text-[var(--ink-3)] mt-1">
                               {new Date(notification.created_at).toLocaleString("id-ID", {
                                 day: "2-digit",
                                 month: "short",
@@ -664,18 +669,18 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
             </div>
 
             <div className="hidden md:block text-right">
-              <p className="text-sm font-semibold text-slate-800 leading-none">{session.name}</p>
-              <p className="text-xs text-slate-500 mt-1 leading-none">{session.email}</p>
+              <p className="text-sm font-semibold text-[var(--ink)] leading-none">{session.name}</p>
+              <p className="text-xs text-[var(--ink-3)] mt-1 leading-none">{session.email}</p>
             </div>
 
-            <button className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-sm border border-indigo-200">
+            <button className="w-8 h-8 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-bold flex items-center justify-center text-sm border border-[var(--accent)]">
               {session.initials}
             </button>
 
             <button
               type="button"
               onClick={onLogout}
-              className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border border-[var(--border)] text-[var(--ink-2)] hover:bg-[var(--bg)]"
             >
               <LogOut className="w-4 h-4 mr-1.5" />
               Logout
