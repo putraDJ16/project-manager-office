@@ -28,7 +28,13 @@ import {
 import type { AuthSession } from "../../data/auth";
 import type { ThemeMode } from "../../utils/theme";
 import { hasPermission } from "../../utils/permissions";
-import { fetchMyAssignmentCounter, type MyAssignmentCounterResponse } from "../../services/authApi";
+import {
+  fetchMyAssignmentCounter,
+  fetchMyProjects,
+  type MyAssignmentCounterResponse,
+  type MyProjectResponse
+} from "../../services/authApi";
+import { fetchMyTimesheets } from "../../services/timesheetApi";
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -44,6 +50,17 @@ export type AppShellProps = {
   onToggleTheme: () => void;
   onOpenOnboarding: () => void;
 };
+
+function toLocalDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getActiveProjects(projects: MyProjectResponse[]) {
+  return projects.filter((project) => project.status === "Active");
+}
 
 export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOnboarding }: AppShellProps) {
   const navigate = useNavigate();
@@ -61,6 +78,7 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
     active_issues: 0,
     total_active: 0
   });
+  const [timesheetReminder, setTimesheetReminder] = useState({ shouldShow: false, activeProjectCount: 0 });
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const navItemClass = `flex items-center py-2 text-sm font-medium rounded-md transition-colors ${
     isSidebarMinimized ? "justify-center px-2" : "px-3"
@@ -116,15 +134,39 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
     }
   };
 
+  const loadTimesheetReminder = async () => {
+    if (!canViewTasks) {
+      setTimesheetReminder({ shouldShow: false, activeProjectCount: 0 });
+      return;
+    }
+
+    const today = toLocalDateKey();
+    try {
+      const [projectRows, todayTimesheets] = await Promise.all([
+        fetchMyProjects({ member_only: true }),
+        fetchMyTimesheets({ start_date: today, end_date: today })
+      ]);
+      const activeProjects = getActiveProjects(projectRows);
+      setTimesheetReminder({
+        activeProjectCount: activeProjects.length,
+        shouldShow: activeProjects.length > 0 && todayTimesheets.length === 0
+      });
+    } catch {
+      setTimesheetReminder({ shouldShow: false, activeProjectCount: 0 });
+    }
+  };
+
   useEffect(() => {
     void loadNotifications();
     void loadAssignmentCounter();
+    void loadTimesheetReminder();
     const interval = window.setInterval(() => {
       void loadNotifications();
       void loadAssignmentCounter();
+      void loadTimesheetReminder();
     }, 30000);
     return () => window.clearInterval(interval);
-  }, [session.userId, session.accessToken]);
+  }, [session.userId, session.accessToken, canViewTasks]);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -506,6 +548,20 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
           </div>
 
           <div className="flex items-center space-x-4">
+            {timesheetReminder.shouldShow && (
+              <Link
+                to="/tugas-saya?tab=timesheets&create=timesheet"
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100"
+                title="Belum isi timesheet hari ini untuk project aktif"
+              >
+                <FileClock className="h-4 w-4" />
+                <span className="hidden xl:inline">Isi timesheet hari ini</span>
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-600 px-1.5 text-[11px] font-bold leading-none text-white">
+                  {timesheetReminder.activeProjectCount > 9 ? "9+" : timesheetReminder.activeProjectCount}
+                </span>
+              </Link>
+            )}
+
             <button
               type="button"
               onClick={onToggleTheme}

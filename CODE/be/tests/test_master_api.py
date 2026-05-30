@@ -9,6 +9,7 @@ def test_roles_crud(client, auth_headers):
     before = client.get("/api/v1/roles", headers=auth_headers)
     assert before.status_code == 200
     assert len(before.get_json()["data"]) >= 1
+    assert any(role["is_default"] for role in before.get_json()["data"])
 
     created = client.post(
         "/api/v1/roles",
@@ -22,13 +23,22 @@ def test_roles_crud(client, auth_headers):
     )
     assert created.status_code == 201
     role_id = created.get_json()["data"]["id"]
+    assert created.get_json()["data"]["is_default"] is False
 
     updated = client.patch(f"/api/v1/roles/{role_id}", headers=auth_headers, json={"description": "Lead QA Team"})
     assert updated.status_code == 200
 
+    default = client.patch(f"/api/v1/roles/{role_id}/default", headers=auth_headers)
+    assert default.status_code == 200
+    assert default.get_json()["data"]["is_default"] is True
+
+    after_default = client.get("/api/v1/roles", headers=auth_headers)
+    assert after_default.status_code == 200
+    default_roles = [role for role in after_default.get_json()["data"] if role["is_default"]]
+    assert [role["id"] for role in default_roles] == [role_id]
+
     status = client.patch(f"/api/v1/roles/{role_id}/status", headers=auth_headers, json={"status": "Inactive"})
-    assert status.status_code == 200
-    assert status.get_json()["data"]["status"] == "Inactive"
+    assert status.status_code == 400
 
 
 def test_project_manager_cannot_mutate_master_data(client):

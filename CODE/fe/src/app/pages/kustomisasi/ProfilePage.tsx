@@ -10,6 +10,7 @@ import {
   FolderKanban,
   KeyRound,
   ListTodo,
+  Loader2,
   Mail,
   Shield,
   User,
@@ -368,7 +369,7 @@ export function ProfilePage() {
               disabled={isSubmittingPassword}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-60"
             >
-              <KeyRound className="w-4 h-4" />
+              {isSubmittingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
               {isSubmittingPassword ? "Menyimpan..." : "Simpan Password Baru"}
             </button>
           </form>

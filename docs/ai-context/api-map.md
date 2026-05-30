@@ -56,6 +56,7 @@ Documentation endpoints:
 | POST | `/roles` | Master Data | `CODE/be/app/api/v1/roles.py::create_role_handler` | `role_service.create_role` | JSON role payload | Role, message | JWT + `masterRoles.create` |
 | PATCH | `/roles/<role_id>` | Master Data | `CODE/be/app/api/v1/roles.py::update_role_handler` | `role_service.update_role` | JSON partial role payload | Role, message | JWT + `masterRoles.edit` |
 | PATCH | `/roles/<role_id>/status` | Master Data | `CODE/be/app/api/v1/roles.py::update_role_status_handler` | `role_service.update_role_status` | JSON `{status}` | Role, message | JWT + `masterRoles.edit` |
+| PATCH | `/roles/<role_id>/default` | Master Data | `CODE/be/app/api/v1/roles.py::set_default_role_handler` | `role_service.set_default_role` | None | Role, message | JWT + `masterRoles.edit` |
 | GET | `/employees` | Master Data | `CODE/be/app/api/v1/employees.py::list_employees_handler` | `employee_service.list_employees` | None | Employee list | JWT + employee reference read permission (`masterEmployees`, project/task/gantt/timesheet/issue/workload/calendar view) |
 | POST | `/employees` | Master Data | `CODE/be/app/api/v1/employees.py::create_employee_handler` | `employee_service.create_employee` | JSON employee payload | Employee, default password message | JWT + `masterEmployees.create` |
 | PATCH | `/employees/<employee_id>` | Master Data | `CODE/be/app/api/v1/employees.py::update_employee_handler` | `employee_service.update_employee` | JSON partial employee payload | Employee, message | JWT + `masterEmployees.edit` |

@@ -1,5 +1,5 @@
 import { type FormEvent, useMemo, useState } from "react";
-import { CheckSquare, MessageSquare, Plus, Send, Trash2, X } from "lucide-react";
+import { CheckSquare, Loader2, MessageSquare, Plus, Send, Trash2, X } from "lucide-react";
 
 type TaskComment = {
   id: number;
@@ -233,8 +233,8 @@ export function TaskDetailModal({
                   disabled={isSavingChecklist || draftChecklistItem.trim().length === 0}
                   className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  <Plus className="mr-1 h-4 w-4" />
-                  Tambah
+                  {isSavingChecklist ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
+                  {isSavingChecklist ? "Menambah..." : "Tambah"}
                 </button>
               </form>
             )}
@@ -283,7 +283,7 @@ export function TaskDetailModal({
                   disabled={isSavingComment || draftComment.trim().length === 0}
                   className="inline-flex items-center px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Send className="w-4 h-4 mr-1.5" />
+                  {isSavingComment ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Send className="w-4 h-4 mr-1.5" />}
                   {isSavingComment ? "Mengirim..." : "Kirim Komentar"}
                 </button>
               </div>

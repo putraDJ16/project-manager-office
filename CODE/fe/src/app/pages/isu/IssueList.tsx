@@ -7,6 +7,7 @@ import {
   Filter,
   KanbanSquare,
   List,
+  Loader2,
   Paperclip,
   Search,
   Settings2,
@@ -95,6 +96,8 @@ export function IssueList() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSlaModalOpen, setIsSlaModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmittingIssue, setIsSubmittingIssue] = useState(false);
+  const [isSubmittingSla, setIsSubmittingSla] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
@@ -243,27 +246,34 @@ export function IssueList() {
       return;
     }
 
-    await createIssue({
-      projectId: createForm.projectId,
-      title: createForm.title,
-      severity: createForm.severity,
-      reporter: reporterName,
-      assignee: createForm.assignee || null,
-      module: createForm.module,
-      environment: createForm.environment,
-      description: createForm.description,
-      reproductionSteps: parseMultilineInput(createForm.reproductionSteps),
-      actualResult: createForm.actualResult,
-      expectedResult: createForm.expectedResult,
-      attachments: selectedAttachments.map((file) => file.name)
-    });
+    setIsSubmittingIssue(true);
+    try {
+      await createIssue({
+        projectId: createForm.projectId,
+        title: createForm.title,
+        severity: createForm.severity,
+        reporter: reporterName,
+        assignee: createForm.assignee || null,
+        module: createForm.module,
+        environment: createForm.environment,
+        description: createForm.description,
+        reproductionSteps: parseMultilineInput(createForm.reproductionSteps),
+        actualResult: createForm.actualResult,
+        expectedResult: createForm.expectedResult,
+        attachments: selectedAttachments.map((file) => file.name)
+      });
 
-    const refreshed = await getIssues();
-    setIssues(refreshed);
-    setCreateForm(getDefaultCreateForm(defaultProjectId));
-    setSelectedAttachments([]);
-    setIsCreateModalOpen(false);
-    setNotice("Isu baru berhasil dibuat.");
+      const refreshed = await getIssues();
+      setIssues(refreshed);
+      setCreateForm(getDefaultCreateForm(defaultProjectId));
+      setSelectedAttachments([]);
+      setIsCreateModalOpen(false);
+      setNotice("Isu baru berhasil dibuat.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Gagal membuat isu baru.");
+    } finally {
+      setIsSubmittingIssue(false);
+    }
   };
 
   const handleStatusChange = async (issueId: string, status: IssueStatus) => {
@@ -307,11 +317,18 @@ export function IssueList() {
       }))
     };
 
-    const saved = await updateSlaConfig(nextConfig);
-    setSlaConfig(saved);
-    setSlaDraft(buildRuleDraftMap(saved));
-    setIsSlaModalOpen(false);
-    setNotice("Pengaturan SLA & eskalasi berhasil disimpan.");
+    setIsSubmittingSla(true);
+    try {
+      const saved = await updateSlaConfig(nextConfig);
+      setSlaConfig(saved);
+      setSlaDraft(buildRuleDraftMap(saved));
+      setIsSlaModalOpen(false);
+      setNotice("Pengaturan SLA & eskalasi berhasil disimpan.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Gagal menyimpan pengaturan SLA.");
+    } finally {
+      setIsSubmittingSla(false);
+    }
   };
 
   const getIssueSlaInfo = (issue: Issue) => {
@@ -515,6 +532,7 @@ export function IssueList() {
         <div
           className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           onClick={() => {
+            if (isSubmittingIssue) return;
             setSelectedAttachments([]);
             setIsCreateModalOpen(false);
           }}
@@ -524,11 +542,12 @@ export function IssueList() {
               <h2 className="text-base font-bold text-slate-900">Lapor Bug Baru</h2>
               <button
                 type="button"
+                disabled={isSubmittingIssue}
                 onClick={() => {
                   setSelectedAttachments([]);
                   setIsCreateModalOpen(false);
                 }}
-                className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -741,16 +760,22 @@ export function IssueList() {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
+                  disabled={isSubmittingIssue}
                   onClick={() => {
                     setSelectedAttachments([]);
                     setIsCreateModalOpen(false);
                   }}
-                  className="px-4 py-2 border border-slate-300 rounded-md text-sm"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-sm disabled:opacity-60"
                 >
                   Batal
                 </button>
-                <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700">
-                  Simpan Isu
+                <button
+                  type="submit"
+                  disabled={isSubmittingIssue}
+                  className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 disabled:opacity-60"
+                >
+                  {isSubmittingIssue && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                  {isSubmittingIssue ? "Menyimpan..." : "Simpan Isu"}
                 </button>
               </div>
             </form>
@@ -761,12 +786,19 @@ export function IssueList() {
       {isSlaModalOpen && slaDraft && (
         <div
           className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-          onClick={() => setIsSlaModalOpen(false)}
+          onClick={() => {
+            if (!isSubmittingSla) setIsSlaModalOpen(false);
+          }}
         >
           <div className="w-full max-w-3xl bg-white rounded-xl border border-slate-200 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-base font-bold text-slate-900">Pengaturan SLA & Eskalasi</h2>
-              <button type="button" onClick={() => setIsSlaModalOpen(false)} className="p-1 rounded hover:bg-slate-100 text-slate-500">
+              <button
+                type="button"
+                onClick={() => setIsSlaModalOpen(false)}
+                disabled={isSubmittingSla}
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 disabled:opacity-50"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -834,11 +866,22 @@ export function IssueList() {
               </div>
 
               <div className="flex justify-end gap-2 mt-5">
-                <button type="button" onClick={() => setIsSlaModalOpen(false)} className="px-4 py-2 border border-slate-300 rounded-md text-sm">
+                <button
+                  type="button"
+                  onClick={() => setIsSlaModalOpen(false)}
+                  disabled={isSubmittingSla}
+                  className="px-4 py-2 border border-slate-300 rounded-md text-sm disabled:opacity-60"
+                >
                   Batal
                 </button>
-                <button type="button" onClick={() => void handleSlaSave()} className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-semibold hover:bg-indigo-700">
-                  Simpan Pengaturan
+                <button
+                  type="button"
+                  onClick={() => void handleSlaSave()}
+                  disabled={isSubmittingSla}
+                  className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {isSubmittingSla && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                  {isSubmittingSla ? "Menyimpan..." : "Simpan Pengaturan"}
                 </button>
               </div>
             </div>

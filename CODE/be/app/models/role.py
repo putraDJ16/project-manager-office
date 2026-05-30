@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Enum, String, Text
+from sqlalchemy import JSON, Boolean, Enum, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel, TimestampMixin
@@ -13,6 +13,7 @@ class Role(BaseModel, TimestampMixin):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Enum(*ROLE_STATUS, name="role_status"), nullable=False, default="Active")
     permissions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     employees = relationship("Employee", back_populates="role")
     users = relationship("User", back_populates="role")

@@ -196,11 +196,6 @@ export function LoginPage({ onLogin, themeMode, onToggleTheme }: LoginPageProps)
               Platform manajemen proyek terpadu untuk tugas, isu, SDM, dan tata kelola master data.
             </p>
           </div>
-          <div className="rounded-lg border border-indigo-800 bg-indigo-900/50 p-4 text-sm">
-            <p className="font-semibold text-white mb-2">Demo Akun</p>
-            <p className="text-indigo-200">admin@zoho.local / Admin123!</p>
-            <p className="text-indigo-200 mt-1">pm@zoho.local / Pm123456!</p>
-          </div>
         </div>
 
         <div className="p-8 md:p-10">

@@ -36,6 +36,41 @@ def test_register_success(client):
     assert login.status_code == 200
 
 
+def test_register_uses_configured_default_role(client, auth_headers):
+    role_response = client.post(
+        "/api/v1/roles",
+        headers=auth_headers,
+        json={
+            "name": "Staff Kosong",
+            "description": "Role default tanpa privilege.",
+            "status": "Active",
+            "permissions": {},
+        },
+    )
+    assert role_response.status_code == 201
+    role_id = role_response.get_json()["data"]["id"]
+
+    default_response = client.patch(f"/api/v1/roles/{role_id}/default", headers=auth_headers)
+    assert default_response.status_code == 200
+
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "User Staff",
+            "email": "user.staff@example.com",
+            "password": "Register123!",
+            "confirm_password": "Register123!",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+        },
+    )
+    assert response.status_code == 201
+    user = response.get_json()["data"]["user"]
+    assert user["role_id"] == role_id
+    assert user["role"] == "Staff Kosong"
+
+
 def test_register_options(client):
     response = client.get("/api/v1/auth/register-options")
     assert response.status_code == 200

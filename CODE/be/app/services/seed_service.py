@@ -38,6 +38,7 @@ DEFAULT_ROLES = [
         "id": "role-004",
         "name": "Viewer",
         "description": "Akses baca untuk pemantauan dashboard dan master data.",
+        "is_default": True,
     },
 ]
 
@@ -54,6 +55,7 @@ def sync_default_role_permissions():
                 description=default_role["description"],
                 status="Active",
                 permissions=permissions,
+                is_default=bool(default_role.get("is_default")),
             )
             db.session.add(role)
             continue
@@ -63,6 +65,12 @@ def sync_default_role_permissions():
             role.description = default_role["description"]
         if role_name == "Viewer":
             role.status = "Active"
+        if default_role.get("is_default"):
+            Role.query.filter(Role.id != role.id, Role.is_default.is_(True)).update(
+                {"is_default": False},
+                synchronize_session=False,
+            )
+            role.is_default = True
     db.session.commit()
 
 
@@ -126,6 +134,7 @@ def seed_database(force_reset: bool = False):
             description=default_role["description"],
             status="Active",
             permissions=DEFAULT_ROLE_PERMISSIONS_BY_NAME[default_role["name"]],
+            is_default=bool(default_role.get("is_default")),
         )
         for default_role in DEFAULT_ROLES
     ]

@@ -13,6 +13,10 @@ type ApiEmployee = {
   status: Employee["status"];
 };
 
+type ApiRole = Omit<Role, "isDefault"> & {
+  is_default?: boolean;
+};
+
 const roleModuleKeys: ModuleKey[] = [
   "dashboard",
   "calendar",
@@ -46,7 +50,7 @@ type CacheEntry<T> = {
   expiresAt: number;
 };
 
-function normalizeRole(role: Role): Role {
+function normalizeRole(role: ApiRole | Role): Role {
   const permissions = roleModuleKeys.reduce<Record<ModuleKey, PermissionSet>>((acc, key) => {
     const current = role.permissions?.[key];
     acc[key] = {
@@ -59,7 +63,19 @@ function normalizeRole(role: Role): Role {
     return acc;
   }, {} as Record<ModuleKey, PermissionSet>);
 
-  return { ...role, permissions };
+  return {
+    ...role,
+    isDefault: "is_default" in role ? Boolean(role.is_default) : Boolean((role as Role).isDefault),
+    permissions
+  };
+}
+
+function mapRoleToApi(payload: Omit<Role, "id"> | Partial<Omit<Role, "id">>) {
+  const { isDefault, ...rest } = payload;
+  return {
+    ...rest,
+    ...(isDefault !== undefined ? { is_default: isDefault } : {})
+  };
 }
 
 function mapEmployeeFromApi(data: ApiEmployee): Employee {
@@ -121,7 +137,7 @@ export async function fetchRoles() {
   if (isCacheFresh(rolesCache) && rolesCache) return rolesCache.data;
   if (rolesInFlight) return rolesInFlight;
 
-  rolesInFlight = apiRequest<Role[]>("/roles", { method: "GET" })
+  rolesInFlight = apiRequest<ApiRole[]>("/roles", { method: "GET" })
     .then((result) => {
       const normalized = result.data.map(normalizeRole);
       setRolesCache(normalized);
@@ -135,7 +151,7 @@ export async function fetchRoles() {
 }
 
 export async function createRole(payload: Omit<Role, "id">) {
-  const result = await apiRequest<Role>("/roles", { method: "POST", body: payload });
+  const result = await apiRequest<ApiRole>("/roles", { method: "POST", body: mapRoleToApi(payload) });
   const created = normalizeRole(result.data);
   if (rolesCache) {
     setRolesCache([created, ...rolesCache.data.filter((role) => role.id !== created.id)]);
@@ -144,7 +160,7 @@ export async function createRole(payload: Omit<Role, "id">) {
 }
 
 export async function updateRole(id: string, payload: Partial<Omit<Role, "id">>) {
-  const result = await apiRequest<Role>(`/roles/${id}`, { method: "PATCH", body: payload });
+  const result = await apiRequest<ApiRole>(`/roles/${id}`, { method: "PATCH", body: mapRoleToApi(payload) });
   const updated = normalizeRole(result.data);
   if (rolesCache) {
     setRolesCache(rolesCache.data.map((role) => (role.id === id ? updated : role)));
@@ -154,13 +170,23 @@ export async function updateRole(id: string, payload: Partial<Omit<Role, "id">>)
 }
 
 export async function updateRoleStatus(id: string, status: Role["status"]) {
-  const result = await apiRequest<Role>(`/roles/${id}/status`, {
+  const result = await apiRequest<ApiRole>(`/roles/${id}/status`, {
     method: "PATCH",
     body: { status }
   });
   const updated = normalizeRole(result.data);
   if (rolesCache) {
     setRolesCache(rolesCache.data.map((role) => (role.id === id ? updated : role)));
+  }
+  requestAuthSessionRefresh();
+  return updated;
+}
+
+export async function updateDefaultRole(id: string) {
+  const result = await apiRequest<ApiRole>(`/roles/${id}/default`, { method: "PATCH" });
+  const updated = normalizeRole(result.data);
+  if (rolesCache) {
+    setRolesCache(rolesCache.data.map((role) => ({ ...role, isDefault: role.id === id })));
   }
   requestAuthSessionRefresh();
   return updated;

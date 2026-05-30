@@ -39,6 +39,7 @@ export type Role = {
   description: string;
   status: RoleStatus;
   permissions: Record<ModuleKey, PermissionSet>;
+  isDefault: boolean;
 };
 
 export type Employee = {
@@ -129,6 +130,7 @@ export const initialRoles: Role[] = [
     name: "Administrator",
     description: "Akses penuh untuk seluruh menu aktif dan aksi pengelolaan data.",
     status: "Active",
+    isDefault: false,
     permissions: createRolePermissions({
       dashboard: { view: true },
       calendar: { view: true },
@@ -159,6 +161,7 @@ export const initialRoles: Role[] = [
     name: "Project Manager",
     description: "Fokus pada manajemen tugas, proyek, dan pemantauan isu.",
     status: "Active",
+    isDefault: false,
     permissions: createRolePermissions({
       dashboard: { view: true },
       calendar: { view: true },
@@ -185,6 +188,7 @@ export const initialRoles: Role[] = [
     name: "HR Admin",
     description: "Mengelola data pegawai dan struktur organisasi.",
     status: "Active",
+    isDefault: false,
     permissions: createRolePermissions({
       dashboard: { view: true },
       calendar: { view: true },
@@ -201,6 +205,7 @@ export const initialRoles: Role[] = [
     name: "Viewer",
     description: "Akses baca untuk pemantauan dashboard dan master data.",
     status: "Active",
+    isDefault: true,
     permissions: createRolePermissions({
       dashboard: { view: true },
       calendar: { view: true },

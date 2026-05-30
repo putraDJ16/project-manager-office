@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import { FileWarning, KanbanSquare, List, Paperclip, Search, X } from "lucide-react";
+import { FileWarning, KanbanSquare, List, Loader2, Paperclip, Search, X } from "lucide-react";
 import {
   ISSUE_SEVERITY_ORDER,
   ISSUE_STATUS_ORDER,
@@ -509,6 +509,7 @@ export function ProjectIssuePanel({
         <div
           className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           onClick={() => {
+            if (isSubmitting) return;
             setSelectedAttachments([]);
             setIsCreateModalOpen(false);
           }}
@@ -521,11 +522,12 @@ export function ProjectIssuePanel({
               <h2 className="text-base font-bold text-slate-900">Lapor Bug Proyek</h2>
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => {
                   setSelectedAttachments([]);
                   setIsCreateModalOpen(false);
                 }}
-                className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -709,20 +711,22 @@ export function ProjectIssuePanel({
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => {
                     setSelectedAttachments([]);
                     setIsCreateModalOpen(false);
                   }}
-                  className="px-4 py-2 border border-slate-300 rounded-md text-sm"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-sm disabled:opacity-60"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 disabled:opacity-60"
+                  className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 disabled:opacity-60"
                 >
-                  Simpan Isu
+                  {isSubmitting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                  {isSubmitting ? "Menyimpan..." : "Simpan Isu"}
                 </button>
               </div>
             </form>

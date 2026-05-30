@@ -41,3 +41,11 @@ def update_role_status_handler(role_id: str):
     payload = request.get_json(silent=True) or {}
     role = role_service.update_role_status(role_id, payload.get("status", ""))
     return success_response(role_schema.dump(role), message="Status role berhasil diperbarui.")
+
+
+@api_v1.patch("/roles/<string:role_id>/default")
+@jwt_required()
+@require_permission("masterRoles", "edit")
+def set_default_role_handler(role_id: str):
+    role = role_service.set_default_role(role_id)
+    return success_response(role_schema.dump(role), message="Role default pengguna baru berhasil diperbarui.")

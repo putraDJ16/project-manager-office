@@ -15,7 +15,7 @@ Mengelola login, register, refresh token, profil user, onboarding login pertama,
 
 ## User Roles / Permissions
 
-Semua role dapat login jika user aktif. Akses halaman ditentukan oleh permissions pada role. Register publik membuat user dengan role default aktif yang tersedia.
+Semua role dapat login jika user aktif. Akses halaman ditentukan oleh permissions pada role. Register publik membuat user dengan role default aktif yang ditandai di Master Role; jika belum ada flag default, backend fallback ke `Viewer`, `Project Manager`, lalu role aktif pertama.
 
 ## Main Backend Files
 

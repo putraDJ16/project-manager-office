@@ -7,10 +7,11 @@ Mengelola task project, progress, comments, checklist, date, mandays, dan timesh
 ## Business Flow
 
 1. User membuka menu Tugas Saya untuk melihat tab tugas, isu/bug, kalender meeting, indikator timesheet harian, tabulasi proyek, dan input timesheet harian.
-2. User membuat task untuk project dan phase valid.
-3. User mengubah task fields atau progress sesuai permission.
-4. User menambah komentar/checklist jika punya permission, project member, atau assignee.
-5. Mandays/date logic mempertimbangkan weekend dan project holidays.
+2. Header aplikasi menampilkan reminder timesheet jika user memiliki project member berstatus `Active` dan belum memiliki timesheet pada tanggal hari ini.
+3. User membuat task untuk project dan phase valid.
+4. User mengubah task fields atau progress sesuai permission.
+5. User menambah komentar/checklist jika punya permission, project member, atau assignee.
+6. Mandays/date logic mempertimbangkan weekend dan project holidays.
 
 ## User Roles / Permissions
 
@@ -34,6 +35,7 @@ Menu/route `Tugas Saya` memakai module `tasks` untuk akses halaman dan list tuga
 - `CODE/fe/src/app/pages/tugas/TaskDetailModal.tsx`
 - `CODE/fe/src/app/pages/tugas/TaskDetailPanel.tsx`
 - `CODE/fe/src/app/pages/tugas/TaskFormFields.tsx`
+- `CODE/fe/src/app/components/layout/AppShell.tsx`
 - `CODE/fe/src/app/services/taskApi.ts`
 - `CODE/fe/src/app/services/timesheetApi.ts`
 

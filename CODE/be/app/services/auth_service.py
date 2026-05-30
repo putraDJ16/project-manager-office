@@ -134,7 +134,8 @@ def register(payload: dict):
         raise ApiError("Email sudah terdaftar.", status_code=409)
 
     default_role = (
-        Role.query.filter(Role.name.ilike("Viewer"), Role.status == "Active").first()
+        Role.query.filter(Role.is_default.is_(True), Role.status == "Active").first()
+        or Role.query.filter(Role.name.ilike("Viewer"), Role.status == "Active").first()
         or Role.query.filter(Role.name.ilike("Project Manager"), Role.status == "Active").first()
         or Role.query.filter(Role.status == "Active").first()
     )

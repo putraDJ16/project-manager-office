@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Filter, Pencil, Plus, Search, Shield, UserCheck, UserX, X } from "lucide-react";
+import { Filter, Loader2, Pencil, Plus, Search, Shield, Star, UserCheck, UserX, X } from "lucide-react";
 import {
   type ModuleKey,
   type PermissionSet,
@@ -7,7 +7,7 @@ import {
   type RoleStatus
 } from "../../data/masterData";
 import { loadAuthSession } from "../../data/auth";
-import { createRole, fetchRoles, updateRole, updateRoleStatus } from "../../services/masterApi";
+import { createRole, fetchRoles, updateDefaultRole, updateRole, updateRoleStatus } from "../../services/masterApi";
 import { hasPermission } from "../../utils/permissions";
 import { PaginationControls } from "../../components/ui";
 
@@ -205,6 +205,7 @@ const emptyRoleFormState: RoleFormState = {
   name: "",
   description: "",
   status: "Active",
+  isDefault: false,
   permissions: createEmptyPermissions()
 };
 
@@ -223,6 +224,7 @@ export function RoleMaster() {
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState<RoleFormState>(emptyRoleFormState);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [page, setPage] = useState(1);
 
   const loadData = async () => {
@@ -260,6 +262,10 @@ export function RoleMaster() {
     const start = (page - 1) * PAGE_SIZE;
     return filteredRoles.slice(start, start + PAGE_SIZE);
   }, [filteredRoles, page]);
+  const editingRole = useMemo(
+    () => roles.find((role) => role.id === editingRoleId),
+    [editingRoleId, roles]
+  );
   const hasSearchInput = searchInput.trim().length > 0;
 
   useEffect(() => {
@@ -294,12 +300,14 @@ export function RoleMaster() {
       name: role.name,
       description: role.description,
       status: role.status,
+      isDefault: role.isDefault,
       permissions: normalizePermissions(role.permissions)
     });
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
+    if (isSubmitting) return;
     setIsModalOpen(false);
     setFormError("");
   };
@@ -312,6 +320,24 @@ export function RoleMaster() {
       setNotice(`Status role ${role.name} diperbarui.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Gagal memperbarui status role.";
+      setNotice(message);
+    }
+  };
+
+  const handleDefaultUpdate = async (role: Role) => {
+    if (!canEdit || role.isDefault) return;
+    try {
+      const updated = await updateDefaultRole(role.id);
+      setRoles((current) =>
+        current.map((item) => ({
+          ...item,
+          isDefault: item.id === updated.id
+        }))
+      );
+      setForm((current) => ({ ...current, isDefault: true }));
+      setNotice(`Role ${role.name} dijadikan default pengguna baru.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Gagal memperbarui role default.";
       setNotice(message);
     }
   };
@@ -389,6 +415,7 @@ export function RoleMaster() {
       name: form.name.trim(),
       description: form.description.trim(),
       status: form.status,
+      isDefault: form.isDefault,
       permissions: form.permissions
     };
 
@@ -397,6 +424,7 @@ export function RoleMaster() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       if (modalMode === "create") {
         const created = await createRole(payload);
@@ -411,6 +439,8 @@ export function RoleMaster() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Gagal menyimpan role.";
       setFormError(message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -510,7 +540,17 @@ export function RoleMaster() {
 
                   return (
                     <tr key={role.id} className="hover:bg-color-secondary transition-colors">
-                      <td className="px-4 py-3 font-semibold text-color-foreground">{role.name}</td>
+                      <td className="px-4 py-3 font-semibold text-color-foreground">
+                        <div className="flex flex-col gap-1">
+                          <span>{role.name}</span>
+                          {role.isDefault && (
+                            <span className="inline-flex w-fit items-center rounded-full border border-color-status-warning-border bg-color-status-warning-surface px-2 py-0.5 text-[11px] font-semibold text-color-status-warning">
+                              <Star className="mr-1 h-3 w-3 fill-current" />
+                              Default pengguna baru
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-color-muted-foreground">{role.description}</td>
                       <td className="px-4 py-3 text-color-muted-foreground">
                         <div className="flex flex-wrap gap-1.5">
@@ -538,7 +578,9 @@ export function RoleMaster() {
                               <button
                                 type="button"
                                 onClick={() => void handleStatusUpdate(role, "Inactive")}
-                                className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-color-destructive/40 text-color-destructive hover:bg-color-destructive/15"
+                                disabled={role.isDefault}
+                                className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border border-color-destructive/40 text-color-destructive hover:bg-color-destructive/15 disabled:cursor-not-allowed disabled:opacity-50"
+                                title={role.isDefault ? "Role default tidak bisa dinonaktifkan." : undefined}
                               >
                                 <UserX className="w-3.5 h-3.5 mr-1.5" /> Nonaktifkan
                               </button>
@@ -572,7 +614,12 @@ export function RoleMaster() {
           >
             <div className="px-5 py-4 border-b border-color-border flex items-center justify-between shrink-0">
               <h2 className="text-base font-bold text-color-foreground">{modalMode === "create" ? "Tambah Role" : "Edit Role"}</h2>
-              <button type="button" onClick={closeModal} className="p-1 rounded hover:bg-color-accent text-color-muted-foreground">
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={isSubmitting}
+                className="p-1 rounded hover:bg-color-accent text-color-muted-foreground disabled:opacity-50"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -617,6 +664,37 @@ export function RoleMaster() {
                   required
                 />
               </div>
+
+              {modalMode === "edit" && editingRole && (
+                <div className="rounded-xl border border-color-border bg-color-secondary/45 px-4 py-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-color-foreground">Default pengguna baru</h3>
+                      <p className="mt-1 text-xs text-color-muted-foreground">
+                        Role default dipakai otomatis saat user register dan sebagai pilihan awal saat tambah pegawai.
+                      </p>
+                      {editingRole.isDefault && (
+                        <span className="mt-2 inline-flex items-center rounded-full border border-color-status-warning-border bg-color-status-warning-surface px-2 py-0.5 text-xs font-semibold text-color-status-warning">
+                          <Star className="mr-1 h-3 w-3 fill-current" />
+                          Role ini sedang menjadi default
+                        </span>
+                      )}
+                    </div>
+                    {!editingRole.isDefault && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDefaultUpdate(editingRole)}
+                        disabled={editingRole.status !== "Active"}
+                        className="inline-flex items-center justify-center rounded-md border border-color-status-warning-border px-3 py-2 text-sm font-semibold text-color-status-warning hover:bg-color-status-warning-surface disabled:cursor-not-allowed disabled:opacity-50"
+                        title={editingRole.status !== "Active" ? "Aktifkan role terlebih dahulu sebelum dijadikan default." : undefined}
+                      >
+                        <Star className="mr-1.5 h-4 w-4" />
+                        Jadikan Default
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-xl border border-color-border overflow-hidden">
                 <div className="px-4 py-3 bg-color-secondary border-b border-color-border">
@@ -689,11 +767,21 @@ export function RoleMaster() {
               </div>
 
               <div className="flex justify-end gap-2 border-t border-color-border bg-color-card px-5 py-4 shrink-0">
-                <button type="button" onClick={closeModal} className="px-4 py-2 border border-color-border rounded-md text-sm">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 border border-color-border rounded-md text-sm disabled:opacity-60"
+                >
                   Batal
                 </button>
-                <button type="submit" className="px-4 py-2 bg-color-primary text-color-primary-foreground rounded-md text-sm font-semibold">
-                  {modalMode === "create" ? "Simpan Role" : "Simpan Perubahan"}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center px-4 py-2 bg-color-primary text-color-primary-foreground rounded-md text-sm font-semibold disabled:opacity-60"
+                >
+                  {isSubmitting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                  {isSubmitting ? "Menyimpan..." : modalMode === "create" ? "Simpan Role" : "Simpan Perubahan"}
                 </button>
               </div>
             </form>

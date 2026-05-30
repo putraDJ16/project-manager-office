@@ -5,7 +5,7 @@ Primary ORM models are in `CODE/be/app/models/`. Alembic migrations are in `CODE
 | Table/Model | Purpose | Important Fields | Related Feature | Related Files |
 |---|---|---|---|---|
 | `users` / `User` | Login identity and session subject. | `id`, `email`, `password_hash`, `display_name`, `role_id`, `employee_id`, `is_active`, `onboarding_completed` | Auth and Session, Notifications, Audit Trail | `CODE/be/app/models/user.py`, `CODE/be/app/services/auth_service.py` |
-| `roles` / `Role` | Permission roles. | `id`, `name`, `description`, `status`, `permissions` JSON | Auth and Session, Master Data | `CODE/be/app/models/role.py`, `CODE/be/app/utils/permissions.py`, `CODE/be/app/services/role_service.py` |
+| `roles` / `Role` | Permission roles. | `id`, `name`, `description`, `status`, `permissions` JSON, `is_default` | Auth and Session, Master Data | `CODE/be/app/models/role.py`, `CODE/be/app/utils/permissions.py`, `CODE/be/app/services/role_service.py` |
 | `employees` / `Employee` | Master employee record and optional user link target. | `id`, `nip`, `name`, `email`, `organization`, `unit_organization`, `position`, `role_id`, `status` | Master Data, Project Management, Workload | `CODE/be/app/models/employee.py`, `CODE/be/app/services/employee_service.py` |
 | `organizations` / `Organization` | Master organization reference. | `id`, `name`, `status` | Master Data, Auth registration options | `CODE/be/app/models/organization.py`, `CODE/be/app/services/organization_service.py` |
 | `organization_units` / `OrganizationUnit` | Master organization unit reference. | `id`, `name`, `status` | Master Data, Auth registration options | `CODE/be/app/models/organization_unit.py`, `CODE/be/app/services/organization_unit_service.py` |
@@ -51,6 +51,7 @@ Defined in `CODE/be/app/models/constants.py`:
 - `organizations.name`, `organization_units.name`, and `positions.name` are unique.
 - `project_holidays` has unique constraint on `project_id + holiday_date`.
 - `users` linked by `employee_id` mirrors employee `email`, `name`, `role_id`, and active status when employee master data changes.
+- Only one role should be flagged `is_default=true` through service logic; default role must remain `Active`.
 - `users.onboarding_completed` defaults to false for new users and is set true after first-login onboarding is completed or skipped; migration marks existing users true.
 - `project_members` uses composite primary key `project_id + employee_id`.
 - Attachment folders cascade on project deletion and support self-parenting relationships; service prevents invalid parent/self-descendant moves.
@@ -84,3 +85,4 @@ Current migration files include:
 - `CODE/be/migrations/versions/c5d6e7f8a9b0_update_timesheet_project_and_optional_task.py`
 - `CODE/be/migrations/versions/d6e7f8a9b0c1_allow_multiple_timesheet_entries.py`
 - `CODE/be/migrations/versions/e8f9a0b1c2d3_add_user_onboarding_completed.py`
+- `CODE/be/migrations/versions/e9f0a1b2c3d4_add_default_role_flag.py`

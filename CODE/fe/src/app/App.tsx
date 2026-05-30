@@ -20,9 +20,27 @@ import { applyTheme, getStoredTheme, type ThemeMode } from "./utils/theme";
 
 const AUTH_SESSION_REFRESH_EVENT = "auth-session-refresh";
 
+function getRouteModules(route: AppRoute) {
+  return Array.isArray(route.module) ? route.module : route.module ? [route.module] : [];
+}
+
+function canAccessRoute(route: AppRoute, session: AuthSession) {
+  const routeModules = getRouteModules(route);
+  return routeModules.length === 0 || routeModules.some((module) => hasPermission(session, module, "view"));
+}
+
+function getDefaultLandingPath(session: AuthSession) {
+  const dashboardRoute = routes.find((route) => route.index);
+  if (dashboardRoute && canAccessRoute(dashboardRoute, session)) return "/";
+
+  const accessibleRoute = routes.find(
+    (route) => !route.index && getRouteModules(route).length > 0 && canAccessRoute(route, session)
+  );
+  return accessibleRoute?.path ?? "/profile";
+}
+
 function PermissionGate({ route, session }: { route: AppRoute; session: AuthSession }) {
-  const routeModules = Array.isArray(route.module) ? route.module : route.module ? [route.module] : [];
-  if (routeModules.length > 0 && !routeModules.some((module) => hasPermission(session, module, "view"))) {
+  if (!canAccessRoute(route, session)) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
@@ -190,7 +208,7 @@ export default function App() {
           path="/login"
           element={
             authSession ? (
-              <Navigate to="/" replace />
+              <Navigate to={getDefaultLandingPath(authSession)} replace />
             ) : (
               <LoginPage onLogin={handleLogin} themeMode={themeMode} onToggleTheme={handleToggleTheme} />
             )
@@ -221,12 +239,20 @@ export default function App() {
               key={index} 
               index={route.index} 
               path={route.path} 
-              element={authSession ? <PermissionGate route={route} session={authSession} /> : null} 
+              element={
+                authSession ? (
+                  route.index && getDefaultLandingPath(authSession) !== "/" ? (
+                    <Navigate to={getDefaultLandingPath(authSession)} replace />
+                  ) : (
+                    <PermissionGate route={route} session={authSession} />
+                  )
+                ) : null
+              } 
             />
           ))}
         </Route>
 
-        <Route path="*" element={<Navigate to={authSession ? "/" : "/login"} replace />} />
+        <Route path="*" element={<Navigate to={authSession ? getDefaultLandingPath(authSession) : "/login"} replace />} />
       </Routes>
       {authSession && (!authSession.onboardingCompleted || isManualOnboardingOpen) && (
         <OnboardingTour
