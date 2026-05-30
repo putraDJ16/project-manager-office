@@ -43,6 +43,63 @@ def test_legacy_issues_permission_grants_project_issue_access(client, auth_heade
     assert issue_list_response.status_code == 200
 
 
+def test_issue_create_requires_create_permission(client, auth_headers):
+    role_response = client.post(
+        "/api/v1/roles",
+        headers=auth_headers,
+        json={
+            "name": "Issue View Only",
+            "description": "Role hanya boleh melihat isu.",
+            "status": "Active",
+            "permissions": {
+                "dashboard": {"view": True},
+                "projectIssues": {"view": True},
+            },
+        },
+    )
+    assert role_response.status_code == 201
+    role_id = role_response.get_json()["data"]["id"]
+
+    employee_response = client.post(
+        "/api/v1/employees",
+        headers=auth_headers,
+        json={
+            "nip": "20000101-989",
+            "name": "Issue View Only User",
+            "email": "issue.view.only.user@company.co.id",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+            "role_id": role_id,
+            "status": "Active",
+        },
+    )
+    assert employee_response.status_code == 201
+
+    headers = _login(client, "issue.view.only.user@company.co.id", "Welcome123!")
+    issue_list_response = client.get("/api/v1/issues?project_id=p1", headers=headers)
+    assert issue_list_response.status_code == 200
+
+    create_response = client.post(
+        "/api/v1/issues",
+        headers=headers,
+        json={
+            "project_id": "p1",
+            "title": "Harus Ditolak",
+            "severity": "Major",
+            "reporter": "Issue View Only User",
+            "description": "User view-only tidak boleh membuat isu.",
+            "module": "Permission",
+            "environment": "Testing",
+            "reproduction_steps": ["Buka form lapor bug"],
+            "actual_result": "Form terlihat",
+            "expected_result": "Form tidak terlihat",
+            "attachments": [],
+        },
+    )
+    assert create_response.status_code == 403
+
+
 def test_master_projects_permission_does_not_grant_project_detail_tabs(client, auth_headers):
     role_response = client.post(
         "/api/v1/roles",

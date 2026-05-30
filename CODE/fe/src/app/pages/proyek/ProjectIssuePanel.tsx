@@ -196,6 +196,11 @@ export function ProjectIssuePanel({
 
   const handleCreateIssue = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canCreate) {
+      onNotice({ type: "error", msg: "Role Anda belum memiliki izin tambah Isu & Bug." });
+      setIsCreateModalOpen(false);
+      return;
+    }
     setIsSubmitting(true);
     try {
       const payload: CreateIssueInput = {
@@ -505,7 +510,7 @@ export function ProjectIssuePanel({
         />
       )}
 
-      {isCreateModalOpen && (
+      {isCreateModalOpen && canCreate && (
         <div
           className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           onClick={() => {

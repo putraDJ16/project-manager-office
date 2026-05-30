@@ -11,7 +11,9 @@ from app.utils.permissions import get_current_user, user_has_permission, user_is
 
 def _ensure_project_issue_access(project_id: str | None, action: str):
     current_user = get_current_user()
-    if user_has_permission(current_user, "projectIssues", action) or user_is_project_member(current_user, project_id):
+    if user_has_permission(current_user, "projectIssues", action):
+        return
+    if action == "view" and user_is_project_member(current_user, project_id):
         return
     raise ApiError("Anda tidak memiliki izin untuk melakukan aksi ini.", status_code=403)
 

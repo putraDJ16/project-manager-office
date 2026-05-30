@@ -135,6 +135,60 @@ def test_operational_role_can_read_references_without_master_menu(client, auth_h
     assert create_employee.status_code == 403
 
 
+def test_employee_viewer_can_load_employee_master_references(client, auth_headers):
+    role_response = client.post(
+        "/api/v1/roles",
+        headers=auth_headers,
+        json={
+            "name": "Employee Viewer Only",
+            "description": "Hanya bisa melihat master pegawai.",
+            "status": "Active",
+            "permissions": {
+                "masterEmployees": {"view": True},
+            },
+        },
+    )
+    assert role_response.status_code == 201
+    role_id = role_response.get_json()["data"]["id"]
+
+    employee_response = client.post(
+        "/api/v1/employees",
+        headers=auth_headers,
+        json={
+            "nip": "20000101-987",
+            "name": "Employee Viewer",
+            "email": "employee.viewer@company.co.id",
+            "organization": "ZOHO PM SaaS",
+            "unit_organization": "Engineering",
+            "position": "Backend Developer",
+            "role_id": role_id,
+            "status": "Active",
+        },
+    )
+    assert employee_response.status_code == 201
+
+    headers = _login(client, "employee.viewer@company.co.id", "Welcome123!")
+
+    employees = client.get("/api/v1/employees", headers=headers)
+    assert employees.status_code == 200
+
+    role_references = client.get("/api/v1/roles/reference", headers=headers)
+    assert role_references.status_code == 200
+    assert "permissions" not in role_references.get_json()["data"][0]
+
+    roles = client.get("/api/v1/roles", headers=headers)
+    assert roles.status_code == 403
+
+    organizations = client.get("/api/v1/organizations", headers=headers)
+    assert organizations.status_code == 200
+
+    units = client.get("/api/v1/organization-units", headers=headers)
+    assert units.status_code == 200
+
+    positions = client.get("/api/v1/positions", headers=headers)
+    assert positions.status_code == 200
+
+
 def test_employee_crud(client, auth_headers):
     created = client.post(
         "/api/v1/employees",

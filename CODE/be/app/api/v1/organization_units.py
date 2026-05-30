@@ -5,12 +5,12 @@ from app.api.v1 import api_v1
 from app.schemas import organization_unit_schema, organization_units_schema
 from app.services import organization_unit_service
 from app.utils.http import success_response
-from app.utils.permissions import require_permission
+from app.utils.permissions import require_any_permission, require_permission
 
 
 @api_v1.get("/organization-units")
 @jwt_required()
-@require_permission("masterOrganizationUnits", "view")
+@require_any_permission((("masterOrganizationUnits", "view"), ("masterEmployees", "view")))
 def list_organization_units_handler():
     units = organization_unit_service.list_organization_units()
     return success_response(organization_units_schema.dump(units))

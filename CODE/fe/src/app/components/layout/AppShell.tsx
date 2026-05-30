@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Outlet, Link, useNavigate } from "react-router";
 import {
   Bell,
-  Search,
   Home,
   Bug,
   FolderKanban,
@@ -536,32 +535,23 @@ export function AppShell({ session, onLogout, themeMode, onToggleTheme, onOpenOn
 
         {/* Topbar */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-10">
-          <div className="flex items-center">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Cari tugas, isu, atau proyek..."
-                className="pl-9 pr-4 py-1.5 bg-slate-100 border-transparent rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white w-64 transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-4">
+          <div className="flex min-w-0 items-center">
             {timesheetReminder.shouldShow && (
               <Link
                 to="/tugas-saya?tab=timesheets&create=timesheet"
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100"
+                className="inline-flex h-9 max-w-full items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100"
                 title="Belum isi timesheet hari ini untuk project aktif"
               >
-                <FileClock className="h-4 w-4" />
-                <span className="hidden xl:inline">Isi timesheet hari ini</span>
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-600 px-1.5 text-[11px] font-bold leading-none text-white">
+                <FileClock className="h-4 w-4 shrink-0" />
+                <span className="hidden truncate sm:inline">Isi timesheet hari ini</span>
+                <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-amber-600 px-1.5 text-[11px] font-bold leading-none text-white">
                   {timesheetReminder.activeProjectCount > 9 ? "9+" : timesheetReminder.activeProjectCount}
                 </span>
               </Link>
             )}
+          </div>
 
+          <div className="flex items-center space-x-4">
             <button
               type="button"
               onClick={onToggleTheme}

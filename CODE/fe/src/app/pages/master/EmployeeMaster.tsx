@@ -22,7 +22,7 @@ import type { MasterReferenceItem, MasterReferenceType } from "../../data/master
 import {
   createEmployee,
   fetchEmployees,
-  fetchRoles,
+  fetchRoleReferences,
   resetEmployeePassword,
   updateEmployee,
   updateEmployeeStatus
@@ -96,7 +96,7 @@ export function EmployeeMaster() {
     try {
       const [employeeData, roleData, referenceData] = await Promise.all([
         fetchEmployees(),
-        fetchRoles(),
+        fetchRoleReferences(),
         fetchMasterReferences()
       ]);
       setEmployees(employeeData);

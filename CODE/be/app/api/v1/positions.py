@@ -5,12 +5,12 @@ from app.api.v1 import api_v1
 from app.schemas import position_schema, positions_schema
 from app.services import position_service
 from app.utils.http import success_response
-from app.utils.permissions import require_permission
+from app.utils.permissions import require_any_permission, require_permission
 
 
 @api_v1.get("/positions")
 @jwt_required()
-@require_permission("masterPositions", "view")
+@require_any_permission((("masterPositions", "view"), ("masterEmployees", "view")))
 def list_positions_handler():
     positions = position_service.list_positions()
     return success_response(positions_schema.dump(positions))

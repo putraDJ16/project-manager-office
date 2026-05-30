@@ -14,7 +14,7 @@ Mengelola role, employee, organization, organization unit, dan position.
 
 ## User Roles / Permissions
 
-Backend tetap memakai module permission granular seperti `masterRoles`, `masterEmployees`, `masterOrganizations`, `masterOrganizationUnits`, dan `masterPositions`. UI Role Master menampilkan permission sebagai menu level 1 sidebar, lalu memetakan pilihan tersebut ke module granular di belakang layar. Master Role juga menyediakan satu role default aktif untuk pengguna baru dari register publik dan default pilihan saat membuat pegawai. `GET /employees` juga dapat dipakai sebagai data referensi oleh menu operasional berizin, tetapi mutasi pegawai tetap wajib permission `masterEmployees`.
+Backend tetap memakai module permission granular seperti `masterRoles`, `masterEmployees`, `masterOrganizations`, `masterOrganizationUnits`, dan `masterPositions`. UI Role Master menampilkan Data Master sebagai tree berisi Pegawai, Role, Organisasi, Unit Organisasi, dan Jabatan agar akses tiap master bisa diatur terpisah. Parent tree seperti Proyek dan Data Master dapat mencentang semua child untuk action yang didukung child tersebut. Master Role juga menyediakan satu role default aktif untuk pengguna baru dari register publik dan default pilihan saat membuat pegawai. `GET /employees`, `GET /roles/reference`, dan referensi organisasi/unit/jabatan dapat dipakai oleh menu Pegawai berizin `masterEmployees.view`, tetapi mutasi pegawai tetap wajib permission `masterEmployees`.
 
 ## Main Backend Files
 
@@ -44,6 +44,7 @@ Backend tetap memakai module permission granular seperti `masterRoles`, `masterE
 | Method | Endpoint | Purpose |
 |---|---|---|
 | GET/POST | `/api/v1/roles` | List/create role |
+| GET | `/api/v1/roles/reference` | List role ringkas untuk form/data Pegawai |
 | PATCH | `/api/v1/roles/<role_id>` | Update role |
 | PATCH | `/api/v1/roles/<role_id>/status` | Update role status |
 | PATCH | `/api/v1/roles/<role_id>/default` | Jadikan role default pengguna baru |

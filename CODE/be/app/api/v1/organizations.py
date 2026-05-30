@@ -5,12 +5,12 @@ from app.api.v1 import api_v1
 from app.schemas import organization_schema, organizations_schema
 from app.services import organization_service
 from app.utils.http import success_response
-from app.utils.permissions import require_permission
+from app.utils.permissions import require_any_permission, require_permission
 
 
 @api_v1.get("/organizations")
 @jwt_required()
-@require_permission("masterOrganizations", "view")
+@require_any_permission((("masterOrganizations", "view"), ("masterEmployees", "view")))
 def list_organizations_handler():
     organizations = organization_service.list_organizations()
     return success_response(organizations_schema.dump(organizations))

@@ -33,7 +33,7 @@ export function EmailOutboxPage() {
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Recipient</th><th className="px-4 py-3">Event</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead>
           <tbody className="divide-y divide-slate-100">
-            {paginatedItems.map((item) => <tr key={item.id}><td className="px-4 py-3">{item.to_email}</td><td className="px-4 py-3">{item.event_key}</td><td className="px-4 py-3">{item.subject}</td><td className="px-4 py-3">{item.status} ({item.attempts})</td><td className="px-4 py-3"><button className="rounded-xl bg-slate-900 px-3 py-1 text-white" onClick={() => resendEmail(item.id).then(load)}>Resend</button></td></tr>)}
+            {paginatedItems.map((item) => <tr key={item.id}><td className="px-4 py-3">{item.to_email}</td><td className="px-4 py-3">{item.event_key}</td><td className="px-4 py-3">{item.subject}</td><td className="px-4 py-3">{item.status} ({item.attempts})</td><td className="px-4 py-3"><button className="rounded-xl border border-color-border bg-color-card px-3 py-1 text-color-foreground transition-colors hover:bg-color-secondary" onClick={() => resendEmail(item.id).then(load)}>Resend</button></td></tr>)}
           </tbody>
         </table>
         <PaginationControls page={page} pageSize={PAGE_SIZE} totalItems={items.length} onPageChange={setPage} className="border-t border-slate-200" />

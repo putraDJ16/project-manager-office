@@ -14,7 +14,7 @@ Mengelola issue project, status issue, escalation, dan konfigurasi SLA per sever
 
 ## User Roles / Permissions
 
-Menu global Isu & Bug memakai `issues`, sedangkan tab Isu & Bug di detail Proyek memakai `projectIssues`. Fallback legacy hanya dari `projectIssues` ke `issues` ada di `PERMISSION_FALLBACKS`, sehingga role global issue tetap dapat mengakses endpoint project issue lama. Akses Proyek (`masterProjects`) tidak otomatis membuka menu Isu & Bug. Project member/manager juga dapat akses issue project.
+Menu global Isu & Bug memakai `issues`, sedangkan tab Isu & Bug di detail Proyek memakai `projectIssues`. Fallback legacy hanya dari `projectIssues` ke `issues` ada di `PERMISSION_FALLBACKS`, sehingga role global issue tetap dapat mengakses endpoint project issue lama. Akses Proyek (`masterProjects`) tidak otomatis membuka menu Isu & Bug. Project member/manager dapat melihat issue project, tetapi membuat issue tetap wajib permission `issues.create` atau `projectIssues.create`.
 Khusus endpoint ubah status (`PATCH /issues/<issue_id>/status`), hanya pelapor atau assignee issue tersebut yang dapat melakukan perubahan.
 
 ## Main Backend Files

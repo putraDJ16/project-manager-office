@@ -17,6 +17,13 @@ type ApiRole = Omit<Role, "isDefault"> & {
   is_default?: boolean;
 };
 
+type ApiRoleReference = {
+  id: string;
+  name: string;
+  status: Role["status"];
+  is_default?: boolean;
+};
+
 const roleModuleKeys: ModuleKey[] = [
   "dashboard",
   "calendar",
@@ -148,6 +155,29 @@ export async function fetchRoles() {
     });
 
   return rolesInFlight;
+}
+
+export async function fetchRoleReferences() {
+  const result = await apiRequest<ApiRoleReference[]>("/roles/reference", { method: "GET" });
+  return result.data.map(
+    (role): Role => ({
+      id: role.id,
+      name: role.name,
+      description: "",
+      status: role.status,
+      isDefault: Boolean(role.is_default),
+      permissions: roleModuleKeys.reduce<Record<ModuleKey, PermissionSet>>((acc, key) => {
+        acc[key] = {
+          view: false,
+          create: false,
+          edit: false,
+          delete: false,
+          restore: false
+        };
+        return acc;
+      }, {} as Record<ModuleKey, PermissionSet>)
+    })
+  );
 }
 
 export async function createRole(payload: Omit<Role, "id">) {

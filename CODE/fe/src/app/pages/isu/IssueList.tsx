@@ -43,6 +43,7 @@ import {
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { PaginationControls } from "../../components/ui";
 import { loadAuthSession } from "../../data/auth";
+import { hasPermission } from "../../utils/permissions";
 
 type ViewMode = "list" | "board";
 type RuleDraft = { targetHours: string; autoEscalate: boolean; escalationDelayMinutes: string };
@@ -79,6 +80,7 @@ function getDefaultCreateForm(defaultProjectId = ""): CreateIssueFormState {
 
 export function IssueList() {
   const session = loadAuthSession();
+  const canCreateIssue = hasPermission(session, "issues", "create");
   const reporterName = session?.employeeName?.trim() || session?.name?.trim() || "";
   const [searchParams] = useSearchParams();
   const [projects, setProjects] = useState<ApiProject[]>([]);
@@ -111,10 +113,10 @@ export function IssueList() {
   }, [notice]);
 
   useEffect(() => {
-    if (searchParams.get("create") !== "issue") return;
+    if (searchParams.get("create") !== "issue" || !canCreateIssue) return;
     setCreateForm((current) => (current.projectId ? current : getDefaultCreateForm(defaultProjectId)));
     setIsCreateModalOpen(true);
-  }, [defaultProjectId, searchParams]);
+  }, [canCreateIssue, defaultProjectId, searchParams]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -241,6 +243,11 @@ export function IssueList() {
 
   const handleCreateIssue = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canCreateIssue) {
+      setNotice("Anda tidak memiliki izin untuk membuat isu baru.");
+      setIsCreateModalOpen(false);
+      return;
+    }
     if (!reporterName) {
       setNotice("Pelapor tidak ditemukan dari sesi login. Silakan login ulang.");
       return;
@@ -375,17 +382,19 @@ export function IssueList() {
           <h1 className="text-2xl font-bold text-slate-900">Isu & Bug Tracking</h1>
           <p className="text-sm text-slate-500 mt-1">Lacak dan selesaikan masalah sistem sesuai Service Level Agreement (SLA).</p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setCreateForm(getDefaultCreateForm(defaultProjectId));
-            setSelectedAttachments([]);
-            setIsCreateModalOpen(true);
-          }}
-          className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 shadow-sm transition-colors"
-        >
-          <FileWarning className="w-4 h-4 mr-2" /> Lapor Bug
-        </button>
+        {canCreateIssue && (
+          <button
+            type="button"
+            onClick={() => {
+              setCreateForm(getDefaultCreateForm(defaultProjectId));
+              setSelectedAttachments([]);
+              setIsCreateModalOpen(true);
+            }}
+            className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 shadow-sm transition-colors"
+          >
+            <FileWarning className="w-4 h-4 mr-2" /> Lapor Bug
+          </button>
+        )}
       </div>
 
       <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50">
@@ -528,7 +537,7 @@ export function IssueList() {
         )}
       </div>
 
-      {isCreateModalOpen && (
+      {isCreateModalOpen && canCreateIssue && (
         <div
           className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           onClick={() => {

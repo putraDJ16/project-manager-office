@@ -5,7 +5,7 @@ from app.api.v1 import api_v1
 from app.schemas import role_schema, roles_schema
 from app.services import role_service
 from app.utils.http import success_response
-from app.utils.permissions import require_permission
+from app.utils.permissions import require_any_permission, require_permission
 
 
 @api_v1.get("/roles")
@@ -14,6 +14,24 @@ from app.utils.permissions import require_permission
 def list_roles_handler():
     roles = role_service.list_roles()
     return success_response(roles_schema.dump(roles))
+
+
+@api_v1.get("/roles/reference")
+@jwt_required()
+@require_any_permission((("masterRoles", "view"), ("masterEmployees", "view")))
+def list_role_references_handler():
+    roles = role_service.list_roles()
+    return success_response(
+        [
+            {
+                "id": role.id,
+                "name": role.name,
+                "status": role.status,
+                "is_default": bool(role.is_default),
+            }
+            for role in roles
+        ]
+    )
 
 
 @api_v1.post("/roles")

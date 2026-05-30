@@ -159,7 +159,39 @@ const menuPermissionGroups: MenuPermissionGroup[] = [
     id: "master",
     label: "Data Master",
     description: "Pegawai, role, organisasi, unit organisasi, dan jabatan.",
-    modules: ["masterEmployees", "masterRoles", "masterOrganizations", "masterOrganizationUnits", "masterPositions"]
+    modules: ["masterEmployees", "masterRoles", "masterOrganizations", "masterOrganizationUnits", "masterPositions"],
+    children: [
+      {
+        id: "master-employees",
+        label: "Pegawai",
+        description: "Menu Master Pegawai dan pengelolaan akun pegawai.",
+        modules: ["masterEmployees"]
+      },
+      {
+        id: "master-roles",
+        label: "Role",
+        description: "Menu Master Role, matrix akses, dan default role pengguna baru.",
+        modules: ["masterRoles"]
+      },
+      {
+        id: "master-organizations",
+        label: "Organisasi",
+        description: "Menu Master Organisasi.",
+        modules: ["masterOrganizations"]
+      },
+      {
+        id: "master-organization-units",
+        label: "Unit Organisasi",
+        description: "Menu Master Unit Organisasi.",
+        modules: ["masterOrganizationUnits"]
+      },
+      {
+        id: "master-positions",
+        label: "Jabatan",
+        description: "Menu Master Jabatan.",
+        modules: ["masterPositions"]
+      }
+    ]
   },
   {
     id: "email-preferences",
@@ -345,15 +377,34 @@ export function RoleMaster() {
   const isActionSupported = (group: MenuPermissionGroup, permissionKey: keyof PermissionSet) =>
     (group.actions ?? permissionKeys).includes(permissionKey);
 
+  const getActionTargetModules = (
+    group: MenuPermissionGroup,
+    permissionKey: keyof PermissionSet
+  ): ModuleKey[] => {
+    const targetModules = new Set<ModuleKey>();
+
+    if (isActionSupported(group, permissionKey)) {
+      group.modules.forEach((moduleKey) => targetModules.add(moduleKey));
+    }
+
+    (group.children ?? []).forEach((child) => {
+      getActionTargetModules(child, permissionKey).forEach((moduleKey) => targetModules.add(moduleKey));
+    });
+
+    return Array.from(targetModules);
+  };
+
   const updateMenuPermission = (
     group: MenuPermissionGroup,
     permissionKey: keyof PermissionSet,
     checked: boolean
   ) => {
-    if (!isActionSupported(group, permissionKey)) return;
+    const targetModules = getActionTargetModules(group, permissionKey);
+    if (targetModules.length === 0) return;
+
     setForm((current) => ({
       ...current,
-      permissions: group.modules.reduce<Record<ModuleKey, PermissionSet>>(
+      permissions: targetModules.reduce<Record<ModuleKey, PermissionSet>>(
         (acc, moduleKey) => {
           acc[moduleKey] = {
             ...acc[moduleKey],
@@ -370,32 +421,40 @@ export function RoleMaster() {
     setForm((current) => ({
       ...current,
       permissions: menuPermissionRows.reduce<Record<ModuleKey, PermissionSet>>(
-        (acc, { group }) =>
-          isActionSupported(group, permissionKey)
-            ? group.modules.reduce<Record<ModuleKey, PermissionSet>>((moduleAcc, moduleKey) => {
-                moduleAcc[moduleKey] = {
-                  ...moduleAcc[moduleKey],
-                  [permissionKey]: checked
-                };
-                return moduleAcc;
-              }, acc)
-            : acc,
+        (acc, { group }) => {
+          const targetModules = getActionTargetModules(group, permissionKey);
+          return targetModules.reduce<Record<ModuleKey, PermissionSet>>((moduleAcc, moduleKey) => {
+            moduleAcc[moduleKey] = {
+              ...moduleAcc[moduleKey],
+              [permissionKey]: checked
+            };
+            return moduleAcc;
+          }, acc);
+        },
         { ...current.permissions }
       )
     }));
   };
 
   const isAllCheckedForAction = (permissionKey: keyof PermissionSet) =>
-    menuPermissionRows
-      .filter(({ group }) => isActionSupported(group, permissionKey))
-      .every(({ group }) => group.modules.every((moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey])));
+    menuPermissionRows.every(({ group }) => {
+      const targetModules = getActionTargetModules(group, permissionKey);
+      if (targetModules.length === 0) return true;
+      return targetModules.every((moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey]));
+    });
 
-  const isMenuActionChecked = (group: MenuPermissionGroup, permissionKey: keyof PermissionSet) =>
-    group.modules.every((moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey]));
+  const isMenuActionChecked = (group: MenuPermissionGroup, permissionKey: keyof PermissionSet) => {
+    const targetModules = getActionTargetModules(group, permissionKey);
+    return targetModules.length > 0 && targetModules.every((moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey]));
+  };
 
-  const isMenuPartiallyChecked = (group: MenuPermissionGroup, permissionKey: keyof PermissionSet) =>
-    !isMenuActionChecked(group, permissionKey) &&
-    group.modules.some((moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey]));
+  const isMenuPartiallyChecked = (group: MenuPermissionGroup, permissionKey: keyof PermissionSet) => {
+    const targetModules = getActionTargetModules(group, permissionKey);
+    return (
+      !isMenuActionChecked(group, permissionKey) &&
+      targetModules.some((moduleKey) => Boolean(form.permissions[moduleKey]?.[permissionKey]))
+    );
+  };
 
   const enabledMenuLabels = (permissions: Record<ModuleKey, PermissionSet>) =>
     menuPermissionGroups

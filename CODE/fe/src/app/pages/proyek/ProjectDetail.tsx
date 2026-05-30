@@ -332,7 +332,7 @@ export function ProjectDetail() {
   const canViewGantt = baseCanViewGantt || isCurrentProjectMember;
   const canViewProjectTimesheets = baseCanViewProjectTimesheets || isCurrentProjectMember;
   const canViewIssues = baseCanViewIssues || isCurrentProjectMember;
-  const canCreateIssues = baseCanCreateIssues || isCurrentProjectMember;
+  const canCreateIssues = baseCanCreateIssues;
   const canEditIssues = baseCanEditIssues || isCurrentProjectMember;
   const canViewAttachments = baseCanViewAttachments || isCurrentProjectMember;
   const canCreateAttachments = baseCanCreateAttachments || isCurrentProjectMember;

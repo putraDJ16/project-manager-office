@@ -51,6 +51,13 @@ function getTabFromSearch(searchParams: URLSearchParams): MyTasksTab {
   return tab && MY_TASKS_TABS.has(tab as MyTasksTab) ? (tab as MyTasksTab) : "tasks";
 }
 
+function toLocalDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function toTaskComment(raw: ApiTaskComment): TaskComment {
   return {
     id: raw.id,
@@ -69,7 +76,7 @@ function toTaskChecklistItem(raw: ApiTaskChecklistItem): TaskChecklistItem {
 }
 
 export function MyTasksPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState<ProfileIdentity | null>(null);
   const [projects, setProjects] = useState<MyProjectResponse[]>([]);
   const [memberProjects, setMemberProjects] = useState<MyProjectResponse[]>([]);
@@ -95,7 +102,7 @@ export function MyTasksPage() {
   const [timesheetForm, setTimesheetForm] = useState({
     project_id: "",
     task_id: "",
-    work_date: new Date().toISOString().slice(0, 10),
+    work_date: toLocalDateKey(),
     hours_spent: "1",
     notes: "",
   });
@@ -181,6 +188,13 @@ export function MyTasksPage() {
     }
     if (searchParams.get("create") === "timesheet") {
       setEditingTimesheetId(null);
+      setTimesheetForm((current) => ({
+        ...current,
+        task_id: "",
+        work_date: toLocalDateKey(),
+        hours_spent: "1",
+        notes: ""
+      }));
       setIsTimesheetModalOpen(true);
     }
   }, [searchParams]);
@@ -195,13 +209,13 @@ export function MyTasksPage() {
   }, [employees, isCreateTaskModalOpen, profile?.employee_id, projects]);
 
   useEffect(() => {
-    if (!isTimesheetModalOpen) return;
+    if (!isTimesheetModalOpen || editingTimesheetId) return;
     setTimesheetForm((current) => ({
       ...current,
       project_id: current.project_id || memberProjects[0]?.id || "",
-      work_date: current.work_date || new Date().toISOString().slice(0, 10)
+      work_date: toLocalDateKey()
     }));
-  }, [isTimesheetModalOpen, memberProjects]);
+  }, [editingTimesheetId, isTimesheetModalOpen, memberProjects]);
 
   useEffect(() => {
     if (!createTaskForm.project_id) {
@@ -250,7 +264,7 @@ export function MyTasksPage() {
     setTimesheetForm((current) => ({
       project_id: current.project_id || memberProjects[0]?.id || "",
       task_id: "",
-      work_date: new Date().toISOString().slice(0, 10),
+      work_date: toLocalDateKey(),
       hours_spent: "1",
       notes: ""
     }));
@@ -273,6 +287,11 @@ export function MyTasksPage() {
     if (isSavingTimesheet) return;
     setIsTimesheetModalOpen(false);
     setEditingTimesheetId(null);
+    if (searchParams.get("create") === "timesheet") {
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete("create");
+      setSearchParams(nextSearchParams, { replace: true });
+    }
   };
 
   const projectNameById = useMemo(
@@ -599,6 +618,11 @@ export function MyTasksPage() {
       setTimesheetForm((current) => ({ ...current, notes: "", hours_spent: "1", task_id: "" }));
       setIsTimesheetModalOpen(false);
       setEditingTimesheetId(null);
+      if (searchParams.get("create") === "timesheet") {
+        const nextSearchParams = new URLSearchParams(searchParams);
+        nextSearchParams.delete("create");
+        setSearchParams(nextSearchParams, { replace: true });
+      }
       setNotice({
         type: "success",
         message: result.message ?? (editingTimesheetId ? "Timesheet berhasil diperbarui." : "Timesheet berhasil ditambahkan."),
