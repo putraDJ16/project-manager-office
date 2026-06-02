@@ -2,18 +2,29 @@ import os
 from datetime import timedelta
 
 
+DEFAULT_FRONTEND_BASE_URL = "http://localhost:5173"
+
+
+def _split_origins(value: str) -> list[str]:
+    return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+
+def _frontend_base_url(cors_origins: list[str]) -> str:
+    return os.getenv("FRONTEND_BASE_URL") or (cors_origins[0] if cors_origins else DEFAULT_FRONTEND_BASE_URL)
+
+
 class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost:5434/zoho_pm"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-change-me")
-    CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")]
+    CORS_ORIGINS = _split_origins(os.getenv("CORS_ORIGINS", DEFAULT_FRONTEND_BASE_URL))
     JSON_SORT_KEYS = False
     ATTACHMENT_STORAGE_DIR = os.getenv("ATTACHMENT_STORAGE_DIR", "")
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(25 * 1024 * 1024)))
     DEFAULT_EMPLOYEE_PASSWORD = os.getenv("DEFAULT_EMPLOYEE_PASSWORD", "Welcome123!")
-    FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+    FRONTEND_BASE_URL = _frontend_base_url(CORS_ORIGINS)
     API_VERSION = os.getenv("API_VERSION", "1.0.0")
     API_PUBLIC_URL = os.getenv("API_PUBLIC_URL", FRONTEND_BASE_URL)
     FLASK_ENV = os.getenv("FLASK_ENV", "development")

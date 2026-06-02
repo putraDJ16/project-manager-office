@@ -1,5 +1,5 @@
-import { type FormEvent, useMemo, useState } from "react";
-import { CheckSquare, Loader2, MessageSquare, Plus, Send, Trash2, X } from "lucide-react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { CheckSquare, Loader2, MessageSquare, Plus, Save, Send, Trash2, X } from "lucide-react";
 
 type TaskComment = {
   id: number;
@@ -40,9 +40,13 @@ type TaskDetailModalProps = {
   isSavingComment: boolean;
   isLoadingChecklist?: boolean;
   isSavingChecklist?: boolean;
+  assigneeOptions?: Array<{ id: string; name: string }>;
+  canEditAssignee?: boolean;
+  isSavingAssignee?: boolean;
   canCreateComment?: boolean;
   canEditChecklist?: boolean;
   onClose: () => void;
+  onSaveAssignee?: (assignee: string) => Promise<void>;
   onSubmitComment: (content: string) => Promise<void>;
   onAddChecklistItem: (title: string) => Promise<void>;
   onToggleChecklistItem: (itemId: number, isDone: boolean) => Promise<void>;
@@ -79,9 +83,13 @@ export function TaskDetailModal({
   isSavingComment,
   isLoadingChecklist = false,
   isSavingChecklist = false,
+  assigneeOptions = [],
+  canEditAssignee = false,
+  isSavingAssignee = false,
   canCreateComment = true,
   canEditChecklist = true,
   onClose,
+  onSaveAssignee,
   onSubmitComment,
   onAddChecklistItem,
   onToggleChecklistItem,
@@ -89,6 +97,11 @@ export function TaskDetailModal({
 }: TaskDetailModalProps) {
   const [draftComment, setDraftComment] = useState("");
   const [draftChecklistItem, setDraftChecklistItem] = useState("");
+  const [draftAssignee, setDraftAssignee] = useState(task.assignee);
+
+  useEffect(() => {
+    setDraftAssignee(task.assignee);
+  }, [task.assignee]);
 
   const priorityClass = useMemo(() => {
     const map: Record<TaskDetail["priority"], string> = {
@@ -127,8 +140,22 @@ export function TaskDetailModal({
     }
   };
 
+  const handleAssigneeSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextAssignee = draftAssignee.trim();
+    if (!nextAssignee || nextAssignee === task.assignee || !onSaveAssignee) return;
+    try {
+      await onSaveAssignee(nextAssignee);
+    } catch {
+      // Error notice is handled by parent component.
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[70] bg-black/45 flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[70] bg-black/45 flex items-center justify-center p-4"
+      onClick={isSavingAssignee ? undefined : onClose}
+    >
       <div
         className="w-full max-w-4xl max-h-[90vh] bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col"
         onClick={(event) => event.stopPropagation()}
@@ -139,14 +166,47 @@ export function TaskDetailModal({
             <h2 className="text-xl font-bold text-slate-900 truncate">{task.title}</h2>
             <p className="text-xs text-slate-500 mt-1">Project: {projectName}</p>
           </div>
-          <button type="button" onClick={onClose} className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSavingAssignee}
+            className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-5 border-b border-slate-200 bg-slate-50">
           <InfoItem label="Fase" value={phaseName} />
-          <InfoItem label="Assignee" value={assigneeName} />
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-500">Assignee</p>
+            {canEditAssignee && onSaveAssignee ? (
+              <form onSubmit={(event) => void handleAssigneeSubmit(event)} className="mt-1 flex items-center gap-2">
+                <select
+                  value={draftAssignee}
+                  onChange={(event) => setDraftAssignee(event.target.value)}
+                  disabled={isSavingAssignee}
+                  className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                >
+                  {assigneeOptions.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  disabled={isSavingAssignee || !draftAssignee || draftAssignee === task.assignee}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Simpan assignee"
+                >
+                  {isSavingAssignee ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                </button>
+              </form>
+            ) : (
+              <p className="text-sm text-slate-800 font-medium mt-1">{assigneeName || "-"}</p>
+            )}
+          </div>
           <InfoItem label="Dibuat Oleh" value={task.createdBy} />
           <InfoItem label="Mulai" value={formatDate(task.startDate)} />
           <InfoItem label="Selesai" value={formatDate(task.endDate)} />

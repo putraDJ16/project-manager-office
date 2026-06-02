@@ -85,7 +85,7 @@ import { fetchProjectTimesheets, type ApiTimesheet } from "../../services/timesh
 const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 const PROJECT_PRIORITIES = ["Low", "Medium", "High", "Critical"];
 const TASK_PRIORITIES = ["Low", "Medium", "High", "Critical"];
-const TASK_PROGRESS_OPTIONS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+const TASK_PROGRESS_OPTIONS = Array.from({ length: 101 }, (_, index) => index);
 
 const STATUS_COLORS: Record<string, string> = {
   Active: "bg-color-status-success-surface text-color-status-success",
@@ -263,7 +263,7 @@ export function ProjectDetail() {
     phase_id: "",
     assignee: "",
     priority: "Medium" as string,
-    progress_percentage: 0,
+    progress_percentage: "",
     mandays: "",
     start_date: "",
     end_date: ""
@@ -280,6 +280,7 @@ export function ProjectDetail() {
   const [isSavingTaskComment, setIsSavingTaskComment] = useState(false);
   const [isLoadingTaskChecklist, setIsLoadingTaskChecklist] = useState(false);
   const [isSavingTaskChecklist, setIsSavingTaskChecklist] = useState(false);
+  const [isSavingTaskAssignee, setIsSavingTaskAssignee] = useState(false);
 
   const [attachmentFolders, setAttachmentFolders] = useState<ApiAttachmentFolder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -431,6 +432,32 @@ export function ProjectDetail() {
     () => tasks.find((task) => task.id === selectedTaskId) ?? null,
     [selectedTaskId, tasks]
   );
+
+  const taskAssigneeOptions = useMemo(() => {
+    const options =
+      project && project.members.length > 0
+        ? project.members.map((member) => ({
+            id: member.employee_id,
+            name: member.employee_name || member.employee_id
+          }))
+        : employees
+            .filter((employee) => employee.status === "Active")
+            .map((employee) => ({ id: employee.id, name: employee.name }));
+
+    if (selectedTask?.assignee && !options.some((option) => option.id === selectedTask.assignee)) {
+      const projectMember = project?.members.find((member) => member.employee_id === selectedTask.assignee);
+      const employee = employees.find((item) => item.id === selectedTask.assignee);
+      return [
+        {
+          id: selectedTask.assignee,
+          name: projectMember?.employee_name || employee?.name || selectedTask.assignee
+        },
+        ...options
+      ];
+    }
+
+    return options;
+  }, [employees, project, selectedTask?.assignee]);
 
   const resolveAssigneeLabel = (assigneeValue: string) => {
     if (!assigneeValue) return "";
@@ -850,6 +877,11 @@ export function ProjectDetail() {
       setTaskError("Pilih fase untuk tugas ini.");
       return;
     }
+    const progressPercentage = taskForm.progress_percentage === "" ? 0 : Number(taskForm.progress_percentage);
+    if (!Number.isInteger(progressPercentage) || progressPercentage < 0 || progressPercentage > 100) {
+      setTaskError("Progress harus berupa angka 0 sampai 100.");
+      return;
+    }
     if (taskForm.mandays && (!Number.isInteger(Number(taskForm.mandays)) || Number(taskForm.mandays) < 1)) {
       setTaskError("Mandays harus berupa angka minimal 1.");
       return;
@@ -864,7 +896,7 @@ export function ProjectDetail() {
         assignee: taskForm.assignee,
         project_id: id,
         phase_id: taskForm.phase_id,
-        progress_percentage: taskForm.progress_percentage,
+        progress_percentage: progressPercentage,
         mandays: taskForm.mandays ? Number(taskForm.mandays) : null,
         start_date: taskForm.start_date || null,
         end_date: taskForm.end_date || null
@@ -875,7 +907,7 @@ export function ProjectDetail() {
         phase_id: "",
         assignee: "",
         priority: "Medium",
-        progress_percentage: 0,
+        progress_percentage: "",
         mandays: "",
         start_date: "",
         end_date: ""
@@ -933,6 +965,27 @@ export function ProjectDetail() {
         type: "error",
         msg: err instanceof Error ? err.message : "Gagal memperbarui persentase tugas."
       });
+    }
+  };
+
+  const handleTaskAssigneeSave = async (nextAssignee: string) => {
+    if (!selectedTaskId || !canEditTasks) return;
+    const currentTask = tasks.find((task) => task.id === selectedTaskId);
+    if (!currentTask || currentTask.assignee === nextAssignee) return;
+
+    setIsSavingTaskAssignee(true);
+    try {
+      const updated = await updateTask(selectedTaskId, { assignee: nextAssignee });
+      setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
+      setSaveNotice({ type: "success", msg: "Assignee tugas berhasil diperbarui." });
+    } catch (err: unknown) {
+      setSaveNotice({
+        type: "error",
+        msg: err instanceof Error ? err.message : "Gagal memperbarui assignee tugas."
+      });
+      throw err;
+    } finally {
+      setIsSavingTaskAssignee(false);
     }
   };
 
@@ -1500,7 +1553,7 @@ export function ProjectDetail() {
                       phase_id: "",
                       assignee: "",
                       priority: "Medium",
-                      progress_percentage: 0,
+                      progress_percentage: "",
                       mandays: "",
                       start_date: "",
                       end_date: ""
@@ -1586,9 +1639,7 @@ export function ProjectDetail() {
                       onChange={(event) =>
                         setTaskForm((current) => ({
                           ...current,
-                          progress_percentage: Number.isNaN(Number(event.target.value))
-                            ? 0
-                            : Math.max(0, Math.min(100, Number(event.target.value)))
+                          progress_percentage: event.target.value
                         }))
                       }
                       className="w-full px-3 py-2 border border-color-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-color-ring"
@@ -2161,9 +2212,13 @@ export function ProjectDetail() {
           isSavingComment={isSavingTaskComment}
           isLoadingChecklist={isLoadingTaskChecklist}
           isSavingChecklist={isSavingTaskChecklist}
+          assigneeOptions={taskAssigneeOptions}
+          canEditAssignee={canEditTasks}
+          isSavingAssignee={isSavingTaskAssignee}
           canCreateComment={canCreateTaskComments}
           canEditChecklist={canCreateTaskComments}
           onClose={() => setSelectedTaskId(null)}
+          onSaveAssignee={handleTaskAssigneeSave}
           onSubmitComment={handleSubmitTaskComment}
           onAddChecklistItem={handleAddTaskChecklistItem}
           onToggleChecklistItem={handleToggleTaskChecklistItem}

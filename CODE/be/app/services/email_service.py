@@ -7,6 +7,7 @@ from email.message import EmailMessage
 from email.utils import formataddr
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from flask import current_app, render_template
 from sqlalchemy import and_
@@ -25,6 +26,7 @@ PREFERENCE_BY_ENTITY = {
     "action_item": "action_items",
 }
 SECURITY_EVENTS = {"auth.welcome", "auth.password_reset", "auth.password_changed"}
+DEFAULT_FRONTEND_BASE_URL = "http://localhost:5173"
 
 
 def get_or_create_preferences(user_id: int) -> UserEmailPreference:
@@ -47,8 +49,24 @@ def is_email_allowed(user: User | None, entity_type: str | None, event_key: str)
     return bool(getattr(get_or_create_preferences(user.id), pref_field, True))
 
 
+def _configured_frontend_base_url() -> str:
+    base = (current_app.config.get("FRONTEND_BASE_URL") or "").strip()
+    if base:
+        return base.rstrip("/")
+
+    origins = current_app.config.get("CORS_ORIGINS") or []
+    if isinstance(origins, str):
+        origins = [origin.strip() for origin in origins.split(",") if origin.strip()]
+    for origin in origins:
+        if origin and origin != "*":
+            return origin.rstrip("/")
+    return DEFAULT_FRONTEND_BASE_URL
+
+
 def _target_url(path: str | None) -> str:
-    base = current_app.config.get("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
+    if path and urlparse(path).scheme in {"http", "https"}:
+        return path
+    base = _configured_frontend_base_url()
     if not path:
         return base
     return f"{base}/{path.lstrip('/')}"
