@@ -1,4 +1,4 @@
-import { apiRequest } from "./apiClient";
+import { apiRequest, type Paginated, unwrapListData } from "./apiClient";
 
 export type ApiProject = {
   id: string;
@@ -70,8 +70,8 @@ export type UpdateProjectPayload = Partial<CreateProjectPayload>;
 type MutationResult<T> = { data: T; message?: string };
 
 export async function fetchProjects(): Promise<ApiProject[]> {
-  const result = await apiRequest<ApiProject[]>("/projects", { method: "GET" });
-  return result.data;
+  const result = await apiRequest<ApiProject[] | Paginated<ApiProject>>("/projects", { method: "GET" });
+  return unwrapListData(result.data);
 }
 
 export async function getProject(projectId: string): Promise<ApiProjectDetail> {

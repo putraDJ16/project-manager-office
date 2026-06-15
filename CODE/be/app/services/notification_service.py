@@ -89,6 +89,52 @@ def list_notifications(user_id: str | int, unread_only: bool = False):
     return NotificationRepository.list_notifications(normalized_user_id, unread_only=unread_only)
 
 
+def list_notifications_paginated(
+    per_page: int,
+    cursor_payload: dict | None,
+    request,
+    user_id: str | int,
+    is_read: bool | None = None
+) -> dict:
+    """
+    Get paginated list of notifications with filters.
+    
+    Args:
+        per_page: Number of items per page
+        cursor_payload: Decoded cursor dict or None
+        request: Flask request object
+        user_id: User ID to filter notifications
+        is_read: Optional filter by read status
+        
+    Returns:
+        Dict with items, meta, and links
+    """
+    from app.utils.pagination import paginate
+    from app.schemas import notifications_schema
+    
+    normalized_user_id = _parse_user_id(user_id)
+    
+    # Get filtered query
+    query = NotificationRepository.query_notifications(
+        user_id=normalized_user_id,
+        is_read=is_read
+    )
+    
+    # Sort spec: created_at DESC, id DESC (newest first)
+    sort_spec = [
+        (Notification.created_at, 'desc'),
+        (Notification.id, 'desc')
+    ]
+    
+    # Paginate
+    result = paginate(query, sort_spec, per_page, cursor_payload, request)
+    
+    # Serialize items
+    result['items'] = notifications_schema.dump(result['items'])
+    
+    return result
+
+
 def get_unread_count(user_id: str | int):
     normalized_user_id = _parse_user_id(user_id)
     return NotificationRepository.unread_count(normalized_user_id)

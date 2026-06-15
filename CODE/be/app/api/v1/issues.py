@@ -28,10 +28,36 @@ def _ensure_issue_access(issue_id: str, action: str):
 @api_v1.get("/issues")
 @jwt_required()
 def list_issues_handler():
-    project_id = (request.args.get("project_id") or "").strip() or None
-    _ensure_project_issue_access(project_id, "view")
-    issues = issue_service.list_issues(project_id=project_id)
-    return success_response(issues_schema.dump(issues))
+    from app.utils.pagination import parse_pagination_args
+    from app.utils.http import paginated_response, error_response
+    
+    try:
+        project_id = (request.args.get("project_id") or "").strip() or None
+        _ensure_project_issue_access(project_id, "view")
+        
+        # Parse pagination args
+        per_page, cursor_payload = parse_pagination_args(request)
+        
+        # Parse filters
+        search = request.args.get("q") or request.args.get("search")
+        status = request.args.get("status")
+        severity = request.args.get("severity")
+        
+        # Get paginated results
+        result = issue_service.list_issues_paginated(
+            per_page=per_page,
+            cursor_payload=cursor_payload,
+            request=request,
+            project_id=project_id,
+            search=search,
+            status=status,
+            severity=severity
+        )
+        
+        return paginated_response(result)
+        
+    except ValueError as e:
+        return error_response(str(e), status_code=400)
 
 
 @api_v1.post("/issues")

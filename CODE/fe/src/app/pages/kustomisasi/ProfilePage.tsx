@@ -104,7 +104,7 @@ export function ProfilePage() {
 
         const [projectResult, activityResult, taskResult, issueResult] = await Promise.allSettled([
           fetchMyProjects(),
-          fetchUserAuditTrails(profileData.id, 25),
+          fetchUserAuditTrails({ userId: profileData.id, perPage: 25 }),
           fetchAllTasks(),
           getIssues(),
         ]);
@@ -117,7 +117,7 @@ export function ProfilePage() {
         }
 
         if (activityResult.status === "fulfilled") {
-          setActivities(activityResult.value.filter((item) => item.method !== "GET"));
+          setActivities(activityResult.value.items.filter((item) => item.method !== "GET"));
         } else {
           setActivityError(
             activityResult.reason instanceof Error ? activityResult.reason.message : "Gagal memuat riwayat aktivitas."

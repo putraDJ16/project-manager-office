@@ -1,4 +1,4 @@
-import { apiRequest } from "./apiClient";
+import { apiRequest, type Paginated } from "./apiClient";
 
 export type ApiAuditTrail = {
   id: number;
@@ -17,25 +17,35 @@ export type ApiAuditTrail = {
   created_at: string;
 };
 
-type AuditTrailListPayload = {
-  items: ApiAuditTrail[];
-  meta: {
-    page: number;
-    per_page: number;
-    total: number;
-    total_pages: number;
-  };
+export type AuditTrailListParams = {
+  cursorUrl?: string;
+  perPage?: number;
+  userId?: number;
+  method?: string;
+  path?: string;
+  statusCode?: number;
+  q?: string;
 };
 
-export async function fetchUserAuditTrails(userId: number, perPage = 20) {
-  const query = new URLSearchParams({
-    page: "1",
-    per_page: String(perPage),
-    user_id: String(userId),
-  });
+function buildAuditTrailPath(params: AuditTrailListParams = {}) {
+  if (params.cursorUrl) {
+    return params.cursorUrl;
+  }
 
-  const result = await apiRequest<AuditTrailListPayload>(`/audit-trails?${query.toString()}`, {
+  const query = new URLSearchParams();
+  query.set("per_page", String(params.perPage ?? 20));
+  if (params.userId !== undefined) query.set("user_id", String(params.userId));
+  if (params.method) query.set("method", params.method);
+  if (params.path) query.set("path", params.path);
+  if (params.statusCode !== undefined) query.set("status_code", String(params.statusCode));
+  if (params.q) query.set("q", params.q);
+
+  return `/audit-trails?${query.toString()}`;
+}
+
+export async function fetchUserAuditTrails(params: AuditTrailListParams): Promise<Paginated<ApiAuditTrail>> {
+  const result = await apiRequest<Paginated<ApiAuditTrail>>(buildAuditTrailPath(params), {
     method: "GET",
   });
-  return result.data.items;
+  return result.data;
 }

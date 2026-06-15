@@ -27,8 +27,34 @@ EMPLOYEE_REFERENCE_READ_PERMISSIONS = (
 @jwt_required()
 @require_any_permission(EMPLOYEE_REFERENCE_READ_PERMISSIONS)
 def list_employees_handler():
-    employees = employee_service.list_employees()
-    return success_response(employees_schema.dump(employees))
+    from app.utils.pagination import parse_pagination_args
+    from app.utils.http import paginated_response, error_response
+    
+    try:
+        # Parse pagination args
+        per_page, cursor_payload = parse_pagination_args(request)
+        
+        # Parse filters
+        search = request.args.get("q") or request.args.get("search")
+        organization = request.args.get("organization")
+        position = request.args.get("position")
+        status = request.args.get("status")
+        
+        # Get paginated results
+        result = employee_service.list_employees_paginated(
+            per_page=per_page,
+            cursor_payload=cursor_payload,
+            request=request,
+            search=search,
+            organization=organization,
+            position=position,
+            status=status
+        )
+        
+        return paginated_response(result)
+        
+    except ValueError as e:
+        return error_response(str(e), status_code=400)
 
 
 @api_v1.post("/employees")

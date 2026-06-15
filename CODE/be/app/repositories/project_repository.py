@@ -1,10 +1,41 @@
 from app.models import Phase, Project, ProjectHoliday, ProjectMember
+from sqlalchemy.orm import Query
 
 
 class ProjectRepository:
     @staticmethod
     def list_projects():
         return Project.query.order_by(Project.name.asc()).all()
+    
+    @staticmethod
+    def query_projects(search: str | None = None, status: str | None = None, priority: str | None = None, manager_id: str | None = None) -> Query:
+        """
+        Build a filtered query for projects.
+        
+        Args:
+            search: Search term for name
+            status: Filter by status
+            priority: Filter by priority
+            manager_id: Filter by manager
+            
+        Returns:
+            SQLAlchemy Query object (not executed)
+        """
+        query = Project.query
+        
+        if search:
+            query = query.filter(Project.name.ilike(f'%{search}%'))
+        
+        if status:
+            query = query.filter(Project.status == status)
+        
+        if priority:
+            query = query.filter(Project.priority == priority)
+        
+        if manager_id:
+            query = query.filter(Project.manager_id == manager_id)
+        
+        return query
 
     @staticmethod
     def get_project(project_id: str):

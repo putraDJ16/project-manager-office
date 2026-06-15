@@ -20,6 +20,56 @@ def list_issues(project_id: str | None = None):
     return IssueRepository.list_issues(project_id=project_id)
 
 
+def list_issues_paginated(
+    per_page: int,
+    cursor_payload: dict | None,
+    request,
+    project_id: str | None = None,
+    search: str | None = None,
+    status: str | None = None,
+    severity: str | None = None
+) -> dict:
+    """
+    Get paginated list of issues with filters.
+    
+    Args:
+        per_page: Number of items per page
+        cursor_payload: Decoded cursor dict or None
+        request: Flask request object
+        project_id: Filter by project
+        search: Search term for title/description
+        status: Filter by status
+        severity: Filter by severity
+        
+    Returns:
+        Dict with items, meta, and links
+    """
+    from app.utils.pagination import paginate
+    from app.schemas import issues_schema
+    
+    # Get filtered query
+    query = IssueRepository.query_issues(
+        project_id=project_id,
+        search=search,
+        status=status,
+        severity=severity
+    )
+    
+    # Sort spec: created_at DESC, id DESC (newest first)
+    sort_spec = [
+        (Issue.created_at, 'desc'),
+        (Issue.id, 'desc')
+    ]
+    
+    # Paginate
+    result = paginate(query, sort_spec, per_page, cursor_payload, request)
+    
+    # Serialize items
+    result['items'] = issues_schema.dump(result['items'])
+    
+    return result
+
+
 def get_issue(issue_id: str):
     return IssueRepository.get_issue(issue_id)
 

@@ -217,6 +217,8 @@ Isi contoh:
 DATABASE_URL=postgresql+psycopg://zoho_user:ganti_password_database_yang_panjang@HOST_DATABASE:5432/zoho_pm
 JWT_SECRET_KEY=ganti_dengan_random_secret_yang_panjang
 CORS_ORIGINS=https://pmo.domainanda.com
+FRONTEND_BASE_URL=https://pmo.domainanda.com
+API_PUBLIC_URL=https://pmo.domainanda.com
 DEFAULT_EMPLOYEE_PASSWORD=GantiPasswordAwal123!
 ATTACHMENT_STORAGE_DIR=/app/storage
 MAX_CONTENT_LENGTH=26214400

@@ -44,8 +44,35 @@ PROJECT_PHASE_READ_PERMISSIONS = (
 @jwt_required()
 @require_any_permission(PROJECT_REFERENCE_READ_PERMISSIONS)
 def list_projects_handler():
-    projects = project_service.list_projects()
-    return success_response(projects_schema.dump(projects))
+    from app.utils.pagination import parse_pagination_args
+    from app.utils.http import paginated_response
+    
+    try:
+        # Parse pagination args
+        per_page, cursor_payload = parse_pagination_args(request)
+        
+        # Parse filters
+        search = request.args.get('q')
+        status = request.args.get('status')
+        priority = request.args.get('priority')
+        manager_id = request.args.get('manager_id')
+        
+        # Get paginated results
+        result = project_service.list_projects_paginated(
+            per_page=per_page,
+            cursor_payload=cursor_payload,
+            request=request,
+            search=search,
+            status=status,
+            priority=priority,
+            manager_id=manager_id
+        )
+        
+        return paginated_response(result)
+        
+    except ValueError as e:
+        from app.utils.http import error_response
+        return error_response(str(e), status_code=400)
 
 
 @api_v1.post("/projects")

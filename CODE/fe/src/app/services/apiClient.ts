@@ -3,6 +3,30 @@ import { clearAuthSession, getAccessToken, getRefreshToken, updateAccessToken } 
 const importMetaEnv = (import.meta as ImportMeta & { env?: Record<string, string> }).env;
 const API_BASE_URL = importMetaEnv?.VITE_API_BASE_URL?.trim() || "/api/v1";
 
+export type PageMeta = {
+  total: number;
+  per_page: number;
+  count: number;
+  has_next: boolean;
+  has_prev: boolean;
+};
+
+export type PageLinks = {
+  self: string;
+  next: string | null;
+  prev: string | null;
+};
+
+export type Paginated<T> = {
+  items: T[];
+  meta: PageMeta;
+  links: PageLinks;
+};
+
+export function unwrapListData<T>(data: T[] | Paginated<T>): T[] {
+  return Array.isArray(data) ? data : data.items;
+}
+
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
   skipAuth?: boolean;
@@ -38,7 +62,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const isFormDataBody = typeof FormData !== "undefined" && body instanceof FormData;
 
   const makeRequest = async (token: string | null) => {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetch(resolveApiPath(path), {
       ...rest,
       headers: {
         ...(isFormDataBody ? {} : { "Content-Type": "application/json" }),
@@ -75,4 +99,20 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
 export function getApiBaseUrl() {
   return API_BASE_URL;
+}
+
+function resolveApiPath(path: string) {
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  if (path.startsWith(API_BASE_URL)) {
+    return path;
+  }
+
+  if (path.startsWith("/")) {
+    return `${API_BASE_URL}${path}`;
+  }
+
+  return `${API_BASE_URL}/${path}`;
 }

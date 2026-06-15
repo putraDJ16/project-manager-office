@@ -19,6 +19,56 @@ def list_projects():
     return ProjectRepository.list_projects()
 
 
+def list_projects_paginated(
+    per_page: int,
+    cursor_payload: dict | None,
+    request,
+    search: str | None = None,
+    status: str | None = None,
+    priority: str | None = None,
+    manager_id: str | None = None
+) -> dict:
+    """
+    Get paginated list of projects with filters.
+    
+    Args:
+        per_page: Number of items per page
+        cursor_payload: Decoded cursor dict or None
+        request: Flask request object
+        search: Search term for project name
+        status: Filter by status
+        priority: Filter by priority
+        manager_id: Filter by manager
+        
+    Returns:
+        Dict with items, meta, and links
+    """
+    from app.utils.pagination import paginate
+    from app.schemas import projects_schema
+    
+    # Get filtered query
+    query = ProjectRepository.query_projects(
+        search=search,
+        status=status,
+        priority=priority,
+        manager_id=manager_id
+    )
+    
+    # Sort spec: name ASC, id ASC (id as tie-breaker)
+    sort_spec = [
+        (Project.name, 'asc'),
+        (Project.id, 'asc')
+    ]
+    
+    # Paginate
+    result = paginate(query, sort_spec, per_page, cursor_payload, request)
+    
+    # Serialize items
+    result['items'] = projects_schema.dump(result['items'])
+    
+    return result
+
+
 def get_project(project_id: str):
     project = ProjectRepository.get_project(project_id)
     if not project:

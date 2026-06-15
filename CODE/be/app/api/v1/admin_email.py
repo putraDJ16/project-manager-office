@@ -30,15 +30,41 @@ def _dump(row):
 @jwt_required()
 @require_permission("adminEmailLogs", "view")
 def list_email_outbox_handler():
-    query = EmailOutbox.query
-    if request.args.get("status"):
-        query = query.filter(EmailOutbox.status == request.args["status"])
-    if request.args.get("to_email"):
-        query = query.filter(EmailOutbox.to_email.ilike(f"%{request.args['to_email']}%"))
-    page = max(int(request.args.get("page", 1)), 1)
-    per_page = min(max(int(request.args.get("per_page", 20)), 1), 100)
-    pagination = query.order_by(EmailOutbox.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-    return success_response({"items": [_dump(item) for item in pagination.items], "total": pagination.total, "page": page, "per_page": per_page})
+    from app.utils.pagination import parse_pagination_args, paginate
+    from app.utils.http import paginated_response, error_response
+    
+    try:
+        # Parse pagination args
+        per_page, cursor_payload = parse_pagination_args(request)
+        
+        # Build filtered query
+        query = EmailOutbox.query
+        
+        # Parse filters
+        status = request.args.get("status")
+        search = request.args.get("q") or request.args.get("to_email")
+        
+        if status:
+            query = query.filter(EmailOutbox.status == status)
+        if search:
+            query = query.filter(EmailOutbox.to_email.ilike(f"%{search}%"))
+        
+        # Sort spec: created_at DESC, id DESC (newest first)
+        sort_spec = [
+            (EmailOutbox.created_at, 'desc'),
+            (EmailOutbox.id, 'desc')
+        ]
+        
+        # Paginate
+        result = paginate(query, sort_spec, per_page, cursor_payload, request)
+        
+        # Serialize items
+        result['items'] = [_dump(item) for item in result['items']]
+        
+        return paginated_response(result)
+        
+    except ValueError as e:
+        return error_response(str(e), status_code=400)
 
 
 @api_v1.post("/admin/email-outbox/<int:outbox_id>/resend")

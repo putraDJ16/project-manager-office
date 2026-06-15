@@ -10,15 +10,42 @@ from app.utils.http import success_response
 @api_v1.get("/notifications")
 @jwt_required()
 def list_notifications_handler():
-    claims = get_jwt()
-    unread_only = (request.args.get("unread_only") or "").lower() in {"1", "true", "yes"}
-    notifications = notification_service.list_notifications(claims["sub"], unread_only=unread_only)
-    return success_response(
-        {
-            "items": notifications_schema.dump(notifications),
-            "unread_count": notification_service.get_unread_count(claims["sub"]),
-        }
-    )
+    from app.utils.pagination import parse_pagination_args
+    from app.utils.http import paginated_response, error_response
+    
+    try:
+        claims = get_jwt()
+        
+        # Parse pagination args
+        per_page, cursor_payload = parse_pagination_args(request)
+        
+        # Parse filters - convert unread_only to is_read filter
+        unread_only = (request.args.get("unread_only") or "").lower() in {"1", "true", "yes"}
+        is_read_param = request.args.get("is_read")
+        
+        # Determine is_read filter
+        is_read = None
+        if unread_only:
+            is_read = False
+        elif is_read_param is not None:
+            is_read = is_read_param.lower() in {"1", "true", "yes"}
+        
+        # Get paginated results
+        result = notification_service.list_notifications_paginated(
+            per_page=per_page,
+            cursor_payload=cursor_payload,
+            request=request,
+            user_id=claims["sub"],
+            is_read=is_read
+        )
+        
+        # Add unread_count to meta
+        result['meta']['unread_count'] = notification_service.get_unread_count(claims["sub"])
+        
+        return paginated_response(result)
+        
+    except ValueError as e:
+        return error_response(str(e), status_code=400)
 
 
 @api_v1.patch("/notifications/<int:notification_id>/read")

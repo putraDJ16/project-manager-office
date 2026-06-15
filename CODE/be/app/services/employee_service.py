@@ -18,6 +18,56 @@ def list_employees():
     return EmployeeRepository.list_all()
 
 
+def list_employees_paginated(
+    per_page: int,
+    cursor_payload: dict | None,
+    request,
+    search: str | None = None,
+    organization: str | None = None,
+    position: str | None = None,
+    status: str | None = None
+) -> dict:
+    """
+    Get paginated list of employees with filters.
+    
+    Args:
+        per_page: Number of items per page
+        cursor_payload: Decoded cursor dict or None
+        request: Flask request object
+        search: Search term for name/email
+        organization: Filter by organization
+        position: Filter by position
+        status: Filter by status
+        
+    Returns:
+        Dict with items, meta, and links
+    """
+    from app.utils.pagination import paginate
+    from app.schemas import employees_schema
+    
+    # Get filtered query
+    query = EmployeeRepository.query_employees(
+        search=search,
+        organization=organization,
+        position=position,
+        status=status
+    )
+    
+    # Sort spec: name ASC, id ASC
+    sort_spec = [
+        (Employee.name, 'asc'),
+        (Employee.id, 'asc')
+    ]
+    
+    # Paginate
+    result = paginate(query, sort_spec, per_page, cursor_payload, request)
+    
+    # Serialize items
+    result['items'] = employees_schema.dump(result['items'])
+    
+    return result
+
+
 def _validate_unique(nip: str, email: str, employee_id: str | None = None):
     duplicate_nip = EmployeeRepository.get_by_nip(nip)
     if duplicate_nip and duplicate_nip.id != employee_id:

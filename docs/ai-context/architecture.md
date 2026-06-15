@@ -65,7 +65,7 @@ Typical authenticated flow:
 ## Environment Configuration
 
 - Backend config file: `CODE/be/app/config.py`.
-- Important backend env vars: `DATABASE_URL`, `JWT_SECRET_KEY`, `CORS_ORIGINS`, `ATTACHMENT_STORAGE_DIR`, `MAX_CONTENT_LENGTH`, `DEFAULT_EMPLOYEE_PASSWORD`, `JWT_ACCESS_TOKEN_EXPIRES_MINUTES`, `SESSION_TIMEOUT_MINUTES`.
+- Important backend env vars: `DATABASE_URL`, `JWT_SECRET_KEY`, `CORS_ORIGINS`, `FRONTEND_BASE_URL`, `API_PUBLIC_URL`, `ATTACHMENT_STORAGE_DIR`, `MAX_CONTENT_LENGTH`, `DEFAULT_EMPLOYEE_PASSWORD`, `JWT_ACCESS_TOKEN_EXPIRES_MINUTES`, `SESSION_TIMEOUT_MINUTES`.
 - Frontend API base: `VITE_API_BASE_URL`, defaulting to `/api/v1`.
 - Frontend proxy target is configured by `VITE_PROXY_TARGET` in Docker Compose and Vite config.
 
@@ -85,7 +85,7 @@ Typical authenticated flow:
 Email delivery is asynchronous and additive to existing API behavior:
 
 1. Domain services call `email_service.enqueue_event_email` or `notification_service.notify_user` after the business event succeeds.
-2. `email_service` renders Jinja templates from `CODE/be/app/templates/email/`, checks `user_email_preferences`, and inserts a `Queued` row into `email_outbox`.
+2. `email_service` renders Jinja templates from `CODE/be/app/templates/email/`, checks `user_email_preferences`, builds CTA links from `FRONTEND_BASE_URL` with `CORS_ORIGINS` fallback, and inserts a `Queued` row into `email_outbox`.
 3. Meeting invite/update/cancel emails include a generated `.ics` payload from `ics_builder` with stable `meeting-{id}@pmo.indocyber.id` UID.
 4. `email_dispatcher` polls due queued rows, sends them through SMTP when `MAIL_ENABLED=true`, and marks rows `Sent` or schedules retries at 1, 5, and 30 minutes.
 5. Admins inspect and resend rows through `/api/v1/admin/email-outbox` endpoints guarded by `adminEmailLogs` permissions.

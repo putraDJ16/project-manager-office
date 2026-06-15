@@ -38,11 +38,40 @@ def _ensure_project_task_access(project_id: str | None, action: str):
 @api_v1.get("/tasks")
 @jwt_required()
 def list_tasks_handler():
-    project_id = request.args.get("project_id")
-    _ensure_project_task_access(project_id, "view")
-    search = request.args.get("search")
-    tasks = task_service.list_tasks(project_id=project_id, search=search)
-    return success_response(tasks_schema.dump(tasks))
+    from app.utils.pagination import parse_pagination_args
+    from app.utils.http import paginated_response, error_response
+    
+    try:
+        project_id = request.args.get("project_id")
+        _ensure_project_task_access(project_id, "view")
+        
+        # Parse pagination args
+        per_page, cursor_payload = parse_pagination_args(request)
+        
+        # Parse filters
+        search = request.args.get("q") or request.args.get("search")
+        phase_id = request.args.get("phase_id")
+        priority = request.args.get("priority")
+        assignee = request.args.get("assignee")
+        status = request.args.get("status")
+        
+        # Get paginated results
+        result = task_service.list_tasks_paginated(
+            per_page=per_page,
+            cursor_payload=cursor_payload,
+            request=request,
+            project_id=project_id,
+            search=search,
+            phase_id=phase_id,
+            priority=priority,
+            assignee=assignee,
+            status=status
+        )
+        
+        return paginated_response(result)
+        
+    except ValueError as e:
+        return error_response(str(e), status_code=400)
 
 
 @api_v1.post("/tasks")

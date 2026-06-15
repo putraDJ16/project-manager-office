@@ -68,6 +68,61 @@ def list_tasks(project_id: str | None = None, search: str | None = None):
     return TaskRepository.list_tasks(project_id=project_id, search=search)
 
 
+def list_tasks_paginated(
+    per_page: int,
+    cursor_payload: dict | None,
+    request,
+    project_id: str | None = None,
+    search: str | None = None,
+    phase_id: str | None = None,
+    priority: str | None = None,
+    assignee: str | None = None,
+    status: str | None = None
+) -> dict:
+    """
+    Get paginated list of tasks with filters.
+    
+    Args:
+        per_page: Number of items per page
+        cursor_payload: Decoded cursor dict or None
+        request: Flask request object
+        project_id: Filter by project
+        search: Search term for task title
+        phase_id: Filter by phase
+        priority: Filter by priority
+        assignee: Filter by assignee
+        status: Filter by status
+        
+    Returns:
+        Dict with items, meta, and links
+    """
+    from app.utils.pagination import paginate
+    from app.schemas import tasks_schema
+    
+    # Get filtered query
+    query = TaskRepository.query_tasks(
+        project_id=project_id,
+        search=search,
+        phase_id=phase_id,
+        priority=priority,
+        assignee=assignee,
+        status=status
+    )
+    
+    # Sort spec: id ASC (primary key)
+    sort_spec = [
+        (Task.id, 'asc')
+    ]
+    
+    # Paginate
+    result = paginate(query, sort_spec, per_page, cursor_payload, request)
+    
+    # Serialize items
+    result['items'] = tasks_schema.dump(result['items'])
+    
+    return result
+
+
 def get_task(task_id: str):
     return TaskRepository.get_task(task_id)
 

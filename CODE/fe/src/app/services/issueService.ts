@@ -1,4 +1,4 @@
-import { apiRequest } from "./apiClient";
+import { apiRequest, type Paginated, unwrapListData } from "./apiClient";
 import type { CreateIssueInput, Issue, IssueStatus, SlaConfig, SlaRule } from "../domain/issues";
 
 type ApiIssue = {
@@ -75,8 +75,8 @@ export async function getIssues(projectId?: string): Promise<Issue[]> {
   if (projectId) query.set("project_id", projectId);
   const suffix = query.toString();
   const path = suffix ? `/issues?${suffix}` : "/issues";
-  const result = await apiRequest<ApiIssue[]>(path, { method: "GET" });
-  return result.data.map(mapIssueFromApi);
+  const result = await apiRequest<ApiIssue[] | Paginated<ApiIssue>>(path, { method: "GET" });
+  return unwrapListData(result.data).map(mapIssueFromApi);
 }
 
 export async function createIssue(payload: CreateIssueInput): Promise<Issue> {

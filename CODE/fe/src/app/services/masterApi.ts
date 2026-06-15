@@ -1,4 +1,4 @@
-import { apiRequest } from "./apiClient";
+import { apiRequest, type Paginated, unwrapListData } from "./apiClient";
 import type { Employee, ModuleKey, PermissionSet, Role } from "../data/masterData";
 
 type ApiEmployee = {
@@ -144,9 +144,9 @@ export async function fetchRoles() {
   if (isCacheFresh(rolesCache) && rolesCache) return rolesCache.data;
   if (rolesInFlight) return rolesInFlight;
 
-  rolesInFlight = apiRequest<ApiRole[]>("/roles", { method: "GET" })
+  rolesInFlight = apiRequest<ApiRole[] | Paginated<ApiRole>>("/roles", { method: "GET" })
     .then((result) => {
-      const normalized = result.data.map(normalizeRole);
+      const normalized = unwrapListData(result.data).map(normalizeRole);
       setRolesCache(normalized);
       return normalized;
     })
@@ -226,9 +226,9 @@ export async function fetchEmployees() {
   if (isCacheFresh(employeesCache) && employeesCache) return employeesCache.data;
   if (employeesInFlight) return employeesInFlight;
 
-  employeesInFlight = apiRequest<ApiEmployee[]>("/employees", { method: "GET" })
+  employeesInFlight = apiRequest<ApiEmployee[] | Paginated<ApiEmployee>>("/employees", { method: "GET" })
     .then((result) => {
-      const mapped = result.data.map(mapEmployeeFromApi);
+      const mapped = unwrapListData(result.data).map(mapEmployeeFromApi);
       setEmployeesCache(mapped);
       return mapped;
     })

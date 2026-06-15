@@ -1,3 +1,6 @@
+from sqlalchemy import or_
+from sqlalchemy.orm import Query
+
 from app.extensions import db
 from app.models import Employee
 
@@ -6,6 +9,48 @@ class EmployeeRepository:
     @staticmethod
     def list_all():
         return Employee.query.order_by(Employee.name.asc()).all()
+    
+    @staticmethod
+    def query_employees(
+        search: str | None = None,
+        organization: str | None = None,
+        position: str | None = None,
+        status: str | None = None
+    ) -> Query:
+        """
+        Build a filtered query for employees.
+        
+        Args:
+            search: Search term for name/email
+            organization: Filter by organization
+            position: Filter by position
+            status: Filter by status
+            
+        Returns:
+            SQLAlchemy Query object (not executed)
+        """
+        query = Employee.query
+        
+        if search:
+            normalized = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Employee.name.ilike(normalized),
+                    Employee.email.ilike(normalized),
+                    Employee.nip.ilike(normalized)
+                )
+            )
+        
+        if organization:
+            query = query.filter(Employee.organization == organization)
+        
+        if position:
+            query = query.filter(Employee.position == position)
+        
+        if status:
+            query = query.filter(Employee.status == status)
+        
+        return query
 
     @staticmethod
     def get_by_id(employee_id: str):

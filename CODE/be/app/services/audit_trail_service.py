@@ -2,7 +2,7 @@ from typing import Any
 
 from flask import Request, Response, g
 from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
-from sqlalchemy import desc, insert
+from sqlalchemy import desc, insert, or_
 
 from app.extensions import db
 from app.models import AuditTrail
@@ -200,3 +200,47 @@ def list_audit_trails(
             "total_pages": (total + per_page - 1) // per_page if total else 0,
         },
     }
+
+
+def list_audit_trails_paginated(
+    per_page: int,
+    cursor_payload: dict | None,
+    request,
+    user_id: int | None = None,
+    method: str | None = None,
+    path: str | None = None,
+    status_code: int | None = None,
+    search: str | None = None
+) -> dict:
+    from app.utils.pagination import paginate
+    from app.schemas import audit_trails_schema
+
+    query = AuditTrail.query
+
+    if user_id is not None:
+        query = query.filter(AuditTrail.user_id == user_id)
+    if method:
+        query = query.filter(AuditTrail.method == method.upper())
+    if path:
+        query = query.filter(AuditTrail.path == path)
+    if status_code is not None:
+        query = query.filter(AuditTrail.status_code == status_code)
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                AuditTrail.path.ilike(search_pattern),
+                AuditTrail.action.ilike(search_pattern),
+                AuditTrail.note.ilike(search_pattern),
+            )
+        )
+
+    sort_spec = [
+        (AuditTrail.created_at, "desc"),
+        (AuditTrail.id, "desc"),
+    ]
+
+    result = paginate(query, sort_spec, per_page, cursor_payload, request)
+
+    result["items"] = audit_trails_schema.dump(result["items"])
+    return result

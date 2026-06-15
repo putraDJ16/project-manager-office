@@ -1,4 +1,4 @@
-import { apiRequest } from "./apiClient";
+import { apiRequest, type Paginated, unwrapListData } from "./apiClient";
 
 export type ApiProject = {
   id: string;
@@ -60,8 +60,8 @@ let projectsInFlight: Promise<ApiProject[]> | null = null;
 export async function fetchProjects() {
   if (projectsInFlight) return projectsInFlight;
 
-  projectsInFlight = apiRequest<ApiProject[]>("/projects", { method: "GET" })
-    .then((result) => result.data)
+  projectsInFlight = apiRequest<ApiProject[] | Paginated<ApiProject>>("/projects", { method: "GET" })
+    .then((result) => unwrapListData(result.data))
     .finally(() => {
       projectsInFlight = null;
     });
@@ -91,8 +91,8 @@ export async function fetchTasks(projectId: string, searchQuery: string) {
   const search = searchQuery.trim();
   const query = new URLSearchParams({ project_id: projectId });
   if (search) query.set("search", search);
-  const result = await apiRequest<ApiTask[]>(`/tasks?${query.toString()}`, { method: "GET" });
-  return result.data;
+  const result = await apiRequest<ApiTask[] | Paginated<ApiTask>>(`/tasks?${query.toString()}`, { method: "GET" });
+  return unwrapListData(result.data);
 }
 
 export async function fetchAllTasks(searchQuery = "") {
@@ -100,8 +100,8 @@ export async function fetchAllTasks(searchQuery = "") {
   const query = new URLSearchParams();
   if (search) query.set("search", search);
   const suffix = query.toString() ? `?${query.toString()}` : "";
-  const result = await apiRequest<ApiTask[]>(`/tasks${suffix}`, { method: "GET" });
-  return result.data;
+  const result = await apiRequest<ApiTask[] | Paginated<ApiTask>>(`/tasks${suffix}`, { method: "GET" });
+  return unwrapListData(result.data);
 }
 
 export async function createTask(payload: {
